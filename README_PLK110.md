@@ -18,6 +18,10 @@ The workflow is manual-only and pins every security-sensitive source used by the
 kernel integration. Patch failures are fatal. KPM, extra ZRAM algorithms,
 third-party hide patches, debug mode, and SUSFS kernel logging are disabled.
 
+Two obsolete Android test-suite prebuilts (`asuite` and `tradefed`) are removed
+from the local manifest because CodeLinaro no longer publishes the referenced
+branch. They are not kernel or device-driver build inputs.
+
 The kernel zip and the stable SUSFS userspace module are packaged separately.
 Do not install the userspace module until the new kernel has completed a clean
 boot and its effective SUSFS feature list has been verified.

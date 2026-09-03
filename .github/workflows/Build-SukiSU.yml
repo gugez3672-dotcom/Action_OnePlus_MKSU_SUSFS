@@ -74,6 +74,19 @@ jobs:
             -b "$MANIFEST_COMMIT" \
             -m oneplus_15.xml \
             --depth=1
+
+          # These are Android test-suite prebuilts, not kernel build inputs.
+          # Their CodeLinaro branch was removed after OnePlus published the
+          # manifest, so keeping them makes an otherwise valid source sync fail.
+          mkdir -p .repo/local_manifests
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<manifest>' \
+            '  <remove-project name="kernel_platform/prebuilts/asuite" />' \
+            '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />' \
+            '</manifest>' \
+            > .repo/local_manifests/prune-unused-test-prebuilts.xml
+
           repo sync -c --no-tags --no-clone-bundle -j2
 
           git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
