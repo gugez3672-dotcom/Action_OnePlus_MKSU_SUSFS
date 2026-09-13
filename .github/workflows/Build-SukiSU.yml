@@ -23,6 +23,7 @@ env:
   STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
   EXPECTED_CONFIG_ADDITIONS_SHA256: d3235c8aa6e95b7b56c24a4619f01d930ffbac48a050d593fdcf896f770a997e
   A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
+  SUKISU_COMPAT_PATCH_SHA256: ea2be02443d0d5aed8da7866071af33bfc89a3f394d905b2db49798e6c574444
 
   # Exact running A.67 GKI commit plus the official A.67 OnePlus SoC/modules
   # snapshots. The public manifest is branch-based, so all three are checked
@@ -70,6 +71,7 @@ jobs:
           echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
           echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions" | sha256sum --check
           echo "$A67_SELINUX_PATCH_SHA256  patches/PLK110_A67_susfs_selinux_hooks.patch" | sha256sum --check
+          echo "$SUKISU_COMPAT_PATCH_SHA256  patches/PLK110_SukiSU_4.2_6.12_compat.patch" | sha256sum --check
 
       - name: Install dependencies
         run: |
@@ -142,6 +144,23 @@ jobs:
 
           grep -q 'config KSU_SUSFS' KernelSU/kernel/Kconfig
           grep -q 'susfs_init();' KernelSU/kernel/ksu.c
+
+      - name: Apply SukiSU 4.2 Android 6.12 compatibility patch
+        run: |
+          set -euo pipefail
+          patch="$GITHUB_WORKSPACE/patches/PLK110_SukiSU_4.2_6.12_compat.patch"
+          echo "$SUKISU_COMPAT_PATCH_SHA256  $patch" | sha256sum --check
+
+          cd kernel_workspace/kernel_platform/KernelSU
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+          grep -Fq 'static int kernel_umount_feature_set(u64 value)' kernel/feature/kernel_umount.c
+          grep -Fq '.id = LSM_ID_UNDEF,' kernel/hook/lsm_hook.c
+          grep -Fq 'security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), &ksu_lsmid);' kernel/hook/lsm_hook.c
+          grep -Fq '#define LSM_ID_UNDEF' ../common/include/uapi/linux/lsm.h
+          grep -Fq 'const struct lsm_id *lsmid' ../common/include/linux/lsm_hooks.h
 
       - name: Apply pinned SUSFS kernel patch
         run: |
@@ -242,12 +261,37 @@ jobs:
           KMI_SYMBOL_LIST_STRICT_MODE=0 \
             ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_VARIANT"
 
-      - name: Verify effective kernel configuration
+          # oplus_build_kernel.sh pipes the inner build through tee and can
+          # otherwise return success even when Bazel failed. A fresh Actions
+          # workspace must contain both of these outputs before we continue.
+          dist="kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
+          if [ ! -s "$dist/Image" ]; then
+            echo "::error::Kernel build produced no non-empty dist/Image; refusing to continue."
+            exit 1
+          fi
+          if [ ! -s "$dist/out_dir/.config" ]; then
+            echo "::error::Kernel build produced no effective dist/out_dir/.config; refusing to continue."
+            exit 1
+          fi
+
+      - name: Export effective kernel configuration
         run: |
           set -euo pipefail
           cd kernel_workspace/kernel_platform
 
-          effective_config="out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/gki_kernel/common/.config"
+          # OnePlus prepare_vendor.sh explicitly publishes the Kleaf output
+          # tree as dist/out_dir and copies out_dir/.config as a build artifact.
+          grep -Fq '"out_dir/.config"' build/kernel/android/prepare_vendor.sh
+          effective_config_source="out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist/out_dir/.config"
+          test -s "$effective_config_source"
+          cp "$effective_config_source" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
+          cmp -s "$effective_config_source" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
+
+      - name: Verify effective kernel configuration
+        run: |
+          set -euo pipefail
+
+          effective_config="$GITHUB_WORKSPACE/effective_kernel_config.txt"
           test -s "$effective_config"
 
           stock_config="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
@@ -298,7 +342,6 @@ jobs:
           grep -E "$sensitive" "$effective_config" | sort > /tmp/effective.sensitive
           diff -u /tmp/stock.sensitive /tmp/effective.sensitive
 
-          cp "$effective_config" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
           cp "$stock_config" "$GITHUB_WORKSPACE/stock_kernel_config.txt"
           cp "$expected_additions" "$GITHUB_WORKSPACE/expected_config_additions.txt"
           cp /tmp/actual.config.additions "$GITHUB_WORKSPACE/actual_config_additions.txt"
@@ -383,7 +426,7 @@ jobs:
           } > artifacts/BUILD_INFO.txt
 
           cp "$image" artifacts/Image
-          cp effective_kernel_config.txt artifacts/
+          cp "$GITHUB_WORKSPACE/effective_kernel_config.txt" artifacts/
           cp stock_kernel_config.txt artifacts/
           cp expected_config_additions.txt artifacts/
           cp actual_config_additions.txt artifacts/
