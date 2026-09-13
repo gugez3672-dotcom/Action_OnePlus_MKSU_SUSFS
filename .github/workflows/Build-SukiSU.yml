@@ -2,6 +2,11 @@ name: Build PLK110 SukiSU 4.2 + SUSFS 2.3
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/plk110-build-trigger
 
 permissions:
   contents: read
@@ -124,6 +129,37 @@ jobs:
           grep -qx 'CONFIG_LOCALVERSION="-4k"' kernel_platform/common/arch/arm64/configs/gki_defconfig
           grep -Fq 'suffix = "-ab" + os.environ["BUILD_NUMBER"]' \
             kernel_platform/build/kernel/kleaf/workspace_status_stamp.py
+
+      - name: Restore A.67 vmlinux_oki build output
+        run: |
+          set -euo pipefail
+          cd kernel_workspace/kernel_platform/common
+
+          # The pinned A.67 common commit predates OnePlus' vmlinux_oki copy,
+          # while the pinned Kleaf build description already declares that
+          # file as a required GKI output. Add only the later official copy
+          # operation; the linked vmlinux itself is left untouched.
+          grep -Fq '"vmlinux_oki",' ../build/kernel/kleaf/constants.bzl
+          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' scripts/Makefile.vmlinux
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/Makefile.vmlinux")
+          text = path.read_text()
+          anchor = (
+              "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
+              "\t+$(call if_changed_dep,link_vmlinux)\n"
+          )
+          replacement = anchor + "\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n"
+          if text.count(anchor) != 1:
+              raise SystemExit("unexpected A.67 Makefile.vmlinux link rule")
+          path.write_text(text.replace(anchor, replacement, 1))
+          PY
+
+          grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' scripts/Makefile.vmlinux
+          git diff --check
+          test "$(git diff --numstat -- scripts/Makefile.vmlinux | awk '{print $1 " " $2}')" = "1 0"
 
       - name: Integrate pinned SukiSU builtin
         run: |
