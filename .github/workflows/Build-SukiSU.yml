@@ -163,7 +163,7 @@ jobs:
           git apply --check "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
           git apply "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
 
-          grep -q '#define SUSFS_VERSION "2.3.0"' include/linux/susfs.h
+          grep -q '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
 
       - name: Configure minimal full SUSFS build
