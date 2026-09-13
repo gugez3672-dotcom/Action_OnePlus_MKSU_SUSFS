@@ -17,13 +17,17 @@ env:
   ANDROID_VERSION: android16
   KERNEL_VERSION: "6.12"
   BUILD_METHOD: gki
+  FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
+  EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
+  STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
 
-  # The running device's exact GKI commit plus the closest published CN vendor
-  # source set (PLK110_16.0.3.503) to the installed .505 firmware.
+  # Exact running A.67 GKI commit plus the official A.67 OnePlus SoC/modules
+  # snapshots. The public manifest is branch-based, so all three are checked
+  # out to immutable commits below.
   MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
-  COMMON_COMMIT: 188c695beb6df4f4f85e647aedda9e76327686ac
-  SOC_COMMIT: 6504e3d0385a951de4848bc81ce19ce8f8145dbe
-  MODULES_COMMIT: c1134b3ceec2328873337d39689f78d06f385d6f
+  COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
+  SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
+  MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
 
   # SukiSU's builtin branch contains the SUSFS-side SukiSU integration.
   SUKISU_COMMIT: e2912817f4e1b194e582a06e0b5eacf6a3fb7083
@@ -40,6 +44,11 @@ jobs:
     timeout-minutes: 180
 
     steps:
+      - name: Checkout audited build definition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
       - name: Maximize build space
         uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
         with:
@@ -55,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y git curl jq python3 zip
+          sudo apt-get install -y binutils git curl jq python3 zip
 
           curl --fail --location --retry 3 \
             https://storage.googleapis.com/git-repo-downloads/repo \
@@ -175,6 +184,10 @@ jobs:
           set_config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
           set_config KSU_SUSFS_OPEN_REDIRECT y
           set_config KSU_SUSFS_SUS_MAP y
+          set_config LTO_NONE y
+          set_config LTO_CLANG n
+          set_config LTO_CLANG_FULL n
+          set_config LTO_CLANG_THIN n
 
           for build_file in common/BUILD.bazel msm-kernel/BUILD.bazel; do
             if [ -f "$build_file" ]; then
@@ -193,7 +206,7 @@ jobs:
         run: |
           set -euo pipefail
           cd kernel_workspace
-          LTO=thin \
+          LTO=none \
           SYSTEM_DLKM_RE_SIGN=0 \
           BUILD_SYSTEM_DLKM=0 \
           KMI_SYMBOL_LIST_STRICT_MODE=0 \
@@ -206,6 +219,9 @@ jobs:
 
           effective_config="$(find out -type f -path '*/common/.config' -print -quit)"
           test -n "$effective_config"
+
+          stock_config="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
+          echo "$STOCK_CONFIG_SHA256  $stock_config" | sha256sum --check
 
           for symbol in \
             CONFIG_KSU \
@@ -224,7 +240,24 @@ jobs:
           ! grep -qx 'CONFIG_KPM=y' "$effective_config"
           ! grep -qx 'CONFIG_KSU_DEBUG=y' "$effective_config"
           ! grep -qx 'CONFIG_KSU_SUSFS_ENABLE_LOG=y' "$effective_config"
+          grep -qx 'CONFIG_LTO_NONE=y' "$effective_config"
+          ! grep -qx 'CONFIG_LTO_CLANG=y' "$effective_config"
+
+          # A full diff is retained for review. Changes to scheduling, CPU
+          # frequency/idle, ZRAM, LTO/CFI, module ABI/signing, preemption or
+          # debug hardening are fatal: this kernel is an A.67 stock-behaviour
+          # baseline with only SukiSU/SUSFS integration.
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock_config" | sort > /tmp/stock.config.sorted
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective_config" | sort > /tmp/effective.config.sorted
+          diff -u /tmp/stock.config.sorted /tmp/effective.config.sorted > "$GITHUB_WORKSPACE/kernel_config_delta.txt" || true
+
+          sensitive='^(# )?CONFIG_(PREEMPT|PREEMPTION|HZ|HZ_|SCHED|SCHED_|UCLAMP|WALT|HMBIRD|SLIM_SCHED|EXT_GROUP_SCHED|CPU_FREQ|CPU_FREQ_|CPU_IDLE|CPU_IDLE_|ZRAM|ZSMALLOC|LTO|LTO_|CFI|CFI_|MODVERSIONS|MODULE_SIG|MODULE_SIG_|KASAN|KASAN_|DEBUG_KERNEL)(=| is not set)'
+          grep -E "$sensitive" "$stock_config" | sort > /tmp/stock.sensitive
+          grep -E "$sensitive" "$effective_config" | sort > /tmp/effective.sensitive
+          diff -u /tmp/stock.sensitive /tmp/effective.sensitive
+
           cp "$effective_config" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
+          cp "$stock_config" "$GITHUB_WORKSPACE/stock_kernel_config.txt"
 
       - name: Package kernel and stable userspace module separately
         run: |
@@ -238,6 +271,12 @@ jobs:
           test -n "$image"
           test -s "$image"
 
+          strings "$image" > /tmp/plk110-image.strings
+          kernel_banner="$(grep -m1 '^Linux version ' /tmp/plk110-image.strings)"
+          test -n "$kernel_banner"
+          printf '%s\n' "$kernel_banner" | grep -F "$EXPECTED_KERNEL_RELEASE"
+          ! printf '%s\n' "$kernel_banner" | grep -F -- '-dirty'
+
           git clone --filter=blob:none --no-checkout --depth=1 --branch master \
             https://github.com/Numbersf/AnyKernel3.git AnyKernel3
           git -C AnyKernel3 fetch --depth=1 origin "$ANYKERNEL_COMMIT"
@@ -249,6 +288,7 @@ jobs:
           sed -i 's/^kernel.string=.*/kernel.string=PLK110 SukiSU 4.2 + SUSFS 2.3/' AnyKernel3/anykernel.sh
           sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
           sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
+          sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
 
           mkdir artifacts
           (
@@ -267,7 +307,8 @@ jobs:
 
           {
             echo "device=$DEVICE"
-            echo "firmware_baseline=PLK110_16.0.3.505(CN01)"
+            echo "firmware_baseline=$FIRMWARE_BASELINE"
+            echo "expected_kernel_release=$EXPECTED_KERNEL_RELEASE"
             echo "manifest=$MANIFEST_COMMIT"
             echo "common=$COMMON_COMMIT"
             echo "soc=$SOC_COMMIT"
@@ -282,8 +323,24 @@ jobs:
             echo "module_sha256=$module_sha"
           } > artifacts/BUILD_INFO.txt
 
+          cp "$image" artifacts/Image
           cp effective_kernel_config.txt artifacts/
-          sha256sum artifacts/* > artifacts/SHA256SUMS.txt
+          cp stock_kernel_config.txt artifacts/
+          cp kernel_config_delta.txt artifacts/
+          printf '%s\n' "$kernel_banner" > artifacts/KERNEL_BANNER.txt
+          (
+            cd artifacts
+            sha256sum \
+              BUILD_INFO.txt \
+              Image \
+              KERNEL_BANNER.txt \
+              PLK110_SukiSU-4.2_SUSFS-2.3_NoKPM.zip \
+              effective_kernel_config.txt \
+              kernel_config_delta.txt \
+              ksu_module_susfs_1.5.2+_R28.zip \
+              stock_kernel_config.txt \
+              > SHA256SUMS.txt
+          )
 
       - name: Upload verified build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
