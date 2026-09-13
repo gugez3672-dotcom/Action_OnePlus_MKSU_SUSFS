@@ -16,7 +16,7 @@ env:
   CODENAME: canoe
   ANDROID_VERSION: android16
   KERNEL_VERSION: "6.12"
-  BUILD_METHOD: gki
+  BUILD_VARIANT: perf
   FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
   EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
   STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
@@ -211,7 +211,7 @@ jobs:
           rm -f msm-kernel/android/abi_gki_protected_exports_*
           sed -i 's/check_defconfig//g' common/build.config.gki
 
-          # Keep the device's g188c695beb6d base identifier without a -dirty
+          # Keep the device's gb2a876903b49 base identifier without a -dirty
           # suffix after applying the audited local patches.
           sed -i "s/printf '%s' -dirty/: # reproducible patched tree/" common/scripts/setlocalversion
 
@@ -219,11 +219,11 @@ jobs:
         run: |
           set -euo pipefail
           cd kernel_workspace
-          LTO=none \
+          mkdir -p "out/target/product/$CODENAME"
           SYSTEM_DLKM_RE_SIGN=0 \
           BUILD_SYSTEM_DLKM=0 \
           KMI_SYMBOL_LIST_STRICT_MODE=0 \
-            ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_METHOD"
+            ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_VARIANT"
 
       - name: Verify effective kernel configuration
         run: |
