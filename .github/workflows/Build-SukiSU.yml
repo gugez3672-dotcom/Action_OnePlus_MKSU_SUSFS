@@ -147,8 +147,13 @@ jobs:
             kernel_platform/common/50_add_susfs.patch
 
           cd kernel_platform/common
-          git apply --check 50_add_susfs.patch
-          git apply 50_add_susfs.patch
+          # OnePlus A.67 has a different comment block immediately after
+          # selinux_state. Apply the upstream SUSFS patch everywhere else,
+          # then use the audited A.67-only hooks.c context adaptation.
+          git apply --check --exclude=security/selinux/hooks.c 50_add_susfs.patch
+          git apply --exclude=security/selinux/hooks.c 50_add_susfs.patch
+          git apply --check "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
+          git apply "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
 
           grep -q '#define SUSFS_VERSION "2.3.0"' include/linux/susfs.h
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
