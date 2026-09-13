@@ -17,9 +17,11 @@ env:
   ANDROID_VERSION: android16
   KERNEL_VERSION: "6.12"
   BUILD_VARIANT: perf
+  BUILD_NUMBER: "14541642"
   FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
   EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
   STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+  EXPECTED_CONFIG_ADDITIONS_SHA256: d3235c8aa6e95b7b56c24a4619f01d930ffbac48a050d593fdcf896f770a997e
   A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
 
   # Exact running A.67 GKI commit plus the official A.67 OnePlus SoC/modules
@@ -66,6 +68,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+          echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions" | sha256sum --check
           echo "$A67_SELINUX_PATCH_SHA256  patches/PLK110_A67_susfs_selinux_hooks.patch" | sha256sum --check
 
       - name: Install dependencies
@@ -116,6 +119,9 @@ jobs:
           test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
           test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
           test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+          grep -qx 'CONFIG_LOCALVERSION="-4k"' kernel_platform/common/arch/arm64/configs/gki_defconfig
+          grep -Fq 'suffix = "-ab" + os.environ["BUILD_NUMBER"]' \
+            kernel_platform/build/kernel/kleaf/workspace_status_stamp.py
 
       - name: Integrate pinned SukiSU builtin
         run: |
@@ -172,35 +178,47 @@ jobs:
           cd kernel_workspace/kernel_platform
           config=common/arch/arm64/configs/gki_defconfig
 
-          set_config() {
-            symbol="$1"
-            value="$2"
-            sed -i -E "/^(# )?CONFIG_${symbol}(=| is not set)/d" "$config"
-            if [ "$value" = y ]; then
-              printf 'CONFIG_%s=y\n' "$symbol" >> "$config"
-            else
-              printf '# CONFIG_%s is not set\n' "$symbol" >> "$config"
-            fi
+          ksu_kconfig=common/drivers/kernelsu/Kconfig
+          test -f "$ksu_kconfig"
+
+          default_of() {
+            awk -v wanted="$1" '
+              $1 == "config" && $2 == wanted { in_symbol=1; next }
+              in_symbol && $1 == "default" { print $2; exit }
+              in_symbol && $1 == "config" { exit }
+            ' "$ksu_kconfig"
           }
 
-          set_config KSU y
-          set_config KSU_FEATURE_ADBROOT n
-          set_config KSU_DEBUG n
-          set_config KPM n
-          set_config KSU_SUSFS y
-          set_config KSU_SUSFS_SUS_PATH y
-          set_config KSU_SUSFS_SUS_MOUNT y
-          set_config KSU_SUSFS_SUS_KSTAT y
-          set_config KSU_SUSFS_SPOOF_UNAME y
-          set_config KSU_SUSFS_ENABLE_LOG n
-          set_config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS y
-          set_config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG y
-          set_config KSU_SUSFS_OPEN_REDIRECT y
-          set_config KSU_SUSFS_SUS_MAP y
-          set_config LTO_NONE y
-          set_config LTO_CLANG n
-          set_config LTO_CLANG_FULL n
-          set_config LTO_CLANG_THIN n
+          # At this pinned SukiSU commit the requested builtin and SUSFS
+          # features default to enabled, while debug and KPM default off.
+          # Assert those upstream defaults so a future semantic change fails
+          # before compilation instead of silently changing this kernel.
+          for symbol in \
+            KSU KSU_SUSFS KSU_SUSFS_SUS_PATH KSU_SUSFS_SUS_MOUNT \
+            KSU_SUSFS_SUS_KSTAT KSU_SUSFS_SPOOF_UNAME \
+            KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+            KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+            KSU_SUSFS_OPEN_REDIRECT KSU_SUSFS_SUS_MAP; do
+            test "$(default_of "$symbol")" = y
+          done
+          test "$(default_of KSU_DEBUG)" = n
+          test "$(default_of KPM)" = n
+
+          # These two features default on upstream but are intentionally off
+          # here. Insert only the non-default values at savedefconfig's exact
+          # canonical location; all other stock choices, including LTO, stay
+          # untouched in the official A.67 defconfig.
+          sed -i -E '/^(# )?CONFIG_(KSU|KPM)(_|=| is not set)/d' "$config"
+          awk '
+            /^CONFIG_EXT4_FS=y$/ {
+              print "# CONFIG_KSU_FEATURE_ADBROOT is not set"
+              print "# CONFIG_KSU_SUSFS_ENABLE_LOG is not set"
+            }
+            { print }
+          ' "$config" > "$config.tmp"
+          mv "$config.tmp" "$config"
+          test "$(grep -c '^# CONFIG_KSU_FEATURE_ADBROOT is not set$' "$config")" -eq 1
+          test "$(grep -c '^# CONFIG_KSU_SUSFS_ENABLE_LOG is not set$' "$config")" -eq 1
 
           for build_file in common/BUILD.bazel msm-kernel/BUILD.bazel; do
             if [ -f "$build_file" ]; then
@@ -209,7 +227,6 @@ jobs:
           done
           rm -f common/android/abi_gki_protected_exports_*
           rm -f msm-kernel/android/abi_gki_protected_exports_*
-          sed -i 's/check_defconfig//g' common/build.config.gki
 
           # Keep the device's gb2a876903b49 base identifier without a -dirty
           # suffix after applying the audited local patches.
@@ -230,11 +247,13 @@ jobs:
           set -euo pipefail
           cd kernel_workspace/kernel_platform
 
-          effective_config="$(find out -type f -path '*/common/.config' -print -quit)"
-          test -n "$effective_config"
+          effective_config="out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/gki_kernel/common/.config"
+          test -s "$effective_config"
 
           stock_config="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
+          expected_additions="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions"
           echo "$STOCK_CONFIG_SHA256  $stock_config" | sha256sum --check
+          echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  $expected_additions" | sha256sum --check
 
           for symbol in \
             CONFIG_KSU \
@@ -250,38 +269,47 @@ jobs:
             grep -qx "${symbol}=y" "$effective_config"
           done
 
-          ! grep -qx 'CONFIG_KPM=y' "$effective_config"
-          ! grep -qx 'CONFIG_KSU_DEBUG=y' "$effective_config"
-          ! grep -qx 'CONFIG_KSU_SUSFS_ENABLE_LOG=y' "$effective_config"
+          grep -qx '# CONFIG_KSU_FEATURE_ADBROOT is not set' "$effective_config"
+          grep -qx '# CONFIG_KPM is not set' "$effective_config"
+          grep -qx '# CONFIG_KSU_DEBUG is not set' "$effective_config"
+          grep -qx '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set' "$effective_config"
           grep -qx 'CONFIG_LTO_NONE=y' "$effective_config"
-          ! grep -qx 'CONFIG_LTO_CLANG=y' "$effective_config"
+          grep -qx '# CONFIG_LTO_CLANG_FULL is not set' "$effective_config"
+          grep -qx '# CONFIG_LTO_CLANG_THIN is not set' "$effective_config"
 
           # A full diff is retained for review. Changes to scheduling, CPU
           # frequency/idle, ZRAM, LTO/CFI, module ABI/signing, preemption or
           # debug hardening are fatal: this kernel is an A.67 stock-behaviour
           # baseline with only SukiSU/SUSFS integration.
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock_config" | sort > /tmp/stock.config.sorted
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective_config" | sort > /tmp/effective.config.sorted
+          export LC_ALL=C
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock_config" | sort -u > /tmp/stock.config.sorted
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective_config" | sort -u > /tmp/effective.config.sorted
           diff -u /tmp/stock.config.sorted /tmp/effective.config.sorted > "$GITHUB_WORKSPACE/kernel_config_delta.txt" || true
 
-          sensitive='^(# )?CONFIG_(PREEMPT|PREEMPTION|HZ|HZ_|SCHED|SCHED_|UCLAMP|WALT|HMBIRD|SLIM_SCHED|EXT_GROUP_SCHED|CPU_FREQ|CPU_FREQ_|CPU_IDLE|CPU_IDLE_|ZRAM|ZSMALLOC|LTO|LTO_|CFI|CFI_|MODVERSIONS|MODULE_SIG|MODULE_SIG_|KASAN|KASAN_|DEBUG_KERNEL)(=| is not set)'
+          # Full-diff gate: the effective build may only add the exact pinned
+          # SukiSU/SUSFS symbols below and may not remove any stock A.67 symbol.
+          comm -13 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/actual.config.additions
+          comm -23 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/unexpected.config.removals
+          test ! -s /tmp/unexpected.config.removals
+          diff -u "$expected_additions" /tmp/actual.config.additions
+
+          sensitive='^(# )?CONFIG_(PREEMPT.*|HZ.*|SCHED.*|UCLAMP.*|WALT.*|HMBIRD.*|SLIM_SCHED.*|EXT_GROUP_SCHED.*|CPU_FREQ.*|CPU_IDLE.*|ZRAM.*|ZSMALLOC.*|LTO.*|CFI.*|MODVERSIONS|MODULE_SIG.*|KASAN.*|DEBUG_KERNEL)(=| is not set)'
           grep -E "$sensitive" "$stock_config" | sort > /tmp/stock.sensitive
           grep -E "$sensitive" "$effective_config" | sort > /tmp/effective.sensitive
           diff -u /tmp/stock.sensitive /tmp/effective.sensitive
 
           cp "$effective_config" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
           cp "$stock_config" "$GITHUB_WORKSPACE/stock_kernel_config.txt"
+          cp "$expected_additions" "$GITHUB_WORKSPACE/expected_config_additions.txt"
+          cp /tmp/actual.config.additions "$GITHUB_WORKSPACE/actual_config_additions.txt"
+          cp /tmp/unexpected.config.removals "$GITHUB_WORKSPACE/unexpected_config_removals.txt"
 
       - name: Package kernel and stable userspace module separately
         run: |
           set -euo pipefail
 
-          dist=kernel_workspace/kernel_platform/out/msm-kernel-canoe-gki/dist
+          dist=kernel_workspace/kernel_platform/out/msm-kernel-canoe-perf/dist
           image="$dist/Image"
-          if [ ! -s "$image" ]; then
-            image="$(find kernel_workspace/kernel_platform/out -type f -name Image -print -quit)"
-          fi
-          test -n "$image"
           test -s "$image"
 
           strings "$image" > /tmp/plk110-image.strings
@@ -302,6 +330,23 @@ jobs:
           sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
           sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
           sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
+          sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
+
+          grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
+          grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
+          grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
+          ! grep -Eq '^[[:space:]]*(patch_fstab|flash_generic|write_boot.*vendor)' AnyKernel3/anykernel.sh
+          for forbidden in \
+            dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
+            vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
+            vendor_kernel_boot vendor_kernel_boot.img \
+            vendor_dlkm vendor_dlkm.img system_dlkm system_dlkm.img \
+            recovery recovery.img abl abl.img; do
+            test ! -e "AnyKernel3/$forbidden"
+          done
+          test ! -d AnyKernel3/vendor_ramdisk
+          test ! -d AnyKernel3/vendor_patch
+          test ! -d AnyKernel3/modules
 
           mkdir artifacts
           (
@@ -322,6 +367,7 @@ jobs:
             echo "device=$DEVICE"
             echo "firmware_baseline=$FIRMWARE_BASELINE"
             echo "expected_kernel_release=$EXPECTED_KERNEL_RELEASE"
+            echo "stock_kernel_build_number=$BUILD_NUMBER"
             echo "manifest=$MANIFEST_COMMIT"
             echo "common=$COMMON_COMMIT"
             echo "soc=$SOC_COMMIT"
@@ -339,6 +385,9 @@ jobs:
           cp "$image" artifacts/Image
           cp effective_kernel_config.txt artifacts/
           cp stock_kernel_config.txt artifacts/
+          cp expected_config_additions.txt artifacts/
+          cp actual_config_additions.txt artifacts/
+          cp unexpected_config_removals.txt artifacts/
           cp kernel_config_delta.txt artifacts/
           printf '%s\n' "$kernel_banner" > artifacts/KERNEL_BANNER.txt
           (
@@ -348,10 +397,13 @@ jobs:
               Image \
               KERNEL_BANNER.txt \
               PLK110_SukiSU-4.2_SUSFS-2.3_NoKPM.zip \
+              actual_config_additions.txt \
               effective_kernel_config.txt \
+              expected_config_additions.txt \
               kernel_config_delta.txt \
               ksu_module_susfs_1.5.2+_R28.zip \
               stock_kernel_config.txt \
+              unexpected_config_removals.txt \
               > SHA256SUMS.txt
           )
 
