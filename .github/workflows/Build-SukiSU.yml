@@ -335,6 +335,8 @@ jobs:
           echo "$STOCK_CONFIG_SHA256  $stock_config" | sha256sum --check
           echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  $expected_additions" | sha256sum --check
 
+          verification_failed=0
+
           for symbol in \
             CONFIG_KSU \
             CONFIG_KSU_SUSFS \
@@ -346,16 +348,32 @@ jobs:
             CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
             CONFIG_KSU_SUSFS_OPEN_REDIRECT \
             CONFIG_KSU_SUSFS_SUS_MAP; do
-            grep -qx "${symbol}=y" "$effective_config"
+            if ! grep -qx "${symbol}=y" "$effective_config"; then
+              echo "::error::Effective config does not enable ${symbol}=y"
+              grep -E "^${symbol}=|^# ${symbol} is not set$" "$effective_config" || true
+              verification_failed=1
+            fi
           done
 
-          grep -qx '# CONFIG_KSU_FEATURE_ADBROOT is not set' "$effective_config"
-          grep -qx '# CONFIG_KPM is not set' "$effective_config"
-          grep -qx '# CONFIG_KSU_DEBUG is not set' "$effective_config"
-          grep -qx '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set' "$effective_config"
-          grep -qx 'CONFIG_LTO_NONE=y' "$effective_config"
-          grep -qx '# CONFIG_LTO_CLANG_FULL is not set' "$effective_config"
-          grep -qx '# CONFIG_LTO_CLANG_THIN is not set' "$effective_config"
+          require_exact_config_line() {
+            local line="$1"
+            local symbol="${2:-}"
+            if ! grep -Fqx "$line" "$effective_config"; then
+              echo "::error::Effective config missing required line: $line"
+              if [ -n "$symbol" ]; then
+                grep -E "^${symbol}=|^# ${symbol} is not set$" "$effective_config" || true
+              fi
+              verification_failed=1
+            fi
+          }
+
+          require_exact_config_line '# CONFIG_KSU_FEATURE_ADBROOT is not set' CONFIG_KSU_FEATURE_ADBROOT
+          require_exact_config_line '# CONFIG_KPM is not set' CONFIG_KPM
+          require_exact_config_line '# CONFIG_KSU_DEBUG is not set' CONFIG_KSU_DEBUG
+          require_exact_config_line '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set' CONFIG_KSU_SUSFS_ENABLE_LOG
+          require_exact_config_line 'CONFIG_LTO_NONE=y' CONFIG_LTO_NONE
+          require_exact_config_line '# CONFIG_LTO_CLANG_FULL is not set' CONFIG_LTO_CLANG_FULL
+          require_exact_config_line '# CONFIG_LTO_CLANG_THIN is not set' CONFIG_LTO_CLANG_THIN
 
           # A full diff is retained for review. Changes to scheduling, CPU
           # frequency/idle, ZRAM, LTO/CFI, module ABI/signing, preemption or
@@ -370,18 +388,49 @@ jobs:
           # SukiSU/SUSFS symbols below and may not remove any stock A.67 symbol.
           comm -13 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/actual.config.additions
           comm -23 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/unexpected.config.removals
-          test ! -s /tmp/unexpected.config.removals
-          diff -u "$expected_additions" /tmp/actual.config.additions
+
+          if [ -s /tmp/unexpected.config.removals ]; then
+            echo "::group::Unexpected stock config removals"
+            cat /tmp/unexpected.config.removals
+            echo "::endgroup::"
+            echo "::error::Effective config removed stock A.67 symbols."
+            verification_failed=1
+          fi
+
+          if ! diff -u "$expected_additions" /tmp/actual.config.additions > "$GITHUB_WORKSPACE/config_additions_diff.txt"; then
+            echo "::group::Expected SukiSU/SUSFS config additions"
+            cat "$expected_additions"
+            echo "::endgroup::"
+            echo "::group::Actual config additions"
+            cat /tmp/actual.config.additions
+            echo "::endgroup::"
+            echo "::group::Config additions diff"
+            cat "$GITHUB_WORKSPACE/config_additions_diff.txt"
+            echo "::endgroup::"
+            echo "::error::Effective config additions differ from the audited SukiSU/SUSFS set."
+            verification_failed=1
+          fi
 
           sensitive='^(# )?CONFIG_(PREEMPT.*|HZ.*|SCHED.*|UCLAMP.*|WALT.*|HMBIRD.*|SLIM_SCHED.*|EXT_GROUP_SCHED.*|CPU_FREQ.*|CPU_IDLE.*|ZRAM.*|ZSMALLOC.*|LTO.*|CFI.*|MODVERSIONS|MODULE_SIG.*|KASAN.*|DEBUG_KERNEL)(=| is not set)'
           grep -E "$sensitive" "$stock_config" | sort > /tmp/stock.sensitive
           grep -E "$sensitive" "$effective_config" | sort > /tmp/effective.sensitive
-          diff -u /tmp/stock.sensitive /tmp/effective.sensitive
+          if ! diff -u /tmp/stock.sensitive /tmp/effective.sensitive > "$GITHUB_WORKSPACE/sensitive_config_diff.txt"; then
+            echo "::group::Sensitive config diff"
+            cat "$GITHUB_WORKSPACE/sensitive_config_diff.txt"
+            echo "::endgroup::"
+            echo "::error::Sensitive stock kernel configuration changed."
+            verification_failed=1
+          fi
 
           cp "$stock_config" "$GITHUB_WORKSPACE/stock_kernel_config.txt"
           cp "$expected_additions" "$GITHUB_WORKSPACE/expected_config_additions.txt"
           cp /tmp/actual.config.additions "$GITHUB_WORKSPACE/actual_config_additions.txt"
           cp /tmp/unexpected.config.removals "$GITHUB_WORKSPACE/unexpected_config_removals.txt"
+
+          if [ "$verification_failed" -ne 0 ]; then
+            echo "::error::Effective kernel configuration verification failed; see diagnostics above."
+            exit 1
+          fi
 
       - name: Package kernel and stable userspace module separately
         run: |
