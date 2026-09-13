@@ -1,0 +1,45 @@
+diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
+--- a/kernel/feature/kernel_umount.c
++++ b/kernel/feature/kernel_umount.c
+@@ -3,7 +3,15 @@
+ static int kernel_umount_feature_get(u64 *value)
+ {
+     *value = ksu_kernel_umount_enabled ? 1 : 0;
+     return 0;
+ }
+ 
++static int kernel_umount_feature_set(u64 value)
++{
++    bool enable = value != 0;
++    ksu_kernel_umount_enabled = enable;
++    pr_info("kernel_umount: set to %d\n", enable);
++    return 0;
++}
++
+ static const struct ksu_feature_handler kernel_umount_handler = {
+     .feature_id = KSU_FEATURE_KERNEL_UMOUNT,
+     .name = "kernel_umount",
+diff --git a/kernel/hook/lsm_hook.c b/kernel/hook/lsm_hook.c
+--- a/kernel/hook/lsm_hook.c
++++ b/kernel/hook/lsm_hook.c
+@@ -173,3 +173,10 @@
+ #endif
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
++static const struct lsm_id ksu_lsmid = {
++    .name = "ksu",
++    .id = LSM_ID_UNDEF,
++};
++#endif
++
+ static struct security_hook_list ksu_hooks[] = {
+@@ -185,6 +192,8 @@
+ void __init ksu_lsm_hook_init(void)
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
++    security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), &ksu_lsmid);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+     security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), "ksu");
+ #else
+     // https://elixir.bootlin.com/linux/v4.10.17/source/include/linux/lsm_hooks.h#L1892
