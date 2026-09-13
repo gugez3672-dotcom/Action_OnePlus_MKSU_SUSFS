@@ -20,6 +20,7 @@ env:
   FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
   EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
   STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+  A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
 
   # Exact running A.67 GKI commit plus the official A.67 OnePlus SoC/modules
   # snapshots. The public manifest is branch-based, so all three are checked
@@ -44,11 +45,6 @@ jobs:
     timeout-minutes: 180
 
     steps:
-      - name: Checkout audited build definition
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-
       - name: Maximize build space
         uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
         with:
@@ -59,6 +55,18 @@ jobs:
           remove-android: "true"
           remove-haskell: "true"
           remove-codeql: "true"
+
+      - name: Checkout audited build definition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify checked-in baseline and adaptation
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+          echo "$A67_SELINUX_PATCH_SHA256  patches/PLK110_A67_susfs_selinux_hooks.patch" | sha256sum --check
 
       - name: Install dependencies
         run: |
