@@ -258,9 +258,9 @@ jobs:
           test "$(default_of KSU_DEBUG)" = n
           test "$(default_of KPM)" = n
 
-          # Remove stale KSU/KPM choices and write the exact audited effective
-          # profile explicitly. This survives olddefconfig/savedefconfig instead
-          # of depending on Kconfig default propagation.
+          # Remove stale KSU/KPM choices and write the audited profile.
+          # SUS_PATH stays at its pinned upstream default y because OnePlus'
+          # savedefconfig rejects the redundant explicit CONFIG line.
           sed -i -E '/^(# )?CONFIG_(KSU|KPM)(_|=| is not set)/d' "$config"
           awk '
             /^CONFIG_EXT4_FS=y$/ {
@@ -277,7 +277,6 @@ jobs:
               print "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
               print "CONFIG_KSU_SUSFS_SUS_MAP=y"
               print "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
-              print "CONFIG_KSU_SUSFS_SUS_PATH=y"
             }
             { print }
           ' "$config" > "$config.tmp"
@@ -296,8 +295,7 @@ jobs:
             'CONFIG_KSU_SUSFS_SPOOF_UNAME=y' \
             'CONFIG_KSU_SUSFS_SUS_KSTAT=y' \
             'CONFIG_KSU_SUSFS_SUS_MAP=y' \
-            'CONFIG_KSU_SUSFS_SUS_MOUNT=y' \
-            'CONFIG_KSU_SUSFS_SUS_PATH=y'; do
+            'CONFIG_KSU_SUSFS_SUS_MOUNT=y'; do
             test "$(grep -Fxc "$line" "$config")" -eq 1
           done
 
