@@ -227,7 +227,7 @@ jobs:
           grep -q '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
 
-      - name: Configure minimal full SUSFS build
+      - name: Configure explicit SukiSU/SUSFS build
         run: |
           set -euo pipefail
           cd kernel_workspace/kernel_platform
@@ -244,10 +244,9 @@ jobs:
             ' "$ksu_kconfig"
           }
 
-          # At this pinned SukiSU commit the requested builtin and SUSFS
-          # features default to enabled, while debug and KPM default off.
-          # Assert those upstream defaults so a future semantic change fails
-          # before compilation instead of silently changing this kernel.
+          # Assert the pinned upstream semantics, but do not rely on defaults
+          # for the effective build configuration. OnePlus' config pipeline can
+          # normalize unset symbols away, which previously produced KSU=n.
           for symbol in \
             KSU KSU_SUSFS KSU_SUSFS_SUS_PATH KSU_SUSFS_SUS_MOUNT \
             KSU_SUSFS_SUS_KSTAT KSU_SUSFS_SPOOF_UNAME \
@@ -259,21 +258,48 @@ jobs:
           test "$(default_of KSU_DEBUG)" = n
           test "$(default_of KPM)" = n
 
-          # These two features default on upstream but are intentionally off
-          # here. Insert only the non-default values at savedefconfig's exact
-          # canonical location; all other stock choices, including LTO, stay
-          # untouched in the official A.67 defconfig.
+          # Remove stale KSU/KPM choices and write the exact audited effective
+          # profile explicitly. This survives olddefconfig/savedefconfig instead
+          # of depending on Kconfig default propagation.
           sed -i -E '/^(# )?CONFIG_(KSU|KPM)(_|=| is not set)/d' "$config"
           awk '
             /^CONFIG_EXT4_FS=y$/ {
+              print "# CONFIG_KPM is not set"
+              print "# CONFIG_KSU_DEBUG is not set"
               print "# CONFIG_KSU_FEATURE_ADBROOT is not set"
               print "# CONFIG_KSU_SUSFS_ENABLE_LOG is not set"
+              print "CONFIG_KSU=y"
+              print "CONFIG_KSU_SUSFS=y"
+              print "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+              print "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+              print "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+              print "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+              print "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
+              print "CONFIG_KSU_SUSFS_SUS_MAP=y"
+              print "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+              print "CONFIG_KSU_SUSFS_SUS_PATH=y"
             }
             { print }
           ' "$config" > "$config.tmp"
           mv "$config.tmp" "$config"
-          test "$(grep -c '^# CONFIG_KSU_FEATURE_ADBROOT is not set$' "$config")" -eq 1
-          test "$(grep -c '^# CONFIG_KSU_SUSFS_ENABLE_LOG is not set$' "$config")" -eq 1
+
+          for line in \
+            '# CONFIG_KPM is not set' \
+            '# CONFIG_KSU_DEBUG is not set' \
+            '# CONFIG_KSU_FEATURE_ADBROOT is not set' \
+            '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set' \
+            'CONFIG_KSU=y' \
+            'CONFIG_KSU_SUSFS=y' \
+            'CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y' \
+            'CONFIG_KSU_SUSFS_OPEN_REDIRECT=y' \
+            'CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y' \
+            'CONFIG_KSU_SUSFS_SPOOF_UNAME=y' \
+            'CONFIG_KSU_SUSFS_SUS_KSTAT=y' \
+            'CONFIG_KSU_SUSFS_SUS_MAP=y' \
+            'CONFIG_KSU_SUSFS_SUS_MOUNT=y' \
+            'CONFIG_KSU_SUSFS_SUS_PATH=y'; do
+            test "$(grep -Fxc "$line" "$config")" -eq 1
+          done
 
           for build_file in common/BUILD.bazel msm-kernel/BUILD.bazel; do
             if [ -f "$build_file" ]; then
