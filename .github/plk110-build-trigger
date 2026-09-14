@@ -1,3 +1,3 @@
-run=12
-reason=savedefconfig-sus-path-default
-workflow_commit=6b66333d8052cb536e547ba7debaebf7520bfa08
+run=13
+reason=codex-validated-minimal-config-release-fix
+workflow_commit=298789471733eb0c86ffc8e22b34832aa65718e9
