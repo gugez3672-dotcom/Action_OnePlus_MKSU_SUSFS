@@ -302,7 +302,7 @@ jobs:
           path.write_text(text.replace(old, new, 1))
           PY
 
-          grep -Fqx 'scmversion_prefix="-$android_release-$KMI_GENERATION"' \
+          grep -Fq 'scmversion_prefix="-$android_release-$KMI_GENERATION"' \
             build/kernel/kleaf/impl/stamp.bzl
           ! grep -Fq 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"' \
             build/kernel/kleaf/impl/stamp.bzl
