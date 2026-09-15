@@ -1,4 +1,4 @@
-name: Build PLK110 A67 Stock Reproduction
+name: Build PLK110 A67 Stock GKI
 
 on:
   workflow_dispatch:
@@ -33,11 +33,10 @@ env:
   SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
   MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
 
-  ANYKERNEL_COMMIT: 0fc7569866bb5d5fe51752cc410dca3e92ab332f
   REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
 
 jobs:
-  stock-reproduction:
+  stock-gki:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -167,37 +166,17 @@ jobs:
           path.write_text(text.replace(old, new, 1))
           PY
 
-      - name: Use running A.67 configuration as the build input
+      - name: Preserve upstream defconfig and record build adaptations
         run: |
           set -euo pipefail
           common=kernel_workspace/kernel_platform/common
-          stock="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
-
-          # Hold configuration constant so this experiment tests source/toolchain
-          # reproduction rather than a different public defconfig composition.
-          cp "$stock" "$common/arch/arm64/configs/gki_defconfig"
-
-          # A full generated .config is intentionally used as input. Disable only
-          # the upstream savedefconfig equality check; the final effective config
-          # is independently compared against the running-device baseline below.
-          sed -i 's/check_defconfig//g' "$common/build.config.gki"
-
-          # Save every intentional common-tree change before hiding working-tree
-          # dirtiness from CONFIG_LOCALVERSION_AUTO. A '-dirty' release would
-          # itself make this an invalid vendor-module compatibility experiment.
-          git -C "$common" diff -- \
-            scripts/Makefile.vmlinux \
-            arch/arm64/configs/gki_defconfig \
-            build.config.gki \
-            > "$GITHUB_WORKSPACE/artifacts/COMMON_BUILD_ADAPTATIONS.patch"
-          test -s "$GITHUB_WORKSPACE/artifacts/COMMON_BUILD_ADAPTATIONS.patch"
-
-          git -C "$common" update-index --assume-unchanged \
-            scripts/Makefile.vmlinux \
-            arch/arm64/configs/gki_defconfig \
-            build.config.gki
-
+          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki BUILD.bazel
+          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
+          git -C "$common" diff -- scripts/Makefile.vmlinux > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
+          git -C "$common" update-index --assume-unchanged scripts/Makefile.vmlinux
           test -z "$(git -C "$common" status -uno --porcelain)"
+          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
 
       - name: Prove no root or concealment integration exists
         run: |
@@ -208,167 +187,14 @@ jobs:
           ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Makefile"
           ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Kconfig"
 
-      - name: Build stock kernel with official OnePlus perf pipeline
-        run: |
-          set -euo pipefail
-          cd kernel_workspace
-          mkdir -p "out/target/product/$CODENAME"
+      - name: Preflight upstream GKI configuration
+        run: bash scripts/build_gki.sh preflight
 
-          # Deliberately do not set KMI_SYMBOL_LIST_STRICT_MODE=0,
-          # BUILD_SYSTEM_DLKM=0, SYSTEM_DLKM_RE_SIGN=0, LTO overrides,
-          # or any custom performance/network feature flags.
-          ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_VARIANT"
+      - name: Build the GKI used by official canoe perf
+        run: bash scripts/build_gki.sh build
 
-          dist="kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
-          test -s "$dist/Image"
-          test -s "$dist/out_dir/.config"
-
-          mkdir -p "$GITHUB_WORKSPACE/artifacts/build-logs"
-          cp LOGDIR/*.log "$GITHUB_WORKSPACE/artifacts/build-logs/" 2>/dev/null || true
-
-      - name: Verify effective configuration and kernel identity
-        id: verify
-        run: |
-          set -euo pipefail
-          dist="kernel_workspace/kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
-          image="$dist/Image"
-          effective="$dist/out_dir/.config"
-          stock="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
-          out="$GITHUB_WORKSPACE/artifacts"
-
-          cp "$image" "$out/Image"
-          cp "$effective" "$out/effective_kernel_config.txt"
-          cp "$stock" "$out/stock_kernel_config.txt"
-
-          # Root/concealment features must not exist in the effective kernel.
-          if grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)=y|CONFIG_KSU_|CONFIG_SUSFS_)' "$effective"; then
-            echo "::error::Stock reproduction unexpectedly contains KSU/KPM/SUSFS symbols."
-            grep -E '^(CONFIG_(KSU|KPM|SUSFS)|CONFIG_KSU_|CONFIG_SUSFS_)' "$effective" || true
-            exit 1
-          fi
-
-          strings "$image" > /tmp/plk110-stock-image.strings
-          kernel_banner="$(grep -m1 '^Linux version ' /tmp/plk110-stock-image.strings)"
-          test -n "$kernel_banner"
-          printf '%s\n' "$kernel_banner" > "$out/KERNEL_BANNER.txt"
-
-          cc_text="$(grep '^CONFIG_CC_VERSION_TEXT=' "$effective" || true)"
-          rust_text="$(grep '^CONFIG_RUSTC_VERSION_TEXT=' "$effective" || true)"
-          bindgen_text="$(grep '^CONFIG_BINDGEN_VERSION_TEXT=' "$effective" || true)"
-          {
-            echo "$cc_text"
-            echo "$rust_text"
-            echo "$bindgen_text"
-          } > "$out/TOOLCHAIN_IDENTITY.txt"
-
-          # Full raw diff for audit.
-          export LC_ALL=C
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock" | sort -u > /tmp/stock.raw
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective" | sort -u > /tmp/effective.raw
-          diff -u /tmp/stock.raw /tmp/effective.raw > "$out/kernel_config_delta_raw.txt" || true
-
-          # Compiler/rust/bindgen identity strings are generated from the actual
-          # toolchain and are deliberately isolated from functional config.
-          sed -E '/^CONFIG_(CC_VERSION_TEXT|RUSTC_VERSION_TEXT|BINDGEN_VERSION_TEXT)=/d' /tmp/stock.raw > /tmp/stock.functional
-          sed -E '/^CONFIG_(CC_VERSION_TEXT|RUSTC_VERSION_TEXT|BINDGEN_VERSION_TEXT)=/d' /tmp/effective.raw > /tmp/effective.functional
-          diff -u /tmp/stock.functional /tmp/effective.functional > "$out/kernel_config_delta_functional.txt" || true
-
-          comm -13 /tmp/stock.functional /tmp/effective.functional > "$out/functional_config_additions.txt"
-          comm -23 /tmp/stock.functional /tmp/effective.functional > "$out/functional_config_removals.txt"
-
-          additions="$(wc -l < "$out/functional_config_additions.txt")"
-          removals="$(wc -l < "$out/functional_config_removals.txt")"
-          {
-            echo "functional_additions=$additions"
-            echo "functional_removals=$removals"
-          } > "$out/CONFIG_VERDICT.txt"
-
-          sensitive='^(# )?CONFIG_(PREEMPT.*|HZ.*|SCHED.*|UCLAMP.*|WALT.*|HMBIRD.*|SLIM_SCHED.*|EXT_GROUP_SCHED.*|CPU_FREQ.*|CPU_IDLE.*|ZRAM.*|ZSMALLOC.*|LTO.*|CFI.*|MODVERSIONS|MODULE_SIG.*|TRIM_UNUSED_KSYMS|UNUSED_KSYMS_WHITELIST|KASAN.*|DEBUG_KERNEL)(=| is not set)'
-          grep -E "$sensitive" "$stock" | sort -u > /tmp/stock.sensitive
-          grep -E "$sensitive" "$effective" | sort -u > /tmp/effective.sensitive
-          diff -u /tmp/stock.sensitive /tmp/effective.sensitive > "$out/sensitive_config_diff.txt" || true
-
-          release_ok=0
-          if printf '%s\n' "$kernel_banner" | grep -Fq "$EXPECTED_KERNEL_RELEASE" && \
-             ! printf '%s\n' "$kernel_banner" | grep -Fq -- '-dirty'; then
-            release_ok=1
-          fi
-
-          functional_ok=0
-          if [ "$additions" -eq 0 ] && [ "$removals" -eq 0 ]; then
-            functional_ok=1
-          fi
-
-          sensitive_ok=0
-          if [ ! -s "$out/sensitive_config_diff.txt" ]; then
-            sensitive_ok=1
-          fi
-
-          flash_ready=false
-          if [ "$release_ok" -eq 1 ] && [ "$functional_ok" -eq 1 ] && [ "$sensitive_ok" -eq 1 ]; then
-            flash_ready=true
-          fi
-
-          {
-            echo "device=$DEVICE"
-            echo "firmware_baseline=$FIRMWARE_BASELINE"
-            echo "expected_kernel_release=$EXPECTED_KERNEL_RELEASE"
-            echo "actual_kernel_banner=$kernel_banner"
-            echo "release_ok=$release_ok"
-            echo "functional_config_exact=$functional_ok"
-            echo "sensitive_config_exact=$sensitive_ok"
-            echo "flash_ready=$flash_ready"
-            echo "manifest=$MANIFEST_COMMIT"
-            echo "common=$COMMON_COMMIT"
-            echo "soc=$SOC_COMMIT"
-            echo "modules=$MODULES_COMMIT"
-            echo "sukisu=absent"
-            echo "susfs=absent"
-            echo "kpm=absent"
-          } > "$out/BUILD_INFO.txt"
-
-          echo "flash_ready=$flash_ready" >> "$GITHUB_OUTPUT"
-
-      - name: Package boot-only stock reproduction when verification is exact
-        if: steps.verify.outputs.flash_ready == 'true'
-        run: |
-          set -euo pipefail
-          image="$GITHUB_WORKSPACE/artifacts/Image"
-
-          git clone --filter=blob:none --no-checkout --depth=1 --branch master \
-            https://github.com/Numbersf/AnyKernel3.git AnyKernel3
-          git -C AnyKernel3 fetch --depth=1 origin "$ANYKERNEL_COMMIT"
-          git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
-          test "$(git -C AnyKernel3 rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
-          rm -rf AnyKernel3/.git
-
-          cp "$image" AnyKernel3/Image
-          sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 Stock Reproduction/' AnyKernel3/anykernel.sh
-          sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
-          sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
-          sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
-          sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
-
-          grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
-          grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
-          grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
-
-          for forbidden in \
-            dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
-            vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
-            vendor_kernel_boot vendor_kernel_boot.img \
-            vendor_dlkm vendor_dlkm.img system_dlkm system_dlkm.img \
-            recovery recovery.img abl abl.img; do
-            test ! -e "AnyKernel3/$forbidden"
-          done
-          test ! -d AnyKernel3/vendor_ramdisk
-          test ! -d AnyKernel3/vendor_patch
-          test ! -d AnyKernel3/modules
-
-          (
-            cd AnyKernel3
-            zip -r9 "$GITHUB_WORKSPACE/artifacts/PLK110_A67_Stock-Reproduction.zip" .
-          )
+      - name: Verify actual Image config and stock module symbol CRCs
+        run: python3 scripts/verify_gki.py
 
       - name: Generate checksums
         if: always()
@@ -387,25 +213,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-Stock-Reproduction
+          name: PLK110-A67-Stock-GKI-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: warn
-          compression-level: 0
+          compression-level: 6
           retention-days: 14
-
-      - name: Final stock reproduction verdict
-        if: always()
-        run: |
-          set -euo pipefail
-          info=artifacts/BUILD_INFO.txt
-          if [ ! -s "$info" ]; then
-            echo "::error::Stock reproduction did not reach final verification."
-            exit 1
-          fi
-          cat "$info"
-          if ! grep -qx 'flash_ready=true' "$info"; then
-            echo "::error::Image was built but does not exactly reproduce the running A.67 functional config/kernel identity. Do not flash it."
-            exit 1
-          fi
-          test -s artifacts/PLK110_A67_Stock-Reproduction.zip
-          echo "Stock reproduction passed exact gates and is eligible for controlled boot testing."
