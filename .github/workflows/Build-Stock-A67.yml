@@ -166,15 +166,23 @@ jobs:
           path.write_text(text.replace(old, new, 1))
           PY
 
+      - name: Preserve original GKI module signer trust
+        run: |
+          set -euo pipefail
+          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+          python3 scripts/prepare_stock_trust.py
+
       - name: Preserve upstream defconfig and record build adaptations
         run: |
           set -euo pipefail
           common=kernel_workspace/kernel_platform/common
-          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki BUILD.bazel
+          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
           cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
-          git -C "$common" diff -- scripts/Makefile.vmlinux > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+          git -C "$common" diff -- scripts/Makefile.vmlinux BUILD.bazel > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
+          cp "$common/certs/plk110_stock.pem" artifacts/
           git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
-          git -C "$common" update-index --assume-unchanged scripts/Makefile.vmlinux
+          git -C "$common" update-index --assume-unchanged scripts/Makefile.vmlinux BUILD.bazel
           test -z "$(git -C "$common" status -uno --porcelain)"
           (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
 
@@ -188,7 +196,9 @@ jobs:
           ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Kconfig"
 
       - name: Preflight upstream GKI configuration
-        run: bash scripts/build_gki.sh preflight
+        run: |
+          bash scripts/build_gki.sh preflight
+          python3 scripts/verify_gki.py --preflight
 
       - name: Build the GKI used by official canoe perf
         run: bash scripts/build_gki.sh build

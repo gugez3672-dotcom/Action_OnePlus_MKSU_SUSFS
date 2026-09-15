@@ -1,1 +1,1 @@
-2026-09-15: rerun after fixing Kleaf kernel_aarch64_Module.symvers artifact collection.
+A67 stock: restore ZSTD, retain original module signer trust, verify full module set 2026-09-15

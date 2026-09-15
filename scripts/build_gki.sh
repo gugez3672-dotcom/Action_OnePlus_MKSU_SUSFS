@@ -7,10 +7,12 @@ mkdir -p "$GITHUB_WORKSPACE/artifacts" "$GITHUB_WORKSPACE/bazel-cache"
 export TEST_TMPDIR="$GITHUB_WORKSPACE/bazel-cache"
 bazel=(tools/bazel "--output_user_root=$GITHUB_WORKSPACE/bazel-cache")
 # These are the same bzlmod compatibility options used by the pinned
-# OnePlus build_with_bazel.py, with no kernel configuration overrides.
+# OnePlus build_with_bazel.py. Override the SoC rc's disabled ZSTD debug
+# compression to match the configuration embedded in the stock boot Image.
 opts=(
   --incompatible_sandbox_hermetic_tmp=false
   --noenable_workspace
+  --//build/kernel/kleaf:zstd_dwarf_compression=true
   --override_module=rules_kotlin=%workspace%/build/kernel/kleaf/bzlmod/fake_modules/rules_kotlin
   --override_module=protobuf=%workspace%/build/kernel/kleaf/bzlmod/fake_modules/protobuf
   --override_module=rules_java=%workspace%/build/kernel/kleaf/bzlmod/fake_modules/rules_java
