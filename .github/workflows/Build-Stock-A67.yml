@@ -1,0 +1,411 @@
+name: Build PLK110 A67 Stock Reproduction
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/plk110-stock-trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plk110-a67-stock-reproduction
+  cancel-in-progress: false
+
+env:
+  DEVICE: PLK110
+  SOC: sm8850
+  CODENAME: canoe
+  ANDROID_VERSION: android16
+  KERNEL_VERSION: "6.12"
+  BUILD_VARIANT: perf
+  BUILD_NUMBER: "14541642"
+  FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
+  EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
+  STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+
+  # Exact commits previously identified from the running A.67 kernel/source set.
+  MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
+  COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
+  SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
+  MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
+
+  ANYKERNEL_COMMIT: 0fc7569866bb5d5fe51752cc410dca3e92ab332f
+  REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
+
+jobs:
+  stock-reproduction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          swap-size-mb: 8192
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+
+      - name: Checkout audited reproduction definition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify stock baseline
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+
+          stock=baselines/PLK110_16.0.8.302_stock.config
+          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+          grep -qx 'CONFIG_LTO_NONE=y' "$stock"
+          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y binutils git curl jq python3 zip
+
+          curl --fail --location --retry 3 \
+            https://storage.googleapis.com/git-repo-downloads/repo \
+            --output /tmp/repo
+          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
+          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
+
+      - name: Sync and pin OnePlus A.67 source
+        run: |
+          set -euo pipefail
+          mkdir kernel_workspace
+          cd kernel_workspace
+
+          repo init \
+            -u https://github.com/OnePlusOSS/kernel_manifest.git \
+            -b "$MANIFEST_COMMIT" \
+            -m oneplus_15.xml \
+            --depth=1
+
+          # Removed upstream test prebuilts are not kernel build inputs.
+          mkdir -p .repo/local_manifests
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<manifest>' \
+            '  <remove-project name="kernel_platform/prebuilts/asuite" />' \
+            '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />' \
+            '</manifest>' \
+            > .repo/local_manifests/prune-unused-test-prebuilts.xml
+
+          repo sync -c --no-tags --no-clone-bundle -j2
+
+          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
+          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
+          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
+          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
+          git fetch --depth=1 origin "$MODULES_COMMIT"
+          git checkout --detach "$MODULES_COMMIT"
+
+          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
+          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
+          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+
+          {
+            echo "manifest=$MANIFEST_COMMIT"
+            echo "common=$COMMON_COMMIT"
+            echo "soc=$SOC_COMMIT"
+            echo "modules=$MODULES_COMMIT"
+          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+
+      - name: Apply only required stock build-system adaptations
+        run: |
+          set -euo pipefail
+          common=kernel_workspace/kernel_platform/common
+          kp=kernel_workspace/kernel_platform
+
+          # The pinned A.67 common commit predates the later official one-line
+          # vmlinux_oki copy while this pinned Kleaf snapshot already requires
+          # vmlinux_oki as a GKI output. This changes only the copied build
+          # artifact, not the linked vmlinux contents.
+          grep -Fq '"vmlinux_oki",' "$kp/build/kernel/kleaf/constants.bzl"
+          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' "$common/scripts/Makefile.vmlinux"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("kernel_workspace/kernel_platform/common/scripts/Makefile.vmlinux")
+          text = path.read_text()
+          anchor = (
+              "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
+              "\t+$(call if_changed_dep,link_vmlinux)\n"
+          )
+          replacement = anchor + "\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n"
+          if text.count(anchor) != 1:
+              raise SystemExit("unexpected A.67 Makefile.vmlinux link rule")
+          path.write_text(text.replace(anchor, replacement, 1))
+          PY
+
+          # The running PLK110 A.67 release has no Kleaf OKI '-o-' component.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl")
+          text = path.read_text()
+          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
+          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
+          if text.count(old) != 1:
+              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Use running A.67 configuration as the build input
+        run: |
+          set -euo pipefail
+          common=kernel_workspace/kernel_platform/common
+          stock="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
+
+          # Hold configuration constant so this experiment tests source/toolchain
+          # reproduction rather than a different public defconfig composition.
+          cp "$stock" "$common/arch/arm64/configs/gki_defconfig"
+
+          # A full generated .config is intentionally used as input. Disable only
+          # the upstream savedefconfig equality check; the final effective config
+          # is independently compared against the running-device baseline below.
+          sed -i 's/check_defconfig//g' "$common/build.config.gki"
+
+          # Save every intentional common-tree change before hiding working-tree
+          # dirtiness from CONFIG_LOCALVERSION_AUTO. A '-dirty' release would
+          # itself make this an invalid vendor-module compatibility experiment.
+          git -C "$common" diff -- \
+            scripts/Makefile.vmlinux \
+            arch/arm64/configs/gki_defconfig \
+            build.config.gki \
+            > "$GITHUB_WORKSPACE/artifacts/COMMON_BUILD_ADAPTATIONS.patch"
+          test -s "$GITHUB_WORKSPACE/artifacts/COMMON_BUILD_ADAPTATIONS.patch"
+
+          git -C "$common" update-index --assume-unchanged \
+            scripts/Makefile.vmlinux \
+            arch/arm64/configs/gki_defconfig \
+            build.config.gki
+
+          test -z "$(git -C "$common" status -uno --porcelain)"
+
+      - name: Prove no root or concealment integration exists
+        run: |
+          set -euo pipefail
+          kp=kernel_workspace/kernel_platform
+          test ! -e "$kp/KernelSU"
+          test ! -e kernel_workspace/susfs4ksu
+          ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Makefile"
+          ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Kconfig"
+
+      - name: Build stock kernel with official OnePlus perf pipeline
+        run: |
+          set -euo pipefail
+          cd kernel_workspace
+          mkdir -p "out/target/product/$CODENAME"
+
+          # Deliberately do not set KMI_SYMBOL_LIST_STRICT_MODE=0,
+          # BUILD_SYSTEM_DLKM=0, SYSTEM_DLKM_RE_SIGN=0, LTO overrides,
+          # or any custom performance/network feature flags.
+          ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_VARIANT"
+
+          dist="kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
+          test -s "$dist/Image"
+          test -s "$dist/out_dir/.config"
+
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/build-logs"
+          cp LOGDIR/*.log "$GITHUB_WORKSPACE/artifacts/build-logs/" 2>/dev/null || true
+
+      - name: Verify effective configuration and kernel identity
+        id: verify
+        run: |
+          set -euo pipefail
+          dist="kernel_workspace/kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
+          image="$dist/Image"
+          effective="$dist/out_dir/.config"
+          stock="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
+          out="$GITHUB_WORKSPACE/artifacts"
+
+          cp "$image" "$out/Image"
+          cp "$effective" "$out/effective_kernel_config.txt"
+          cp "$stock" "$out/stock_kernel_config.txt"
+
+          # Root/concealment features must not exist in the effective kernel.
+          if grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)=y|CONFIG_KSU_|CONFIG_SUSFS_)' "$effective"; then
+            echo "::error::Stock reproduction unexpectedly contains KSU/KPM/SUSFS symbols."
+            grep -E '^(CONFIG_(KSU|KPM|SUSFS)|CONFIG_KSU_|CONFIG_SUSFS_)' "$effective" || true
+            exit 1
+          fi
+
+          strings "$image" > /tmp/plk110-stock-image.strings
+          kernel_banner="$(grep -m1 '^Linux version ' /tmp/plk110-stock-image.strings)"
+          test -n "$kernel_banner"
+          printf '%s\n' "$kernel_banner" > "$out/KERNEL_BANNER.txt"
+
+          cc_text="$(grep '^CONFIG_CC_VERSION_TEXT=' "$effective" || true)"
+          rust_text="$(grep '^CONFIG_RUSTC_VERSION_TEXT=' "$effective" || true)"
+          bindgen_text="$(grep '^CONFIG_BINDGEN_VERSION_TEXT=' "$effective" || true)"
+          {
+            echo "$cc_text"
+            echo "$rust_text"
+            echo "$bindgen_text"
+          } > "$out/TOOLCHAIN_IDENTITY.txt"
+
+          # Full raw diff for audit.
+          export LC_ALL=C
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock" | sort -u > /tmp/stock.raw
+          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective" | sort -u > /tmp/effective.raw
+          diff -u /tmp/stock.raw /tmp/effective.raw > "$out/kernel_config_delta_raw.txt" || true
+
+          # Compiler/rust/bindgen identity strings are generated from the actual
+          # toolchain and are deliberately isolated from functional config.
+          sed -E '/^CONFIG_(CC_VERSION_TEXT|RUSTC_VERSION_TEXT|BINDGEN_VERSION_TEXT)=/d' /tmp/stock.raw > /tmp/stock.functional
+          sed -E '/^CONFIG_(CC_VERSION_TEXT|RUSTC_VERSION_TEXT|BINDGEN_VERSION_TEXT)=/d' /tmp/effective.raw > /tmp/effective.functional
+          diff -u /tmp/stock.functional /tmp/effective.functional > "$out/kernel_config_delta_functional.txt" || true
+
+          comm -13 /tmp/stock.functional /tmp/effective.functional > "$out/functional_config_additions.txt"
+          comm -23 /tmp/stock.functional /tmp/effective.functional > "$out/functional_config_removals.txt"
+
+          additions="$(wc -l < "$out/functional_config_additions.txt")"
+          removals="$(wc -l < "$out/functional_config_removals.txt")"
+          {
+            echo "functional_additions=$additions"
+            echo "functional_removals=$removals"
+          } > "$out/CONFIG_VERDICT.txt"
+
+          sensitive='^(# )?CONFIG_(PREEMPT.*|HZ.*|SCHED.*|UCLAMP.*|WALT.*|HMBIRD.*|SLIM_SCHED.*|EXT_GROUP_SCHED.*|CPU_FREQ.*|CPU_IDLE.*|ZRAM.*|ZSMALLOC.*|LTO.*|CFI.*|MODVERSIONS|MODULE_SIG.*|TRIM_UNUSED_KSYMS|UNUSED_KSYMS_WHITELIST|KASAN.*|DEBUG_KERNEL)(=| is not set)'
+          grep -E "$sensitive" "$stock" | sort -u > /tmp/stock.sensitive
+          grep -E "$sensitive" "$effective" | sort -u > /tmp/effective.sensitive
+          diff -u /tmp/stock.sensitive /tmp/effective.sensitive > "$out/sensitive_config_diff.txt" || true
+
+          release_ok=0
+          if printf '%s\n' "$kernel_banner" | grep -Fq "$EXPECTED_KERNEL_RELEASE" && \
+             ! printf '%s\n' "$kernel_banner" | grep -Fq -- '-dirty'; then
+            release_ok=1
+          fi
+
+          functional_ok=0
+          if [ "$additions" -eq 0 ] && [ "$removals" -eq 0 ]; then
+            functional_ok=1
+          fi
+
+          sensitive_ok=0
+          if [ ! -s "$out/sensitive_config_diff.txt" ]; then
+            sensitive_ok=1
+          fi
+
+          flash_ready=false
+          if [ "$release_ok" -eq 1 ] && [ "$functional_ok" -eq 1 ] && [ "$sensitive_ok" -eq 1 ]; then
+            flash_ready=true
+          fi
+
+          {
+            echo "device=$DEVICE"
+            echo "firmware_baseline=$FIRMWARE_BASELINE"
+            echo "expected_kernel_release=$EXPECTED_KERNEL_RELEASE"
+            echo "actual_kernel_banner=$kernel_banner"
+            echo "release_ok=$release_ok"
+            echo "functional_config_exact=$functional_ok"
+            echo "sensitive_config_exact=$sensitive_ok"
+            echo "flash_ready=$flash_ready"
+            echo "manifest=$MANIFEST_COMMIT"
+            echo "common=$COMMON_COMMIT"
+            echo "soc=$SOC_COMMIT"
+            echo "modules=$MODULES_COMMIT"
+            echo "sukisu=absent"
+            echo "susfs=absent"
+            echo "kpm=absent"
+          } > "$out/BUILD_INFO.txt"
+
+          echo "flash_ready=$flash_ready" >> "$GITHUB_OUTPUT"
+
+      - name: Package boot-only stock reproduction when verification is exact
+        if: steps.verify.outputs.flash_ready == 'true'
+        run: |
+          set -euo pipefail
+          image="$GITHUB_WORKSPACE/artifacts/Image"
+
+          git clone --filter=blob:none --no-checkout --depth=1 --branch master \
+            https://github.com/Numbersf/AnyKernel3.git AnyKernel3
+          git -C AnyKernel3 fetch --depth=1 origin "$ANYKERNEL_COMMIT"
+          git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
+          test "$(git -C AnyKernel3 rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
+          rm -rf AnyKernel3/.git
+
+          cp "$image" AnyKernel3/Image
+          sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 Stock Reproduction/' AnyKernel3/anykernel.sh
+          sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
+          sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
+          sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
+          sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
+
+          grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
+          grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
+          grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
+
+          for forbidden in \
+            dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
+            vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
+            vendor_kernel_boot vendor_kernel_boot.img \
+            vendor_dlkm vendor_dlkm.img system_dlkm system_dlkm.img \
+            recovery recovery.img abl abl.img; do
+            test ! -e "AnyKernel3/$forbidden"
+          done
+          test ! -d AnyKernel3/vendor_ramdisk
+          test ! -d AnyKernel3/vendor_patch
+          test ! -d AnyKernel3/modules
+
+          (
+            cd AnyKernel3
+            zip -r9 "$GITHUB_WORKSPACE/artifacts/PLK110_A67_Stock-Reproduction.zip" .
+          )
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+              | sort -z \
+              | xargs -0 -r sha256sum \
+              > SHA256SUMS.txt
+          )
+
+      - name: Upload reproduction diagnostics and image
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-Stock-Reproduction
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 14
+
+      - name: Final stock reproduction verdict
+        if: always()
+        run: |
+          set -euo pipefail
+          info=artifacts/BUILD_INFO.txt
+          if [ ! -s "$info" ]; then
+            echo "::error::Stock reproduction did not reach final verification."
+            exit 1
+          fi
+          cat "$info"
+          if ! grep -qx 'flash_ready=true' "$info"; then
+            echo "::error::Image was built but does not exactly reproduce the running A.67 functional config/kernel identity. Do not flash it."
+            exit 1
+          fi
+          test -s artifacts/PLK110_A67_Stock-Reproduction.zip
+          echo "Stock reproduction passed exact gates and is eligible for controlled boot testing."
