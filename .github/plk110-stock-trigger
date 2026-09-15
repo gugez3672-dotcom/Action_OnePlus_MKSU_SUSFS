@@ -1,1 +1,1 @@
-2026-09-15: restore upstream defconfig; build explicit GKI; verify Image IKCONFIG and phone module CRCs.
+2026-09-15: rerun after fixing TreeArtifact .config collection in collect_gki.py.
