@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: plk110-susfs-build
+  group: plk110-a67-sukisu-susfs
   cancel-in-progress: false
 
 env:
@@ -26,29 +26,26 @@ env:
   FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
   EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
   STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
-  EXPECTED_CONFIG_ADDITIONS_SHA256: d3235c8aa6e95b7b56c24a4619f01d930ffbac48a050d593fdcf896f770a997e
-  A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
-  SUKISU_COMPAT_PATCH_SHA256: ea2be02443d0d5aed8da7866071af33bfc89a3f394d905b2db49798e6c574444
 
-  # Exact running A.67 GKI commit plus the official A.67 OnePlus SoC/modules
-  # snapshots. The public manifest is branch-based, so all three are checked
-  # out to immutable commits below.
+  # Exact commits previously identified from the running A.67 kernel/source set.
   MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
   COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
   SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
   MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
 
-  # SukiSU's builtin branch contains the SUSFS-side SukiSU integration.
   SUKISU_COMMIT: e2912817f4e1b194e582a06e0b5eacf6a3fb7083
   SUSFS_COMMIT: c7db8cb367ef3ed4126ed7e222d77757ccb5c05b
   ANYKERNEL_COMMIT: 0fc7569866bb5d5fe51752cc410dca3e92ab332f
+  EXPECTED_CONFIG_ADDITIONS_SHA256: d3235c8aa6e95b7b56c24a4619f01d930ffbac48a050d593fdcf896f770a997e
+  A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
+  SUKISU_COMPAT_PATCH_SHA256: ea2be02443d0d5aed8da7866071af33bfc89a3f394d905b2db49798e6c574444
+  VERIFIED_STOCK_RUN: "34980659033"
+  VERIFIED_STOCK_COMMIT: 34e24abcfaac6fc9db1279ad073c15af216fd664
 
-  SUSFS_MODULE_URL: https://github.com/sidex15/susfs4ksu-module/releases/download/v1.5.2%2B_R28/ksu_module_susfs_1.5.2%2B.zip
-  SUSFS_MODULE_SHA256: abcd6bf456ea8189298d9e496faa440201d90e4f0bd93b83c0527589001c9376
   REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
 
 jobs:
-  build:
+  sukisu-gki:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -64,16 +61,39 @@ jobs:
           remove-haskell: "true"
           remove-codeql: "true"
 
-      - name: Checkout audited build definition
+      - name: Checkout audited reproduction definition
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
-      - name: Verify checked-in baseline and adaptation
+      - name: Verify stock baseline
         run: |
           set -euo pipefail
+          mkdir -p artifacts
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+
+          stock=baselines/PLK110_16.0.8.302_stock.config
+          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+          grep -qx 'CONFIG_LTO_NONE=y' "$stock"
+          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+
+      - name: Require completed stock verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN" \
+            --output artifacts/VERIFIED_STOCK_RUN.json
+          jq -e --arg sha "$VERIFIED_STOCK_COMMIT" \
+            '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"' \
+            artifacts/VERIFIED_STOCK_RUN.json
           echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions" | sha256sum --check
           echo "$A67_SELINUX_PATCH_SHA256  patches/PLK110_A67_susfs_selinux_hooks.patch" | sha256sum --check
           echo "$SUKISU_COMPAT_PATCH_SHA256  patches/PLK110_SukiSU_4.2_6.12_compat.patch" | sha256sum --check
@@ -90,7 +110,7 @@ jobs:
           echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
           sudo install -m 0755 /tmp/repo /usr/local/bin/repo
 
-      - name: Sync and pin OnePlus source
+      - name: Sync and pin OnePlus A.67 source
         run: |
           set -euo pipefail
           mkdir kernel_workspace
@@ -102,9 +122,7 @@ jobs:
             -m oneplus_15.xml \
             --depth=1
 
-          # These are Android test-suite prebuilts, not kernel build inputs.
-          # Their CodeLinaro branch was removed after OnePlus published the
-          # manifest, so keeping them makes an otherwise valid source sync fail.
+          # Removed upstream test prebuilts are not kernel build inputs.
           mkdir -p .repo/local_manifests
           printf '%s\n' \
             '<?xml version="1.0" encoding="UTF-8"?>' \
@@ -126,26 +144,30 @@ jobs:
           test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
           test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
           test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
-          grep -qx 'CONFIG_LOCALVERSION="-4k"' kernel_platform/common/arch/arm64/configs/gki_defconfig
-          grep -Fq 'suffix = "-ab" + os.environ["BUILD_NUMBER"]' \
-            kernel_platform/build/kernel/kleaf/workspace_status_stamp.py
 
-      - name: Restore A.67 vmlinux_oki build output
+          {
+            echo "manifest=$MANIFEST_COMMIT"
+            echo "common=$COMMON_COMMIT"
+            echo "soc=$SOC_COMMIT"
+            echo "modules=$MODULES_COMMIT"
+          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+
+      - name: Apply only required stock build-system adaptations
         run: |
           set -euo pipefail
-          cd kernel_workspace/kernel_platform/common
+          common=kernel_workspace/kernel_platform/common
+          kp=kernel_workspace/kernel_platform
 
-          # The pinned A.67 common commit predates OnePlus' vmlinux_oki copy,
-          # while the pinned Kleaf build description already declares that
-          # file as a required GKI output. Add only the later official copy
-          # operation; the linked vmlinux itself is left untouched.
-          grep -Fq '"vmlinux_oki",' ../build/kernel/kleaf/constants.bzl
-          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' scripts/Makefile.vmlinux
+          # The pinned A.67 common commit predates the later official one-line
+          # vmlinux_oki copy while this pinned Kleaf snapshot already requires
+          # vmlinux_oki as a GKI output. This changes only the copied build
+          # artifact, not the linked vmlinux contents.
+          grep -Fq '"vmlinux_oki",' "$kp/build/kernel/kleaf/constants.bzl"
+          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' "$common/scripts/Makefile.vmlinux"
 
           python3 - <<'PY'
           from pathlib import Path
-
-          path = Path("scripts/Makefile.vmlinux")
+          path = Path("kernel_workspace/kernel_platform/common/scripts/Makefile.vmlinux")
           text = path.read_text()
           anchor = (
               "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
@@ -157,9 +179,23 @@ jobs:
           path.write_text(text.replace(anchor, replacement, 1))
           PY
 
-          grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' scripts/Makefile.vmlinux
-          git diff --check
-          test "$(git diff --numstat -- scripts/Makefile.vmlinux | awk '{print $1 " " $2}')" = "1 0"
+          # The running PLK110 A.67 release has no Kleaf OKI '-o-' component.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl")
+          text = path.read_text()
+          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
+          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
+          if text.count(old) != 1:
+              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Preserve original GKI module signer trust
+        run: |
+          set -euo pipefail
+          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+          python3 scripts/prepare_stock_trust.py
 
       - name: Integrate pinned SukiSU builtin
         run: |
@@ -220,344 +256,84 @@ jobs:
           # selinux_state. Apply the upstream SUSFS patch everywhere else,
           # then use the audited A.67-only hooks.c context adaptation.
           git apply --check --exclude=security/selinux/hooks.c 50_add_susfs.patch
-          git apply --exclude=security/selinux/hooks.c 50_add_susfs.patch
+          # The upstream patch has one whitespace-only line in mm/memory.c.
+          git apply --whitespace=fix --exclude=security/selinux/hooks.c 50_add_susfs.patch
           git apply --check "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
           git apply "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
 
           grep -q '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
 
-      - name: Configure minimal SukiSU/SUSFS build
+      - name: Configure pinned SukiSU and SUSFS features
         run: |
           set -euo pipefail
-          cd kernel_workspace/kernel_platform
-          config=common/arch/arm64/configs/gki_defconfig
+          python3 scripts/prepare_sukisu_config.py
+          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+          git -C kernel_workspace/kernel_platform/common diff --check
+          git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/SUKISU_ADAPTATIONS.patch
+          printf 'sukisu=%s\nsusfs=%s\n' "$SUKISU_COMMIT" "$SUSFS_COMMIT" >> artifacts/SOURCE_PINS.txt
 
-          ksu_kconfig=common/drivers/kernelsu/Kconfig
-          test -f "$ksu_kconfig"
+      - name: Preserve upstream defconfig and record build adaptations
+        run: |
+          set -euo pipefail
+          common=kernel_workspace/kernel_platform/common
+          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
+          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
+          git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+          cp "$common/arch/arm64/configs/plk110_sukisu.fragment" artifacts/
+          tar -czf artifacts/SUSFS_ADDED_SOURCES.tar.gz -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
+          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
+          cp "$common/certs/plk110_stock.pem" artifacts/
+          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
+          git -C "$common" diff --name-only -z | xargs -0 -r git -C "$common" update-index --assume-unchanged
+          test -z "$(git -C "$common" status -uno --porcelain)"
+          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
 
-          default_of() {
-            awk -v wanted="$1" '
-              $1 == "config" && $2 == wanted { in_symbol=1; next }
-              in_symbol && $1 == "default" { print $2; exit }
-              in_symbol && $1 == "config" { exit }
-            ' "$ksu_kconfig"
-          }
+      - name: Preflight upstream GKI configuration
+        run: |
+          bash scripts/build_gki.sh preflight
+          python3 scripts/verify_gki.py --preflight --additions baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
 
-          # Keep only the two non-default policy choices in gki_defconfig.
-          # Every enabled SukiSU/SUSFS symbol below is default y at the pinned
-          # SukiSU commit and is proven again against the effective .config.
-          for symbol in \
-            KSU KSU_FEATURE_ADBROOT KSU_SUSFS KSU_SUSFS_ENABLE_LOG \
-            KSU_SUSFS_SUS_PATH KSU_SUSFS_SUS_MOUNT \
-            KSU_SUSFS_SUS_KSTAT KSU_SUSFS_SPOOF_UNAME \
-            KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-            KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-            KSU_SUSFS_OPEN_REDIRECT KSU_SUSFS_SUS_MAP; do
-            test "$(default_of "$symbol")" = y
-          done
-          test "$(default_of KSU_DEBUG)" = n
-          test "$(default_of KPM)" = n
+      - name: Build the GKI used by official canoe perf
+        run: bash scripts/build_gki.sh build
 
-          sed -i -E '/^(# )?CONFIG_(KSU|KPM)(_|=| is not set)/d' "$config"
-          awk '
-            /^CONFIG_EXT4_FS=y$/ {
-              print "# CONFIG_KSU_FEATURE_ADBROOT is not set"
-              print "# CONFIG_KSU_SUSFS_ENABLE_LOG is not set"
-            }
-            { print }
-          ' "$config" > "$config.tmp"
-          mv "$config.tmp" "$config"
+      - name: Verify actual Image config and stock module symbol CRCs
+        run: python3 scripts/verify_gki.py --additions baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
 
-          for line in \
-            '# CONFIG_KSU_FEATURE_ADBROOT is not set' \
-            '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set'; do
-            test "$(grep -Fxc "$line" "$config")" -eq 1
-          done
-          test "$(grep -Ec '^(# )?CONFIG_(KSU|KPM)(_|=| is not set)' "$config")" -eq 2
-
-          for build_file in common/BUILD.bazel msm-kernel/BUILD.bazel; do
-            if [ -f "$build_file" ]; then
-              sed -i '/"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",/d' "$build_file"
-            fi
-          done
-          rm -f common/android/abi_gki_protected_exports_*
-          rm -f msm-kernel/android/abi_gki_protected_exports_*
-
-          # Keep the device's gb2a876903b49 base identifier without a -dirty
-          # suffix after applying the audited local patches.
-          sed -i "s/printf '%s' -dirty/: # reproducible patched tree/" common/scripts/setlocalversion
-
-          # This OnePlus Kleaf snapshot inserts an OKI "-o-" component, but
-          # the running PLK110 A.67 release has no OKI component.
+      - name: Verify compiled feature code
+        run: |
+          set -euo pipefail
+          grep -Eq ' [Tt] kernelsu_init$' artifacts/System.map
+          grep -Eq ' [Tt] susfs_init$' artifacts/System.map
           python3 - <<'PY'
           from pathlib import Path
-
-          path = Path("build/kernel/kleaf/impl/stamp.bzl")
-          text = path.read_text()
-          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
-          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
-          if text.count(old) != 1:
-              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
-          path.write_text(text.replace(old, new, 1))
+          image = Path('artifacts/Image').read_bytes()
+          assert b'v4.2.0-e2912817@builtin' in image, 'wrong SukiSU version metadata'
+          assert b'v2.3.0' in image, 'SUSFS version missing'
           PY
 
-          grep -Fq 'scmversion_prefix="-$android_release-$KMI_GENERATION"' \
-            build/kernel/kleaf/impl/stamp.bzl
-          ! grep -Fq 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"' \
-            build/kernel/kleaf/impl/stamp.bzl
+      - name: Package verified Image
+        run: bash scripts/package_gki.sh
 
-          expected_from_pins="6.12.23-android16-5-g${COMMON_COMMIT:0:12}-ab${BUILD_NUMBER}-4k"
-          test "$expected_from_pins" = "$EXPECTED_KERNEL_RELEASE"
-
-      - name: Build kernel
+      - name: Generate checksums
+        if: always()
         run: |
           set -euo pipefail
-          cd kernel_workspace
-          mkdir -p "out/target/product/$CODENAME"
-          SYSTEM_DLKM_RE_SIGN=0 \
-          BUILD_SYSTEM_DLKM=0 \
-          KMI_SYMBOL_LIST_STRICT_MODE=0 \
-            ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CODENAME" "$BUILD_VARIANT"
-
-          # oplus_build_kernel.sh pipes the inner build through tee and can
-          # otherwise return success even when Bazel failed. A fresh Actions
-          # workspace must contain both of these outputs before we continue.
-          dist="kernel_platform/out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist"
-          if [ ! -s "$dist/Image" ]; then
-            echo "::error::Kernel build produced no non-empty dist/Image; refusing to continue."
-            exit 1
-          fi
-          if [ ! -s "$dist/out_dir/.config" ]; then
-            echo "::error::Kernel build produced no effective dist/out_dir/.config; refusing to continue."
-            exit 1
-          fi
-
-      - name: Export effective kernel configuration
-        run: |
-          set -euo pipefail
-          cd kernel_workspace/kernel_platform
-
-          # OnePlus prepare_vendor.sh explicitly publishes the Kleaf output
-          # tree as dist/out_dir and copies out_dir/.config as a build artifact.
-          grep -Fq '"out_dir/.config"' build/kernel/android/prepare_vendor.sh
-          effective_config_source="out/msm-kernel-${CODENAME}-${BUILD_VARIANT}/dist/out_dir/.config"
-          test -s "$effective_config_source"
-          cp "$effective_config_source" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
-          cmp -s "$effective_config_source" "$GITHUB_WORKSPACE/effective_kernel_config.txt"
-
-      - name: Verify effective kernel configuration
-        run: |
-          set -euo pipefail
-
-          effective_config="$GITHUB_WORKSPACE/effective_kernel_config.txt"
-          test -s "$effective_config"
-
-          stock_config="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config"
-          expected_additions="$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions"
-          echo "$STOCK_CONFIG_SHA256  $stock_config" | sha256sum --check
-          echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  $expected_additions" | sha256sum --check
-
-          verification_failed=0
-
-          for symbol in \
-            CONFIG_KSU \
-            CONFIG_KSU_SUSFS \
-            CONFIG_KSU_SUSFS_SUS_PATH \
-            CONFIG_KSU_SUSFS_SUS_MOUNT \
-            CONFIG_KSU_SUSFS_SUS_KSTAT \
-            CONFIG_KSU_SUSFS_SPOOF_UNAME \
-            CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-            CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-            CONFIG_KSU_SUSFS_OPEN_REDIRECT \
-            CONFIG_KSU_SUSFS_SUS_MAP; do
-            if ! grep -qx "${symbol}=y" "$effective_config"; then
-              echo "::error::Effective config does not enable ${symbol}=y"
-              grep -E "^${symbol}=|^# ${symbol} is not set$" "$effective_config" || true
-              verification_failed=1
-            fi
-          done
-
-          require_exact_config_line() {
-            local line="$1"
-            local symbol="${2:-}"
-            if ! grep -Fqx "$line" "$effective_config"; then
-              echo "::error::Effective config missing required line: $line"
-              if [ -n "$symbol" ]; then
-                grep -E "^${symbol}=|^# ${symbol} is not set$" "$effective_config" || true
-              fi
-              verification_failed=1
-            fi
-          }
-
-          require_exact_config_line '# CONFIG_KSU_FEATURE_ADBROOT is not set' CONFIG_KSU_FEATURE_ADBROOT
-          require_exact_config_line '# CONFIG_KPM is not set' CONFIG_KPM
-          require_exact_config_line '# CONFIG_KSU_DEBUG is not set' CONFIG_KSU_DEBUG
-          require_exact_config_line '# CONFIG_KSU_SUSFS_ENABLE_LOG is not set' CONFIG_KSU_SUSFS_ENABLE_LOG
-          require_exact_config_line 'CONFIG_LTO_NONE=y' CONFIG_LTO_NONE
-          require_exact_config_line '# CONFIG_LTO_CLANG_FULL is not set' CONFIG_LTO_CLANG_FULL
-          require_exact_config_line '# CONFIG_LTO_CLANG_THIN is not set' CONFIG_LTO_CLANG_THIN
-
-          # Require the audited SukiSU/SUSFS set in full. The OnePlus device
-          # build also merges legitimate SoC/vendor fragments, so unrelated
-          # additions remain diagnostic instead of becoming false failures.
-          while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            if ! grep -Fqx "$line" "$effective_config"; then
-              echo "::error::Effective config missing audited line: $line"
-              verification_failed=1
-            fi
-          done < "$expected_additions"
-
-          export LC_ALL=C
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$stock_config" | sort -u > /tmp/stock.config.sorted
-          grep -E '^(CONFIG_|# CONFIG_.* is not set)' "$effective_config" | sort -u > /tmp/effective.config.sorted
-          diff -u /tmp/stock.config.sorted /tmp/effective.config.sorted > "$GITHUB_WORKSPACE/kernel_config_delta.txt" || true
-          comm -13 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/actual.config.additions
-          comm -23 /tmp/stock.config.sorted /tmp/effective.config.sorted > /tmp/unexpected.config.removals
-          diff -u "$expected_additions" /tmp/actual.config.additions > "$GITHUB_WORKSPACE/config_additions_diff.txt" || true
-
-          sensitive='^(# )?CONFIG_(PREEMPT.*|HZ.*|SCHED.*|UCLAMP.*|WALT.*|HMBIRD.*|SLIM_SCHED.*|EXT_GROUP_SCHED.*|CPU_FREQ.*|CPU_IDLE.*|ZRAM.*|ZSMALLOC.*|LTO.*|CFI.*|MODVERSIONS|MODULE_SIG.*|KASAN.*|DEBUG_KERNEL)(=| is not set)'
-          grep -E "$sensitive" "$stock_config" | sort > /tmp/stock.sensitive
-          grep -E "$sensitive" "$effective_config" | sort > /tmp/effective.sensitive
-          diff -u /tmp/stock.sensitive /tmp/effective.sensitive > "$GITHUB_WORKSPACE/sensitive_config_diff.txt" || true
-
-          # Preserve every stock-sensitive setting exactly. Three signing
-          # lines are intentionally excluded because this Image-only build
-          # disables protected exports and module re-signing. Extra SoC/vendor
-          # symbols are allowed.
-          while IFS= read -r line; do
-            case "$line" in
-              'CONFIG_MODULE_SIG_ALL=y'|\
-              'CONFIG_MODULE_SIG_PROTECT=y'|\
-              'CONFIG_MODULE_SIG_PROTECT_LIST="protected_module_names_list"')
-                continue
-                ;;
-            esac
-            if ! grep -Fqx "$line" "$effective_config"; then
-              echo "::error::Effective config changed protected stock line: $line"
-              verification_failed=1
-            fi
-          done < /tmp/stock.sensitive
-
-          cp "$stock_config" "$GITHUB_WORKSPACE/stock_kernel_config.txt"
-          cp "$expected_additions" "$GITHUB_WORKSPACE/expected_config_additions.txt"
-          cp /tmp/actual.config.additions "$GITHUB_WORKSPACE/actual_config_additions.txt"
-          cp /tmp/unexpected.config.removals "$GITHUB_WORKSPACE/unexpected_config_removals.txt"
-
-          if [ "$verification_failed" -ne 0 ]; then
-            echo "::error::Effective kernel configuration verification failed; see diagnostics above."
-            exit 1
-          fi
-
-      - name: Package kernel and stable userspace module separately
-        run: |
-          set -euo pipefail
-
-          dist=kernel_workspace/kernel_platform/out/msm-kernel-canoe-perf/dist
-          image="$dist/Image"
-          test -s "$image"
-
-          strings "$image" > /tmp/plk110-image.strings
-          kernel_banner="$(grep -m1 '^Linux version ' /tmp/plk110-image.strings)"
-          test -n "$kernel_banner"
-          printf '%s\n' "$kernel_banner" | grep -F "$EXPECTED_KERNEL_RELEASE"
-          ! printf '%s\n' "$kernel_banner" | grep -F -- '-dirty'
-
-          git clone --filter=blob:none --no-checkout --depth=1 --branch master \
-            https://github.com/Numbersf/AnyKernel3.git AnyKernel3
-          git -C AnyKernel3 fetch --depth=1 origin "$ANYKERNEL_COMMIT"
-          git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
-          test "$(git -C AnyKernel3 rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
-          rm -rf AnyKernel3/.git
-
-          cp "$image" AnyKernel3/Image
-          sed -i 's/^kernel.string=.*/kernel.string=PLK110 SukiSU 4.2 + SUSFS 2.3/' AnyKernel3/anykernel.sh
-          sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
-          sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
-          sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
-          sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
-
-          grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
-          grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
-          grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
-          ! grep -Eq '^[[:space:]]*(patch_fstab|flash_generic|write_boot.*vendor)' AnyKernel3/anykernel.sh
-          for forbidden in \
-            dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
-            vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
-            vendor_kernel_boot vendor_kernel_boot.img \
-            vendor_dlkm vendor_dlkm.img system_dlkm system_dlkm.img \
-            recovery recovery.img abl abl.img; do
-            test ! -e "AnyKernel3/$forbidden"
-          done
-          test ! -d AnyKernel3/vendor_ramdisk
-          test ! -d AnyKernel3/vendor_patch
-          test ! -d AnyKernel3/modules
-
-          mkdir artifacts
-          (
-            cd AnyKernel3
-            zip -r9 ../artifacts/PLK110_SukiSU-4.2_SUSFS-2.3_NoKPM.zip .
-          )
-
-          curl --fail --location --retry 3 \
-            "$SUSFS_MODULE_URL" \
-            --output artifacts/ksu_module_susfs_1.5.2+_R28.zip
-          echo "$SUSFS_MODULE_SHA256  artifacts/ksu_module_susfs_1.5.2+_R28.zip" | sha256sum --check
-
-          image_sha="$(sha256sum "$image" | awk '{print $1}')"
-          kernel_zip_sha="$(sha256sum artifacts/PLK110_SukiSU-4.2_SUSFS-2.3_NoKPM.zip | awk '{print $1}')"
-          module_sha="$(sha256sum artifacts/ksu_module_susfs_1.5.2+_R28.zip | awk '{print $1}')"
-
-          {
-            echo "device=$DEVICE"
-            echo "firmware_baseline=$FIRMWARE_BASELINE"
-            echo "expected_kernel_release=$EXPECTED_KERNEL_RELEASE"
-            echo "stock_kernel_build_number=$BUILD_NUMBER"
-            echo "manifest=$MANIFEST_COMMIT"
-            echo "common=$COMMON_COMMIT"
-            echo "soc=$SOC_COMMIT"
-            echo "modules=$MODULES_COMMIT"
-            echo "sukisu=$SUKISU_COMMIT"
-            echo "susfs=$SUSFS_COMMIT"
-            echo "anykernel=$ANYKERNEL_COMMIT"
-            echo "kpm=disabled"
-            echo "susfs_log=disabled"
-            echo "image_sha256=$image_sha"
-            echo "kernel_zip_sha256=$kernel_zip_sha"
-            echo "module_sha256=$module_sha"
-          } > artifacts/BUILD_INFO.txt
-
-          cp "$image" artifacts/Image
-          cp "$GITHUB_WORKSPACE/effective_kernel_config.txt" artifacts/
-          cp stock_kernel_config.txt artifacts/
-          cp expected_config_additions.txt artifacts/
-          cp actual_config_additions.txt artifacts/
-          cp unexpected_config_removals.txt artifacts/
-          cp kernel_config_delta.txt artifacts/
-          printf '%s\n' "$kernel_banner" > artifacts/KERNEL_BANNER.txt
+          mkdir -p artifacts
           (
             cd artifacts
-            sha256sum \
-              BUILD_INFO.txt \
-              Image \
-              KERNEL_BANNER.txt \
-              PLK110_SukiSU-4.2_SUSFS-2.3_NoKPM.zip \
-              actual_config_additions.txt \
-              effective_kernel_config.txt \
-              expected_config_additions.txt \
-              kernel_config_delta.txt \
-              ksu_module_susfs_1.5.2+_R28.zip \
-              stock_kernel_config.txt \
-              unexpected_config_removals.txt \
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+              | sort -z \
+              | xargs -0 -r sha256sum \
               > SHA256SUMS.txt
           )
 
-      - name: Upload verified build artifacts
+      - name: Upload reproduction diagnostics and image
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-SukiSU-4.2-SUSFS-2.3-verified
-          path: artifacts/*
-          if-no-files-found: error
-          compression-level: 0
+          name: PLK110-A67-SukiSU-4.2-SUSFS-2.3-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
           retention-days: 14
