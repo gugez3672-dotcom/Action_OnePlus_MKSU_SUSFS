@@ -1,0 +1,313 @@
+name: Build PLK110 ReSukiSU + SUSFS (Stock Scheduler ABI)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - resukisu-stock-sched
+    paths:
+      - .github/plk110-resukisu-trigger
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: plk110-a67-resukisu-susfs-stock-sched
+  cancel-in-progress: false
+
+env:
+  DEVICE: PLK110
+  SOC: sm8850
+  CODENAME: canoe
+  ANDROID_VERSION: android16
+  KERNEL_VERSION: "6.12"
+  BUILD_VARIANT: perf
+  BUILD_NUMBER: "14541642"
+  FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
+  EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
+  STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+
+  # Exact running A67 source set.
+  MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
+  COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
+  SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
+  MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
+
+  # Pinned mature ReSukiSU / CCTV18 SUSFS integration.
+  RESUKISU_COMMIT: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
+  SUSFS4OKI_COMMIT: 8dce4337bcd15807c5449bbeff6e02a967138db0
+  CCTV18_REFERENCE_COMMIT: 2844bf492f557fb39113fc93a2dd1602e05790d7
+  ANYKERNEL_COMMIT: 0fc7569866bb5d5fe51752cc410dca3e92ab332f
+
+  VERIFIED_STOCK_RUN: "34980659033"
+  VERIFIED_STOCK_COMMIT: 34e24abcfaac6fc9db1279ad073c15af216fd664
+  REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
+
+jobs:
+  resukisu-stock-sched:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          swap-size-mb: 8192
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+
+      - name: Checkout build definition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify A67 baseline and scheduler invariants
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+          stock=baselines/PLK110_16.0.8.302_stock.config
+          grep -qx 'CONFIG_SCHED_CLASS_EXT=y' "$stock"
+          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+
+      - name: Confirm previously verified stock reproduction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3             -H "Authorization: Bearer $GH_TOKEN"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN"             --output artifacts/VERIFIED_STOCK_RUN.json
+          jq -e --arg sha "$VERIFIED_STOCK_COMMIT"             '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"'             artifacts/VERIFIED_STOCK_RUN.json
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y binutils git curl jq python3 zip patch
+
+          curl --fail --location --retry 3             https://storage.googleapis.com/git-repo-downloads/repo             --output /tmp/repo
+          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
+          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
+
+      - name: Sync and pin exact OnePlus A67 source
+        run: |
+          set -euo pipefail
+          mkdir kernel_workspace
+          cd kernel_workspace
+
+          repo init             -u https://github.com/OnePlusOSS/kernel_manifest.git             -b "$MANIFEST_COMMIT"             -m oneplus_15.xml             --depth=1
+
+          mkdir -p .repo/local_manifests
+          printf '%s\n'             '<?xml version="1.0" encoding="UTF-8"?>'             '<manifest>'             '  <remove-project name="kernel_platform/prebuilts/asuite" />'             '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />'             '</manifest>'             > .repo/local_manifests/prune-unused-test-prebuilts.xml
+
+          repo sync -c --no-tags --no-clone-bundle -j2
+
+          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
+          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
+          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
+          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
+          git fetch --depth=1 origin "$MODULES_COMMIT"
+          git checkout --detach "$MODULES_COMMIT"
+
+          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
+          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
+          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+
+          {
+            echo "manifest=$MANIFEST_COMMIT"
+            echo "common=$COMMON_COMMIT"
+            echo "soc=$SOC_COMMIT"
+            echo "modules=$MODULES_COMMIT"
+            echo "cctv18_reference=$CCTV18_REFERENCE_COMMIT"
+          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+
+      - name: Apply only proven A67 stock build-system adaptations
+        run: |
+          set -euo pipefail
+          common=kernel_workspace/kernel_platform/common
+          kp=kernel_workspace/kernel_platform
+
+          grep -Fq '"vmlinux_oki",' "$kp/build/kernel/kleaf/constants.bzl"
+          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' "$common/scripts/Makefile.vmlinux"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("kernel_workspace/kernel_platform/common/scripts/Makefile.vmlinux")
+          text = path.read_text()
+          anchor = (
+              "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
+              "\t+$(call if_changed_dep,link_vmlinux)\n"
+          )
+          replacement = anchor + "\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n"
+          if text.count(anchor) != 1:
+              raise SystemExit("unexpected A67 Makefile.vmlinux link rule")
+          path.write_text(text.replace(anchor, replacement, 1))
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl")
+          text = path.read_text()
+          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
+          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
+          if text.count(old) != 1:
+              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Preserve original GKI module signer trust
+        run: |
+          set -euo pipefail
+          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+          python3 scripts/prepare_stock_trust.py
+
+      - name: Integrate pinned ReSukiSU
+        run: |
+          set -euo pipefail
+          cd kernel_workspace/kernel_platform
+
+          git clone --filter=blob:none --no-checkout             https://github.com/ReSukiSU/ReSukiSU.git KernelSU
+          git -C KernelSU fetch origin "$RESUKISU_COMMIT"
+          git -C KernelSU checkout --detach "$RESUKISU_COMMIT"
+          test "$(git -C KernelSU rev-parse HEAD)" = "$RESUKISU_COMMIT"
+
+          ln -sfn ../../KernelSU/kernel common/drivers/kernelsu
+          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' common/drivers/Makefile ||             printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> common/drivers/Makefile
+          grep -q 'source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig ||             sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig
+
+          grep -q 'config KSU_SUSFS' KernelSU/kernel/Kconfig
+          grep -q 'REPO_NAME := ReSukiSU' KernelSU/kernel/Kbuild
+
+      - name: Apply pinned CCTV18 SUSFS-for-OKI patch
+        run: |
+          set -euo pipefail
+          cd kernel_workspace
+
+          git clone --filter=blob:none --no-checkout --branch oki-android16-6.12             https://github.com/cctv18/susfs4oki.git susfs4ksu
+          git -C susfs4ksu fetch origin "$SUSFS4OKI_COMMIT"
+          git -C susfs4ksu checkout --detach "$SUSFS4OKI_COMMIT"
+          test "$(git -C susfs4ksu rev-parse HEAD)" = "$SUSFS4OKI_COMMIT"
+
+          cp susfs4ksu/kernel_patches/fs/* kernel_platform/common/fs/
+          cp susfs4ksu/kernel_patches/include/linux/* kernel_platform/common/include/linux/
+          cp             susfs4ksu/kernel_patches/50_add_susfs_in_gki-android16-6.12.patch             kernel_platform/common/50_add_susfs.patch
+
+          cd kernel_platform/common
+          patch --dry-run -p1 -F 3 < 50_add_susfs.patch
+          patch -p1 -F 3 < 50_add_susfs.patch
+          test -z "$(find . -name '*.rej' -print -quit)"
+          grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+          grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
+
+      - name: Configure minimal ReSukiSU + SUSFS only
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_resukisu_config.py
+          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+          git -C kernel_workspace/kernel_platform/common diff --check
+
+          # Deliberately exclude unrelated performance/network/scheduler changes.
+          ! grep -Eq '^CONFIG_(KPM|MQ_IOSCHED_ADIOS|REKERNEL|BBG|TCP_CONG_BRUTAL)=y$'             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+
+      - name: Record source and patch state
+        run: |
+          set -euo pipefail
+          common=kernel_workspace/kernel_platform/common
+          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
+          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
+          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
+          cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
+          cp "$common/certs/plk110_stock.pem" artifacts/
+          git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+          git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/RESUKISU_KLEAF_ADAPTATION.patch
+          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
+          tar -czf artifacts/SUSFS4OKI_ADDED_SOURCES.tar.gz             -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
+
+          printf 'resukisu=%s\nsusfs4oki=%s\n' "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT"             >> artifacts/SOURCE_PINS.txt
+
+          git -C "$common" diff --name-only -z | xargs -0 -r git -C "$common" update-index --assume-unchanged
+          test -z "$(git -C "$common" status -uno --porcelain)"
+          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
+
+      - name: Preflight exact stock config plus declared root delta
+        run: |
+          set -euo pipefail
+          bash scripts/build_gki.sh preflight
+          python3 scripts/verify_gki.py             --preflight             --additions baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+
+      - name: Build exact A67 GKI
+        run: bash scripts/build_gki.sh build
+
+      - name: Verify Image config, stock module CRCs and signer trust
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_gki.py             --additions baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+
+      - name: Verify ReSukiSU and SUSFS compiled
+        run: |
+          set -euo pipefail
+          grep -Eq ' [Tt] kernelsu_init$' artifacts/System.map
+          grep -Eq ' [Tt] susfs_init$' artifacts/System.map
+          python3 - <<'PY'
+          from pathlib import Path
+          image = Path('artifacts/Image').read_bytes()
+          assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
+          assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
+          PY
+
+      - name: Gate stock scheduler and Oplus vendor-module compatibility
+        run: |
+          set -euo pipefail
+          grep -qx 'CONFIG_SCHED_CLASS_EXT=y' artifacts/image.config
+          grep -qx 'CONFIG_MODVERSIONS=y' artifacts/image.config
+          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          abi = verdict['module_abi']
+          assert verdict['passed'] is True
+          assert abi['missing'] == []
+          assert abi['crc_mismatches'] == {}
+          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
+              'PASS\n'
+              f"stock vendor modules captured: {abi['phone_module_count']}\n"
+              f"matched kernel symbol CRCs: {abi['matched']}\n"
+              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
+              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
+              'android_vh_scx_restore_flags ABI preserved\n'
+          )
+          PY
+
+      - name: Package verified Image only
+        run: bash scripts/package_resukisu_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
+          )
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-ReSukiSU-SUSFS-StockScheduler-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
