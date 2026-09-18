@@ -205,6 +205,25 @@ jobs:
           patch --dry-run -p1 -F 3 < 50_add_susfs.patch
           patch -p1 -F 3 < 50_add_susfs.patch
           test -z "$(find . -name '*.rej' -print -quit)"
+
+          # CCTV18's patch currently contains two whitespace-only defects.
+          # Normalize only those exact added lines; this does not change logic.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("fs/stat.c")
+          lines = p.read_text().splitlines()
+          for i, line in enumerate(lines):
+              if "query_flags | AT_GETATTR_NOSEC);" in line and i and "request_mask," in lines[i - 1]:
+                  lines[i] = "\t\t\t\t\t\tquery_flags | AT_GETATTR_NOSEC);"
+          p.write_text("\n".join(lines) + "\n")
+
+          p = Path("mm/memory.c")
+          lines = [line.rstrip() for line in p.read_text().splitlines()]
+          p.write_text("\n".join(lines) + "\n")
+          PY
+
+          git diff --check
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
           grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
 
