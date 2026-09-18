@@ -1,1 +1,1 @@
-trigger: retry ReSukiSU + SUSFS on exact PLK110 A67 source after CCTV18 patch whitespace normalization
+trigger: retry after fixing ReSukiSU KSU_SRC for Bazel/Kleaf sandbox
