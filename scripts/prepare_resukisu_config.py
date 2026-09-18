@@ -22,6 +22,9 @@ start = text.index("GIT_BIN :=")
 end = text.index("KERNEL_VERSION :=", start)
 replacement = (
     "# Fixed from the pinned ReSukiSU commit for hermetic Kleaf builds.\n"
+    "# Keep KSU_SRC inside the kernel source tree so ReSukiSU helper includes\n"
+    "# resolve correctly inside Bazel/Kleaf's sandbox.\n"
+    "KSU_SRC := $(srctree)/drivers/kernelsu\n"
     f"KSU_VERSION := {version}\n"
     f"KSU_VERSION_FULL := ReSukiSU-{commit}@PLK110-A67\n\n"
     "$(info -- $(REPO_NAME) version code: $(KSU_VERSION))\n"
