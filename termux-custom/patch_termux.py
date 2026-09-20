@@ -45,7 +45,7 @@ s = read(bootstrap_script)
 # built marker directory defined by the script instead.
 s = s.replace(
     'rm -f "$TERMUX_BUILT_PACKAGES_DIRECTORY_FOR_ARCH"/*',
-    'mkdir -p "$TERMUX_BUILT_PACKAGES_DIRECTORY"\\n\\t\\trm -f "$TERMUX_BUILT_PACKAGES_DIRECTORY"/*',
+    'mkdir -p "$TERMUX_BUILT_PACKAGES_DIRECTORY"\n\t\trm -f "$TERMUX_BUILT_PACKAGES_DIRECTORY"/*',
 )
 s = s.replace(
     'add_termux_bootstrap_second_stage_files "$package_arch"',
