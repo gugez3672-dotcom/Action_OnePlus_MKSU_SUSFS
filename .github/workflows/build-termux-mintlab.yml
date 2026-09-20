@@ -1,0 +1,223 @@
+name: Build Termux MintLab
+
+on:
+  push:
+    branches:
+      - termux-mintlab
+    paths:
+      - ".github/workflows/build-termux-mintlab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+
+    env:
+      APP_PACKAGE: com.mintlab.notes
+      APP_LABEL: Mint Notes
+      TERMUX_APP_SHA: 084d709fbf23ea83b5cb85fd3d795c775be06676
+      TERMUX_PACKAGES_SHA: 25df73f6883362c8a0a2b8d9cde5403d0f156641
+      TERMUX_CUSTOM_BOOTSTRAP: "1"
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/ndk/* || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /usr/share/dotnet || true
+          df -h
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK and NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
+
+      - name: Clone pinned termux-packages
+        run: |
+          git clone https://github.com/termux/termux-packages.git
+          cd termux-packages
+          git checkout "$TERMUX_PACKAGES_SHA"
+
+      - name: Set custom Termux package name
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("termux-packages/scripts/properties.sh")
+          s = p.read_text()
+          old = 'TERMUX_APP__PACKAGE_NAME="com.termux"'
+          new = 'TERMUX_APP__PACKAGE_NAME="com.mintlab.notes"'
+          if old not in s:
+              raise SystemExit("Expected TERMUX_APP__PACKAGE_NAME assignment not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+          grep -n 'TERMUX_APP__PACKAGE_NAME=' termux-packages/scripts/properties.sh | head
+
+      - name: Build aarch64 bootstrap for com.mintlab.notes
+        run: |
+          cd termux-packages
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64 -f
+          test -s bootstrap-aarch64.zip
+          sha256sum bootstrap-aarch64.zip
+
+      - name: Clone pinned termux-app
+        run: |
+          git clone https://github.com/termux/termux-app.git
+          cd termux-app
+          git checkout "$TERMUX_APP_SHA"
+
+      - name: Apply minimal package-id patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          APP_PACKAGE = "com.mintlab.notes"
+          APP_LABEL = "Mint Notes"
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f"Expected text not found in {path}: {old!r}")
+              p.write_text(s.replace(old, new, -1 if count is None else count))
+
+          # 1) Android-visible application id. Keep namespace com.termux unchanged.
+          p = Path("termux-app/app/build.gradle")
+          s = p.read_text()
+          marker = "    defaultConfig {\n"
+          if marker not in s:
+              raise SystemExit("defaultConfig marker not found")
+          s = s.replace(marker, marker + f'        applicationId "{APP_PACKAGE}"\n', 1)
+
+          s = s.replace('manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"',
+                        f'manifestPlaceholders.TERMUX_PACKAGE_NAME = "{APP_PACKAGE}"', 1)
+          s = s.replace('manifestPlaceholders.TERMUX_APP_NAME = "Termux"',
+                        f'manifestPlaceholders.TERMUX_APP_NAME = "{APP_LABEL}"', 1)
+
+          # Only build arm64-v8a. The user's OnePlus 15 is arm64.
+          s = s.replace("include 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'",
+                        "include 'arm64-v8a'", 1)
+          s = s.replace("universalApk true", "universalApk false", 1)
+
+          # Do not overwrite the custom bootstrap with the official com.termux bootstrap.
+          marker = "task downloadBootstraps() {\n    doLast {\n"
+          if marker not in s:
+              raise SystemExit("downloadBootstraps task marker not found")
+          injected = (
+              "task downloadBootstraps() {\n"
+              "    doLast {\n"
+              '        if (System.getenv("TERMUX_CUSTOM_BOOTSTRAP") == "1") {\n'
+              '            logger.quiet("Using custom locally built bootstrap")\n'
+              "            return\n"
+              "        }\n"
+          )
+          s = s.replace(marker, injected, 1)
+          p.write_text(s)
+
+          # 2) Runtime package identity / PREFIX.
+          replace(
+              "termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java",
+              'public static final String TERMUX_APP_NAME = "Termux";',
+              f'public static final String TERMUX_APP_NAME = "{APP_LABEL}";',
+              1,
+          )
+          replace(
+              "termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java",
+              'public static final String TERMUX_PACKAGE_NAME = "com.termux";',
+              f'public static final String TERMUX_PACKAGE_NAME = "{APP_PACKAGE}";',
+              1,
+          )
+
+          # 3) Resource entities that intentionally mirror package name and PREFIX.
+          for path in (
+              "termux-app/app/src/main/res/values/strings.xml",
+              "termux-app/termux-shared/src/main/res/values/strings.xml",
+          ):
+              replace(path,
+                      '<!ENTITY TERMUX_PACKAGE_NAME "com.termux">',
+                      f'<!ENTITY TERMUX_PACKAGE_NAME "{APP_PACKAGE}">',
+                      1)
+              replace(path,
+                      '<!ENTITY TERMUX_APP_NAME "Termux">',
+                      f'<!ENTITY TERMUX_APP_NAME "{APP_LABEL}">',
+                      1)
+
+          replace(
+              "termux-app/termux-shared/src/main/res/values/strings.xml",
+              '<!ENTITY TERMUX_PREFIX_DIR_PATH "/data/data/com.termux/files/usr">',
+              f'<!ENTITY TERMUX_PREFIX_DIR_PATH "/data/data/{APP_PACKAGE}/files/usr">',
+              1,
+          )
+
+          # 4) Android shortcut targetPackage must be patched manually.
+          replace(
+              "termux-app/app/src/main/res/xml/shortcuts.xml",
+              'android:targetPackage="com.termux"',
+              f'android:targetPackage="{APP_PACKAGE}"',
+              1,
+          )
+          PY
+
+          cp termux-packages/bootstrap-aarch64.zip termux-app/app/src/main/cpp/bootstrap-aarch64.zip
+
+          echo "---- package patch verification ----"
+          grep -n 'applicationId\|TERMUX_PACKAGE_NAME =\|TERMUX_APP_NAME =' termux-app/app/build.gradle | head -20
+          grep -n 'TERMUX_PACKAGE_NAME =\|TERMUX_APP_NAME ='             termux-app/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java | head -10
+          grep -n 'targetPackage' termux-app/app/src/main/res/xml/shortcuts.xml
+          sha256sum termux-app/app/src/main/cpp/bootstrap-aarch64.zip
+
+      - name: Build arm64 debug APK
+        run: |
+          cd termux-app
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Validate APK identity
+        run: |
+          APK="$(find termux-app/app/build/outputs/apk -type f -name '*.apk' | grep 'arm64-v8a' | head -n1)"
+          if [ -z "$APK" ]; then
+            echo "arm64-v8a APK not found"
+            find termux-app/app/build/outputs/apk -type f -maxdepth 8 -print || true
+            exit 1
+          fi
+
+          echo "APK=$APK" >> "$GITHUB_ENV"
+          echo "Selected APK: $APK"
+
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          BADGING="$($AAPT dump badging "$APK" | head -n1)"
+          echo "$BADGING"
+          echo "$BADGING" | grep -q "package: name='com.mintlab.notes'"
+
+          mkdir -p artifact
+          cp "$APK" artifact/MintNotes-Terminal-arm64-v8a.apk
+          cp termux-packages/bootstrap-aarch64.zip artifact/bootstrap-aarch64-com.mintlab.notes.zip
+
+          {
+            echo "Android package: com.mintlab.notes"
+            echo "Display label: Mint Notes"
+            echo "Architecture: arm64-v8a"
+            echo "Termux app commit: $TERMUX_APP_SHA"
+            echo "Termux packages commit: $TERMUX_PACKAGES_SHA"
+            echo
+            echo "$BADGING"
+            echo
+            sha256sum artifact/*
+          } > artifact/BUILD_INFO.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MintNotes-Terminal-arm64
+          path: artifact/*
+          if-no-files-found: error
+          retention-days: 7
