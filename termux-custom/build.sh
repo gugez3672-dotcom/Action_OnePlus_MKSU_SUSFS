@@ -9,6 +9,9 @@ CUSTOM_APP_NAME="${CUSTOM_APP_NAME:-Aurel Terminal}"
 
 export CUSTOM_PACKAGE CUSTOM_APP_NAME
 
+echo "Host: $(uname -a)"
+echo "Docker: $(docker --version 2>/dev/null || true)"
+
 rm -rf "$WORK" "$OUT"
 mkdir -p "$WORK" "$OUT"
 
