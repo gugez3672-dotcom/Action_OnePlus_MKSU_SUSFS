@@ -40,6 +40,13 @@ write(properties, s)
 # currently being built so the generated bootstrap second-stage metadata is valid.
 bootstrap_script = packages / "scripts/build-bootstraps.sh"
 s = read(bootstrap_script)
+# Current master references an undefined per-arch built-marker directory when
+# -f is used. With an empty variable that becomes "rm -f /*". Use the actual
+# built marker directory defined by the script instead.
+s = s.replace(
+    'rm -f "$TERMUX_BUILT_PACKAGES_DIRECTORY_FOR_ARCH"/*',
+    'mkdir -p "$TERMUX_BUILT_PACKAGES_DIRECTORY"\\n\\t\\trm -f "$TERMUX_BUILT_PACKAGES_DIRECTORY"/*',
+)
 s = s.replace(
     'add_termux_bootstrap_second_stage_files "$package_arch"',
     'add_termux_bootstrap_second_stage_files "$TERMUX_ARCH"',
