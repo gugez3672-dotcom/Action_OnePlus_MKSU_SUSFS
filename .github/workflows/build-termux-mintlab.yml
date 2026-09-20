@@ -64,6 +64,31 @@ jobs:
           PY
           grep -n 'TERMUX_APP__PACKAGE_NAME=' termux-packages/scripts/properties.sh | head
 
+          # The custom package build has to compile termux-am instead of
+          # downloading the com.termux repository package. Its Gradle build
+          # needs Android 33 / build-tools 30.0.3 and installs them on demand.
+          # The stock restricted profile makes the SDK read-only, which turns
+          # that normal install into a misleading "missing SDK components"
+          # failure after most bootstrap dependencies have already built.
+          sed -i '\|deny /home/builder/lib/\*\* wlk,|d' \
+            termux-packages/scripts/profile-restricted.apparmor
+          ! grep -Fq 'deny /home/builder/lib/** wlk,' \
+            termux-packages/scripts/profile-restricted.apparmor
+
+      - name: Prepare bootstrap build cache
+        run: |
+          sudo mkdir -p /data
+          sudo chown -R "$(id -u):$(id -g)" /data
+          mkdir -p "$HOME/.termux-build" termux-packages/output
+
+      - name: Restore bootstrap build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /data
+            termux-packages/output
+          key: termux-bootstrap-${{ runner.os }}-aarch64-${{ env.TERMUX_PACKAGES_SHA }}-${{ env.APP_PACKAGE }}-v1
+
       - name: Build aarch64 bootstrap for com.mintlab.notes
         run: |
           cd termux-packages
@@ -72,9 +97,18 @@ jobs:
           # this pinned build-bootstraps.sh revision expands an unset legacy
           # directory variable in its force-clean path and ends up executing
           # `rm -f /*` inside the builder container.
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
+          ./scripts/run-docker.sh --mount-termux-dirs ./scripts/build-bootstraps.sh --architectures aarch64
           test -s bootstrap-aarch64.zip
           sha256sum bootstrap-aarch64.zip
+
+      - name: Save bootstrap build cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /data
+            termux-packages/output
+          key: termux-bootstrap-${{ runner.os }}-aarch64-${{ env.TERMUX_PACKAGES_SHA }}-${{ env.APP_PACKAGE }}-v1
 
       - name: Clone pinned termux-app
         run: |
