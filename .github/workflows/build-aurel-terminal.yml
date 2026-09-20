@@ -1,0 +1,74 @@
+name: Build Aurel Terminal
+
+on:
+  push:
+    branches:
+      - termux-custom-build
+    paths:
+      - 'termux-custom/**'
+      - '.github/workflows/build-aurel-terminal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aurel-terminal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      CUSTOM_PACKAGE: io.aurel.terminal
+      CUSTOM_APP_NAME: Aurel Terminal
+
+    steps:
+      - name: Checkout build controller
+        uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/share/powershell /usr/share/swift || true
+          docker system prune -af || true
+          df -h
+
+      - name: Build custom Termux
+        shell: bash
+        run: |
+          chmod +x termux-custom/build.sh
+          bash termux-custom/build.sh
+
+      - name: Upload APK and bootstrap
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: AurelTerminal-arm64-v8a
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            termux-custom/out/AurelTerminal-arm64-v8a.apk
+            termux-custom/out/bootstrap-aarch64.zip
+            termux-custom/out/SHA256SUMS.txt
+            termux-custom/out/build-info.txt
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: AurelTerminal-build-logs
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            termux-custom/out/bootstrap-build.log
+            termux-custom/out/apk-build.log
