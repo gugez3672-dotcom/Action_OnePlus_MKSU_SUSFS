@@ -67,7 +67,12 @@ jobs:
       - name: Build aarch64 bootstrap for com.mintlab.notes
         run: |
           cd termux-packages
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64 -f
+          # This is a fresh runner and fresh termux-packages checkout, so there
+          # cannot be stale package outputs to discard. Do not pass -f here:
+          # this pinned build-bootstraps.sh revision expands an unset legacy
+          # directory variable in its force-clean path and ends up executing
+          # `rm -f /*` inside the builder container.
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --architectures aarch64
           test -s bootstrap-aarch64.zip
           sha256sum bootstrap-aarch64.zip
 
