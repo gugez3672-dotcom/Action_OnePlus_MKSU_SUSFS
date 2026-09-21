@@ -31,6 +31,9 @@ jobs:
           cp /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign signer/
           cp /usr/local/lib/android/sdk/build-tools/35.0.0/aapt signer/
           cp /usr/local/lib/android/sdk/build-tools/35.0.0/aapt2 signer/
+          LIBCPP=$(find /usr/local/lib/android/sdk/build-tools/35.0.0 -type f -name 'libc++.so' | head -n 1)
+          test -n "$LIBCPP"
+          cp "$LIBCPP" signer/
           sha256sum signer/* > signer/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
