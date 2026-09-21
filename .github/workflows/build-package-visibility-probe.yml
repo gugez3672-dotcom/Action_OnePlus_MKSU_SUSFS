@@ -1,14 +1,15 @@
-name: Build Package Visibility Probe
+name: Build APK Raw Read Probe
 
 on:
   push:
     branches:
-      - package-visibility-probe-20260921
+      - apk-raw-read-probe-20260921
     paths:
       - 'settings.gradle'
       - 'build.gradle'
       - 'app/**'
       - '.github/workflows/build-package-visibility-probe.yml'
+      - '.github/raw-read-trigger'
   workflow_dispatch:
 
 jobs:
@@ -46,24 +47,21 @@ jobs:
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
-          "$SDKMANAGER" --list_installed | grep -E 'platforms;android-35|build-tools;35.0.0'
 
-      - name: Build three probe APKs
+      - name: Build probe APK
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Collect APKs
+      - name: Collect APK
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p out
-          cp app/build/outputs/apk/plain/debug/app-plain-debug.apk out/PackageProbe-Plain.apk
-          cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk out/PackageProbe-Targeted.apk
-          cp app/build/outputs/apk/queryall/debug/app-queryall-debug.apk out/PackageProbe-QUERY_ALL.apk
-          sha256sum out/*.apk | tee out/SHA256SUMS.txt
+          cp app/build/outputs/apk/debug/app-debug.apk out/APK-Raw-Read-Probe.apk
+          sha256sum out/APK-Raw-Read-Probe.apk | tee out/SHA256SUMS.txt
 
-      - name: Upload probe APKs
+      - name: Upload probe APK
         uses: actions/upload-artifact@v4
         with:
-          name: package-visibility-probe-apks
+          name: apk-raw-read-probe
           path: out/*
           if-no-files-found: error
