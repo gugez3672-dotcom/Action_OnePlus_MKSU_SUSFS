@@ -79,8 +79,47 @@ jobs:
                   t = t.replace(old, new)
               p.write_text(t)
 
+          # This is a private custom manager. Its own UI must not reject the
+          # custom signing certificate; kernel-side identity checks remain the
+          # actual authorization boundary.
+          ksu_cli = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/shell/KsuCli.kt")
+          t = ksu_cli.read_text()
+          old = '''    suspend fun isOfficialSignature(packageResourcePath: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val shell = getRootShell()
+            val out = shell.newJob()
+                .add("${getKsuDaemonPath()} debug get-sign ${shellQuote(packageResourcePath)}")
+                .to(ArrayList<String>(), null).exec().out
+            out.firstOrNull()?.trim()
+                .orEmpty() == "size: 0x377, hash: d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64"
+        }
+'''
+          new = '''    suspend fun isOfficialSignature(packageResourcePath: String): Boolean = true
+'''
+          if old not in t:
+              raise SystemExit("unexpected isOfficialSignature layout")
+          ksu_cli.write_text(t.replace(old, new, 1))
+
+          # An exact-APK-locked manager must not offer upstream manager updates,
+          # because any updated APK would have a different package/signature/hash.
+          updater = Path("source/manager/app/src/main/java/com/resukisu/resukisu/domain/usecase/CheckManagerUpdateUseCase.kt")
+          t = updater.read_text()
+          old = '''    suspend operator fun invoke(channel: ManagerUpdateChannel): ManagerUpdateInfo? =
+        when (channel) {
+            ManagerUpdateChannel.STABLE -> repository.checkStableUpdate()
+            ManagerUpdateChannel.BETA -> repository.checkBetaUpdate()
+        }
+'''
+          new = '''    suspend operator fun invoke(channel: ManagerUpdateChannel): ManagerUpdateInfo? = null
+'''
+          if old not in t:
+              raise SystemExit("unexpected manager update usecase layout")
+          updater.write_text(t.replace(old, new, 1))
+
           out = gradle.read_text()
           assert f'applicationId = "{pkg}"' in out
+          assert "isOfficialSignature(packageResourcePath: String): Boolean = true" in ksu_cli.read_text()
+          assert "ManagerUpdateInfo? = null" in updater.read_text()
           PY
 
       - name: Generate private manager signing key
