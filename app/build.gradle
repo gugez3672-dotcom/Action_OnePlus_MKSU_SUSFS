@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mintlab.pkgprobe'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.mintlab.pkgprobe"
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+    }
+
+    flavorDimensions += "visibility"
+    productFlavors {
+        plain {
+            dimension "visibility"
+            applicationIdSuffix ".plain"
+            manifestPlaceholders = [probeLabel: "Package Probe - Plain"]
+        }
+        targeted {
+            dimension "visibility"
+            applicationIdSuffix ".targeted"
+            manifestPlaceholders = [probeLabel: "Package Probe - Targeted"]
+        }
+        all {
+            dimension "visibility"
+            applicationIdSuffix ".all"
+            manifestPlaceholders = [probeLabel: "Package Probe - QUERY_ALL"]
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+    }
+}
