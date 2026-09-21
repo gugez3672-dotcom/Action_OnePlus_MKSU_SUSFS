@@ -1,0 +1,33 @@
+name: Export Android APK Signer
+
+on:
+  push:
+    branches:
+      - resukisu-custom-manager
+    paths:
+      - '.github/workflows/Export-ApkSigner.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Collect apksigner runtime
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS=$(find "${ANDROID_HOME}/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)
+          test -n "$BUILD_TOOLS"
+          test -f "$BUILD_TOOLS/lib/apksigner.jar"
+          mkdir -p out
+          cp "$BUILD_TOOLS/lib/apksigner.jar" out/apksigner.jar
+          printf '%s\n' "$BUILD_TOOLS" > out/build-tools-path.txt
+          sha256sum out/apksigner.jar > out/SHA256SUMS.txt
+
+      - name: Upload apksigner
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apksigner-runtime
+          path: out/
+          retention-days: 7
