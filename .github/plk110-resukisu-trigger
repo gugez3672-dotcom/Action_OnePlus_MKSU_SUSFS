@@ -1,4 +1,5 @@
-trigger: strict manager hardening build
+trigger: exact-apk strict manager build
+apk_sha256: 74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644
+cert_sha256: d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64
+package: com.resukisu.resukisu
 base: 236356536ab2cac02f31254c3629a17610f65c37
-policy: package + pinned ReSukiSU signer + no dynamic manager + no foreign driver/info access
-manager: v4.2.0-rc2 / driver 35154
