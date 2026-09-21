@@ -1,7 +1,10 @@
-trigger: final exact-apk strict manager build
+trigger: final user-confirmed Daily Notes strict kernel build
 package: com.daily.notes
-apk_sha256: 60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325
-cert_sha256: 74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3
+app_label: Daily Notes
+apk_sha256: 346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2
+cert_sha256: 06de283eff2a368fa627b9cc10a1c313ec752d05f16184d4764a6b09c4854df9
 cert_size: 878
 manager_source: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
+successful_anchor_run: 35552123084
+successful_anchor_commit: 6335745c8b3ed03eb7413b1b64815c8caabb1d30
 golden_base: 236356536ab2cac02f31254c3629a17610f65c37
