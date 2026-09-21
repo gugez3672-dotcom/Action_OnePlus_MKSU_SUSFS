@@ -1,0 +1,38 @@
+name: Export Android APK Signer
+
+on:
+  push:
+    branches:
+      - package-visibility-probe-20260921
+    paths:
+      - '.github/export-apksigner-trigger'
+      - '.github/workflows/export-apksigner.yml'
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Android build tools 35
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDKMANAGER="/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "build-tools;35.0.0"
+
+      - name: Collect signer
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p signer
+          cp /usr/local/lib/android/sdk/build-tools/35.0.0/lib/apksigner.jar signer/
+          cp /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign signer/
+          sha256sum signer/* > signer/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apksigner-35
+          path: signer/*
+          if-no-files-found: error
