@@ -145,48 +145,48 @@ jobs:
           t = ksu_service.read_text()
           t = t.replace("import android.os.UserHandle\n", "", 1)
 
-          old_load = """    private fun loadAllPackages(): List<PackageInfo> {
-        val tmp = arrayListOf<PackageInfo>()
-        for (user in (getSystemService(USER_SERVICE) as UserManager).userProfiles) {
-            val userId = user.getUserIdCompat()
-            tmp += getInstalledPackagesAsUser(userId)
-        }
-        return tmp
-    }
-"""
-          new_load = """    private fun getAllUserIds(): IntArray {
-        val um = getSystemService(USER_SERVICE) as UserManager
-        return try {
-            val method = um.javaClass.getMethod("getAliveUsers")
-            val users = method.invoke(um) as List<*>
-            extractUserIds(users)
-        } catch (e: Exception) {
-            Log.e(TAG, "getAliveUsers reflection failed", e)
-            intArrayOf(0)
-        }
-    }
-
-    private fun extractUserIds(users: List<*>?): IntArray {
-        if (users.isNullOrEmpty()) return intArrayOf(0)
-        return try {
-            users.map { user ->
-                user!!.javaClass.getField("id").getInt(user)
-            }.distinct().sorted().toIntArray()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error extracting ID from UserInfo", e)
-            intArrayOf(0)
-        }
-    }
-
-    private fun loadAllPackages(): List<PackageInfo> {
-        val tmp = arrayListOf<PackageInfo>()
-        for (userId in getAllUserIds()) {
-            Log.i(TAG, "loadAllPackages userId=$userId")
-            tmp += getInstalledPackagesAsUser(userId)
-        }
-        return tmp
-    }
-"""
+          old_load = (
+              '    private fun loadAllPackages(): List<PackageInfo> {\n'
+              '        val tmp = arrayListOf<PackageInfo>()\n'
+              '        for (user in (getSystemService(USER_SERVICE) as UserManager).userProfiles) {\n'
+              '            val userId = user.getUserIdCompat()\n'
+              '            tmp += getInstalledPackagesAsUser(userId)\n'
+              '        }\n'
+              '        return tmp\n'
+              '    }\n'
+          )
+          new_load = (
+              '    private fun getAllUserIds(): IntArray {\n'
+              '        val um = getSystemService(USER_SERVICE) as UserManager\n'
+              '        return try {\n'
+              '            val method = um.javaClass.getMethod("getAliveUsers")\n'
+              '            val users = method.invoke(um) as List<*>\n'
+              '            extractUserIds(users)\n'
+              '        } catch (e: Exception) {\n'
+              '            Log.e(TAG, "getAliveUsers reflection failed", e)\n'
+              '            intArrayOf(0)\n'
+              '        }\n'
+              '    }\n\n'
+              '    private fun extractUserIds(users: List<*>?): IntArray {\n'
+              '        if (users.isNullOrEmpty()) return intArrayOf(0)\n'
+              '        return try {\n'
+              '            users.map { user ->\n'
+              '                user!!.javaClass.getField("id").getInt(user)\n'
+              '            }.distinct().sorted().toIntArray()\n'
+              '        } catch (e: Exception) {\n'
+              '            Log.e(TAG, "Error extracting ID from UserInfo", e)\n'
+              '            intArrayOf(0)\n'
+              '        }\n'
+              '    }\n\n'
+              '    private fun loadAllPackages(): List<PackageInfo> {\n'
+              '        val tmp = arrayListOf<PackageInfo>()\n'
+              '        for (userId in getAllUserIds()) {\n'
+              '            Log.i(TAG, "loadAllPackages userId=$userId")\n'
+              '            tmp += getInstalledPackagesAsUser(userId)\n'
+              '        }\n'
+              '        return tmp\n'
+              '    }\n'
+          )
           if t.count(old_load) != 1:
               raise SystemExit("unexpected KsuService loadAllPackages implementation")
           t = t.replace(old_load, new_load, 1)
