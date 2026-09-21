@@ -242,7 +242,7 @@ jobs:
             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
           grep -Fq 'KSU_MANAGER_PACKAGE := com.daily.notes' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
-          grep -Fq 'custom com.daily.notes only' \
+          grep -Fq 'final Daily Notes only' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
           ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
