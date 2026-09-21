@@ -3,7 +3,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="APK Raw Read Probe"
+        android:label="Blind APK Scanner"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
