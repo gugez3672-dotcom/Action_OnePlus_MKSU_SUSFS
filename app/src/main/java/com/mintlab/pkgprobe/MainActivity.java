@@ -86,7 +86,11 @@ public class MainActivity extends Activity {
 
         line(s, "Package Visibility Probe v1");
         line(s, "probe.package = " + getPackageName());
-        line(s, "probe.flavor  = " + BuildConfig.FLAVOR);
+        String selfPkg = getPackageName();
+        String flavor = selfPkg.endsWith(".plain") ? "plain"
+                : selfPkg.endsWith(".targeted") ? "targeted"
+                : selfPkg.endsWith(".all") ? "all" : "unknown";
+        line(s, "probe.flavor  = " + flavor);
         line(s, "probe.uid     = " + android.os.Process.myUid());
         line(s, "android       = " + Build.VERSION.RELEASE + " / API " + Build.VERSION.SDK_INT);
         line(s, "target        = " + TARGET);
