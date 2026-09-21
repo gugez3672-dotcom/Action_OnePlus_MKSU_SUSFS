@@ -44,3 +44,20 @@ jobs:
             git log --date=iso-strict --format='%H %cI %s' --all -- clang-r536225/BUILD_INFO | head -100
             exit 1
           fi
+
+      - name: Verify actual 14043575 clang binary
+        run: |
+          set -euo pipefail
+          commit=9a98ca4072ec000f301bd3ece481ea2baca76ca5
+          url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/$commit/clang-r536225.tar.gz"
+          mkdir tc-bin
+          curl --fail --location --retry 4 --retry-delay 3 "$url" --output clang-r536225.tar.gz
+          tar -xzf clang-r536225.tar.gz -C tc-bin
+
+          actual=$(tc-bin/bin/clang --version | head -n 1)
+          expected='Android (14043575, +pgo, +bolt, +lto, +mlgo, based on r536225) clang version 19.0.1 (https://android.googlesource.com/toolchain/llvm-project b3a530ec6537146650e42be89f1089e9a3588460)'
+          printf 'ACTUAL=%s\n' "$actual"
+          printf 'EXPECTED=%s\n' "$expected"
+          test "$actual" = "$expected"
+          tc-bin/bin/ld.lld --version | grep -Fq 'LLD 19.0.1'
+          echo "BINARY_PREFLIGHT=PASS"
