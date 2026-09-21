@@ -242,11 +242,11 @@ jobs:
             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
           grep -Fq 'KSU_MANAGER_PACKAGE := com.daily.notes' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
-          grep -Fq 'ReSukiSU/ReSukiSU only' \
+          grep -Fq 'custom com.daily.notes only' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
           ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
-          grep -Fq 'KSU_MANAGER_APK_SHA256 := 74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644' \
+          grep -Fq 'KSU_MANAGER_APK_SHA256 := 60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
           grep -Fq 'check_apk_file_sha256' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
@@ -313,9 +313,10 @@ jobs:
           assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
           assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
           assert b'com.daily.notes' in image, 'strict manager package not embedded'
-          assert b'd3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64' in image, 'ReSukiSU manager certificate hash missing'
-          assert b'74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644' in image, 'exact manager APK hash missing'
+          assert b'74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3' in image, 'custom manager certificate hash missing'
+          assert b'60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325' in image, 'exact manager APK hash missing'
           for forbidden in (
+              b'd3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64',
               b'c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6',
               b'7e0c6d7278a3bb8e364e0fcba95afaf3666cf5ff3c245a3b63c8833bd0445cc4',
               b'f415f4ed9435427e1fdf7f1fccd4dbc07b3d6b8751e4dbcec6f19671f427870b',
