@@ -1,4 +1,4 @@
-trigger: final user-confirmed Daily Notes strict kernel build
+trigger: retry final Daily Notes strict kernel build after preflight marker fix
 package: com.daily.notes
 app_label: Daily Notes
 apk_sha256: 346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2
@@ -7,4 +7,5 @@ cert_size: 878
 manager_source: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
 successful_anchor_run: 35552123084
 successful_anchor_commit: 6335745c8b3ed03eb7413b1b64815c8caabb1d30
+preflight_fix_commit: 876302f7def2386e2fbf5f5b5898c2182d83e878
 golden_base: 236356536ab2cac02f31254c3629a17610f65c37
