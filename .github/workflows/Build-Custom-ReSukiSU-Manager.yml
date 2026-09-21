@@ -88,6 +88,52 @@ jobs:
                   t = t.replace(old, new)
               p.write_text(t)
 
+          # Fix launcher icon switching after applicationId changes.
+          settings_repo = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/settings/SettingsPlatformRepository.kt")
+          t = settings_repo.read_text()
+          old = '''        val packageName = application.packageName
+        val main = ComponentName(packageName, "$packageName.ui.MainActivity")
+        val alias = ComponentName(packageName, "$packageName.ui.MainActivityAlias")
+'''
+          new = '''        val packageName = application.packageName
+        val main = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivity")
+        val alias = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivityAlias")
+'''
+          if t.count(old) != 1:
+              raise SystemExit("unexpected launcher icon toggle implementation")
+          settings_repo.write_text(t.replace(old, new, 1))
+
+          # Replace only the primary anime artwork with a notebook icon.
+          primary_icon = Path("source/manager/app/src/main/res/drawable/ic_launcher_foreground.xml")
+          primary_icon.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFDF7" android:strokeColor="#3D4652" android:strokeWidth="3.8" android:strokeLineJoin="round"
+        android:pathData="M31,20 L75,20 Q82,20 82,27 L82,83 Q82,88 77,88 L31,88 Q26,88 26,83 L26,25 Q26,20 31,20 Z" />
+    <path android:fillColor="#F4C95D" android:strokeColor="#3D4652" android:strokeWidth="3.0" android:strokeLineJoin="round"
+        android:pathData="M66,20 L82,36 L72,36 Q66,36 66,30 Z" />
+    <path android:strokeColor="#66717F" android:strokeWidth="3.2" android:strokeLineCap="round"
+        android:pathData="M39,43 L69,43 M39,54 L69,54 M39,65 L62,65" />
+    <path android:fillColor="#3D4652"
+        android:pathData="M22,31 A3,3 0,1 0,28 31 A3,3 0,1 0,22 31 M22,45 A3,3 0,1 0,28 45 A3,3 0,1 0,22 45 M22,59 A3,3 0,1 0,28 59 A3,3 0,1 0,22 59 M22,73 A3,3 0,1 0,28 73 A3,3 0,1 0,22 73" />
+</vector>
+""")
+
+          primary_mono = Path("source/manager/app/src/main/res/drawable/ic_launcher_monochrome.xml")
+          primary_mono.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#000000"
+        android:pathData="M31,20 L70,20 L82,32 L82,83 Q82,88 77,88 L31,88 Q26,88 26,83 L26,25 Q26,20 31,20 Z M39,42 L70,42 L70,46 L39,46 Z M39,53 L70,53 L70,57 L39,57 Z M39,64 L63,64 L63,68 L39,68 Z M22,28 L28,28 L28,34 L22,34 Z M22,42 L28,42 L28,48 L22,48 Z M22,56 L28,56 L28,62 L22,62 Z M22,70 L28,70 L28,76 L22,76 Z" />
+</vector>
+""")
+
           # This is a private custom manager. Its own UI must not reject the
           # custom signing certificate; kernel-side identity checks remain the
           # actual authorization boundary.
