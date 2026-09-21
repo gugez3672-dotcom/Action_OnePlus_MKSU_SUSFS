@@ -1,0 +1,179 @@
+name: Build Custom ReSukiSU Manager
+
+on:
+  push:
+    branches:
+      - resukisu-custom-manager
+    paths:
+      - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
+      - '.github/custom-manager-trigger'
+
+permissions:
+  contents: read
+
+env:
+  RESUKISU_COMMIT: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
+  UPSTREAM_MANAGER_RUN: '35234729417'
+  CUSTOM_PACKAGE: com.daily.notes
+  KEY_ALIAS: notes
+  KEYSTORE_PASSWORD: ChangeMe_2026_Custom_Manager
+  KEY_PASSWORD: ChangeMe_2026_Custom_Manager
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout build trigger
+        uses: actions/checkout@v7
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Clone exact ReSukiSU source
+        run: |
+          set -euo pipefail
+          git clone https://github.com/ReSukiSU/ReSukiSU.git source
+          git -C source checkout "${RESUKISU_COMMIT}"
+          test "$(git -C source rev-parse HEAD)" = "${RESUKISU_COMMIT}"
+
+      - name: Patch runtime package only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          pkg = "com.daily.notes"
+          gradle = Path("source/manager/app/build.gradle.kts")
+          text = gradle.read_text()
+
+          if 'applicationId = "' in text:
+              import re
+              text = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{pkg}"', text, count=1)
+          else:
+              anchor = "        versionName = managerVersionName\n"
+              if text.count(anchor) != 1:
+                  raise SystemExit("unexpected app build.gradle layout")
+              text = text.replace(anchor, anchor + f'        applicationId = "{pkg}"\n', 1)
+          gradle.write_text(text)
+
+          # Replace self-owned action/authority strings without touching Kotlin/Java namespaces.
+          replacements = {
+              "com.resukisu.resukisu.magica.LAUNCH": f"{pkg}.magica.LAUNCH",
+              "com.resukisu.resukisu.action.DOWNLOAD_MANAGER_APK": f"{pkg}.action.DOWNLOAD_MANAGER_APK",
+              "com.resukisu.resukisu.action.DISMISS_DOWNLOAD": f"{pkg}.action.DISMISS_DOWNLOAD",
+              "com.resukisu.resukisu.action.CANCEL_DOWNLOAD": f"{pkg}.action.CANCEL_DOWNLOAD",
+              "com.resukisu.resukisu.action.INSTALL_MODULE": f"{pkg}.action.INSTALL_MODULE",
+              "com.resukisu.resukisu.action.DOWNLOAD": f"{pkg}.action.DOWNLOAD",
+          }
+          targets = [
+              Path("source/manager/app/src/main/AndroidManifest.xml"),
+              Path("source/manager/app/src/main/java/com/resukisu/resukisu/magica/BootCompletedReceiver.java"),
+              Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/download/DownloadService.kt"),
+          ]
+          for p in targets:
+              t = p.read_text()
+              for old, new in replacements.items():
+                  t = t.replace(old, new)
+              p.write_text(t)
+
+          out = gradle.read_text()
+          assert f'applicationId = "{pkg}"' in out
+          PY
+
+      - name: Generate private manager signing key
+        working-directory: source/manager
+        run: |
+          set -euo pipefail
+          keytool -genkeypair             -alias "${KEY_ALIAS}"             -keyalg RSA             -keysize 2048             -validity 36500             -storetype JKS             -keystore key.jks             -storepass "${KEYSTORE_PASSWORD}"             -keypass "${KEY_PASSWORD}"             -dname "CN=Notes, OU=Mobile, O=Local, L=Chengdu, ST=Sichuan, C=CN"
+
+          {
+            echo "KEYSTORE_FILE=key.jks"
+            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
+            echo "KEY_ALIAS=${KEY_ALIAS}"
+            echo "KEY_PASSWORD=${KEY_PASSWORD}"
+          } >> gradle.properties
+
+      - name: Build custom manager APK
+        working-directory: source/manager
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease -Pcommit="${RESUKISU_COMMIT}"
+
+      - name: Keep only arm64 base APK
+        run: |
+          set -euo pipefail
+          REL=source/manager/app/build/outputs/apk/release
+          ARM64=$(find "$REL" -maxdepth 1 -type f -name '*arm64-v8a*release.apk' | head -n 1)
+          test -n "$ARM64"
+          mkdir -p source/manager/app/build/outputs/apk/custom
+          cp "$ARM64" source/manager/app/build/outputs/apk/custom/custom-base.apk
+          rm -f "$REL"/*.apk
+          cp source/manager/app/build/outputs/apk/custom/custom-base.apk "$REL/custom-base.apk"
+
+      - name: Fetch exact upstream ksud from matching commit
+        run: |
+          set -euo pipefail
+          mkdir -p upstream-ksud
+          curl -fL --retry 3             "https://nightly.link/ReSukiSU/ReSukiSU/actions/runs/${UPSTREAM_MANAGER_RUN}/ksud-aarch64-linux-android.zip"             -o upstream-ksud.zip
+          unzip -o upstream-ksud.zip -d upstream-ksud >/dev/null
+          KSUD=$(find upstream-ksud -type f -name 'ksud' | head -n 1)
+          test -n "$KSUD"
+          mkdir -p source/target/aarch64-linux-android/release
+          cp "$KSUD" source/target/aarch64-linux-android/release/ksud
+
+      - name: Repack with exact ksud and v2-sign
+        working-directory: source
+        run: |
+          set -euo pipefail
+          python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${KEYSTORE_PASSWORD}"             -S "${KEY_PASSWORD}"             -n ReSukiSU_v4.2.0-rc2_35154-custom             --no-strip
+
+      - name: Verify package signature and identity
+        run: |
+          set -euo pipefail
+          APK=$(find source/dist -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          test -n "$APK"
+
+          AAPT=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt 2>/dev/null | sort -V | tail -n 1)
+          APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+
+          PKG=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)
+          echo "package=$PKG"
+          test "$PKG" = "${CUSTOM_PACKAGE}"
+
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
+
+          keytool -exportcert             -alias "${KEY_ALIAS}"             -keystore source/manager/key.jks             -storepass "${KEYSTORE_PASSWORD}"             -file manager-cert.der >/dev/null
+
+          CERT_SIZE=$(stat -c%s manager-cert.der)
+          CERT_SHA256=$(sha256sum manager-cert.der | awk '{print $1}')
+          APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')
+          APK_SIZE=$(stat -c%s "$APK")
+
+          mkdir -p custom-manager
+          cp "$APK" custom-manager/ReSukiSU_v4.2.0-rc2_35154_com.daily.notes.apk
+          cp apksigner-verify.txt custom-manager/
+          cat > custom-manager/manager_identity.txt <<EOF
+          source_commit=${RESUKISU_COMMIT}
+          package=${CUSTOM_PACKAGE}
+          apk_sha256=$APK_SHA256
+          apk_size=$APK_SIZE
+          cert_sha256=$CERT_SHA256
+          cert_size=$CERT_SIZE
+          signature_scheme=v2
+          abi=arm64-v8a
+          EOF
+          cat custom-manager/manager_identity.txt
+
+      - name: Upload custom manager
+        uses: actions/upload-artifact@v7
+        with:
+          name: ReSukiSU-35154-com.daily.notes
+          path: custom-manager/
+          retention-days: 30
