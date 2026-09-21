@@ -64,7 +64,9 @@ apk_sign.write_text(text)
 assert "EXPECTED_SIZE_OFFICIAL" not in text[keys_start:keys_start + len(strict_keys) + 64]
 assert "ksu_is_dynamic_manager_enabled()" not in text
 
-# No exact-APK hash gate here by design. Package + certificate are the durable identity.\n\n# Do not hand a KernelSU driver fd to arbitrary apps that know the reboot magic.
+# No exact-APK hash gate here by design. Package + certificate are the durable identity.
+
+# Do not hand a KernelSU driver fd to arbitrary apps that know the reboot magic.
 # The real manager is already identified by throne_tracker and receives its fd
 # through the manager setuid path; root/ksud remains allowed.
 supercall = ksu / "kernel/supercall/supercall.c"
