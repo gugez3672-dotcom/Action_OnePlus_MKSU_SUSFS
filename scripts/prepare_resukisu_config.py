@@ -17,6 +17,7 @@ count = int(subprocess.check_output(
 version = 30700 + count
 
 STRICT_MANAGER_PACKAGE = "com.resukisu.resukisu"
+STRICT_MANAGER_APK_SHA256 = "74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644"
 
 kbuild = ksu / "kernel/Kbuild"
 text = kbuild.read_text()
@@ -30,6 +31,8 @@ replacement = (
     f"KSU_VERSION := {version}\n"
     f"KSU_VERSION_FULL := ReSukiSU-{commit}@PLK110-A67\n\n"
     f"KSU_MANAGER_PACKAGE := {STRICT_MANAGER_PACKAGE}\n\n"
+    f"KSU_MANAGER_APK_SHA256 := {STRICT_MANAGER_APK_SHA256}\n"
+    f"ccflags-y += -DKSU_MANAGER_APK_SHA256=\\\"{STRICT_MANAGER_APK_SHA256}\\\"\n\n"
     "$(info -- $(REPO_NAME) version code: $(KSU_VERSION))\n"
     "$(info -- $(REPO_NAME) version name: $(KSU_VERSION_FULL))\n\n"
     "ccflags-y += -DKSU_VERSION=$(KSU_VERSION)\n"
@@ -60,6 +63,98 @@ apk_sign.write_text(text)
 
 assert "EXPECTED_SIZE_OFFICIAL" not in text[keys_start:keys_start + len(strict_keys) + 64]
 assert "ksu_is_dynamic_manager_enabled()" not in text
+
+# Final identity layer: hash the exact installed base.apk bytes. Because package
+# filtering runs before signature/hash verification, this cost is paid only for
+# the one pinned manager package, not for every installed application.
+hash_anchor = "static bool read_exact(struct file *fp, void *buffer, size_t size, loff_t *pos, loff_t end)\n"
+if text.count(hash_anchor) != 1:
+    raise SystemExit("unexpected apk_sign read_exact anchor")
+hash_helper = r'''#ifdef KSU_MANAGER_APK_SHA256
+static bool check_apk_file_sha256(const char *path)
+{
+    struct file *fp;
+    struct crypto_shash *alg;
+    struct sdesc *sdesc;
+    unsigned char *buf = NULL;
+    unsigned char digest[SHA256_DIGEST_SIZE];
+    char hash_str[SHA256_DIGEST_SIZE * 2 + 1];
+    loff_t pos = 0;
+    ssize_t n;
+    bool ok = false;
+    int ret;
+
+    fp = filp_open(path, O_RDONLY, 0);
+    if (IS_ERR(fp))
+        return false;
+    fp->f_mode |= FMODE_NONOTIFY;
+
+    alg = crypto_alloc_shash("sha256", 0, 0);
+    if (IS_ERR(alg))
+        goto out_file;
+
+    sdesc = init_sdesc(alg);
+    if (IS_ERR(sdesc))
+        goto out_alg;
+
+    buf = kmalloc(4096, GFP_KERNEL);
+    if (!buf)
+        goto out_desc;
+
+    ret = crypto_shash_init(&sdesc->shash);
+    if (ret)
+        goto out;
+
+    while ((n = ksu_kernel_read_compat(fp, buf, 4096, &pos)) > 0) {
+        ret = crypto_shash_update(&sdesc->shash, buf, n);
+        if (ret)
+            goto out;
+    }
+    if (n < 0)
+        goto out;
+
+    ret = crypto_shash_final(&sdesc->shash, digest);
+    if (ret)
+        goto out;
+
+    bin2hex(hash_str, digest, SHA256_DIGEST_SIZE);
+    hash_str[SHA256_DIGEST_SIZE * 2] = '\0';
+    ok = strcmp(hash_str, KSU_MANAGER_APK_SHA256) == 0;
+
+out:
+    kfree(buf);
+out_desc:
+    kfree(sdesc);
+out_alg:
+    crypto_free_shash(alg);
+out_file:
+    filp_close(fp, NULL);
+    return ok;
+}
+#endif
+
+'''
+text = text.replace(hash_anchor, hash_helper + hash_anchor, 1)
+
+manager_return = "    return check_v2_signature(path, signature_index);\n"
+if text.count(manager_return) != 1:
+    raise SystemExit("unexpected is_manager_apk return")
+text = text.replace(
+    manager_return,
+    """    if (!check_v2_signature(path, signature_index))
+        return false;
+#ifdef KSU_MANAGER_APK_SHA256
+    if (!check_apk_file_sha256(path))
+        return false;
+#endif
+    return true;
+""",
+    1,
+)
+apk_sign.write_text(text)
+
+assert "KSU_MANAGER_APK_SHA256" in text
+assert "check_apk_file_sha256" in text
 
 # Do not hand a KernelSU driver fd to arbitrary apps that know the reboot magic.
 # The real manager is already identified by throne_tracker and receives its fd
@@ -138,5 +233,6 @@ text = text.replace(
 path.write_text(text)
 print(f"Pinned ReSukiSU metadata: version={version}, commit={commit}")
 print(f"Strict manager package: {STRICT_MANAGER_PACKAGE}; only ReSukiSU certificate accepted; dynamic manager disabled.")
+print(f"Exact manager APK SHA-256: {STRICT_MANAGER_APK_SHA256}")
 print("Strict manager I/O: foreign apps cannot obtain the KSU driver fd or read KSU info/version ioctls.")
 print("Added ReSukiSU/SUSFS as a post-defconfig fragment; stock gki_defconfig remains untouched.")
