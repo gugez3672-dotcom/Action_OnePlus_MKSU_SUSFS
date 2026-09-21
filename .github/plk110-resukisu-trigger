@@ -1,5 +1,7 @@
-trigger: exact-apk strict manager build
-apk_sha256: 74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644
-cert_sha256: d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64
-package: com.resukisu.resukisu
-base: 236356536ab2cac02f31254c3629a17610f65c37
+trigger: final exact-apk strict manager build
+package: com.daily.notes
+apk_sha256: 60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325
+cert_sha256: 74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3
+cert_size: 878
+manager_source: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
+golden_base: 236356536ab2cac02f31254c3629a17610f65c37
