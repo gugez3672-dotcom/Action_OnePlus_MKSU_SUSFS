@@ -89,6 +89,52 @@ jobs:
                   t = t.replace(old, new)
               p.write_text(t)
 
+          # Private manager: no launcher/deep-link/share entry points and no
+          # exported app components. This keeps ordinary apps behind Android's
+          # native package-visibility / AppsFilter boundary.
+          import xml.etree.ElementTree as ET
+          ANDROID_NS = "http://schemas.android.com/apk/res/android"
+          TOOLS_NS = "http://schemas.android.com/tools"
+          ET.register_namespace("android", ANDROID_NS)
+          ET.register_namespace("tools", TOOLS_NS)
+          manifest = Path("source/manager/app/src/main/AndroidManifest.xml")
+          tree = ET.parse(manifest)
+          root = tree.getroot()
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("manifest application node missing")
+
+          def aname(node):
+              return node.get(f"{{{ANDROID_NS}}}name")
+
+          main = next((x for x in app.findall("activity") if aname(x) == ".ui.MainActivity"), None)
+          if main is None:
+              raise SystemExit("MainActivity missing")
+          main.set(f"{{{ANDROID_NS}}}exported", "false")
+          for filt in list(main.findall("intent-filter")):
+              main.remove(filt)
+
+          alias = next((x for x in app.findall("activity-alias") if aname(x) == ".ui.MainActivityAlias"), None)
+          if alias is None:
+              raise SystemExit("MainActivityAlias missing")
+          alias.set(f"{{{ANDROID_NS}}}exported", "false")
+          alias.set(f"{{{ANDROID_NS}}}enabled", "false")
+          for filt in list(alias.findall("intent-filter")):
+              alias.remove(filt)
+
+          receiver = next((x for x in app.findall("receiver") if aname(x) == ".magica.BootCompletedReceiver"), None)
+          if receiver is None:
+              raise SystemExit("BootCompletedReceiver missing")
+          receiver.set(f"{{{ANDROID_NS}}}exported", "false")
+
+          # Fail closed if any app-owned component remains exported.
+          for tag in ("activity", "activity-alias", "service", "receiver", "provider"):
+              for node in app.findall(tag):
+                  if node.get(f"{{{ANDROID_NS}}}exported") == "true":
+                      raise SystemExit(f"unexpected exported component: {tag} {aname(node)}")
+
+          tree.write(manifest, encoding="utf-8", xml_declaration=True)
+
           # Fix launcher icon switching after applicationId changes.
           settings_repo = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/settings/SettingsPlatformRepository.kt")
           t = settings_repo.read_text()
@@ -229,6 +275,21 @@ jobs:
           echo "label=$LABEL"
           test "$PKG" = "${CUSTOM_PACKAGE}"
           test "$LABEL" = "Daily Notes"
+
+          # There must be no launcher entry in the final APK.
+          if printf '%s\n' "$BADGING" | grep -q "^launchable-activity:"; then
+            echo "Unexpected launcher activity remains"
+            exit 1
+          fi
+
+          # Manifest-level visibility sanity checks.
+          MANIFEST_DUMP=$("$AAPT" dump xmltree "$APK" AndroidManifest.xml)
+          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.category.LAUNCHER'
+          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.MAIN'
+          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.VIEW'
+          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND'
+          echo "launcher_visibility=none"
+          echo "ordinary_package_visibility=native_AppsFilter"
 
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
