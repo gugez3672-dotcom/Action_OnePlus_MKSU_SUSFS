@@ -26,7 +26,7 @@ android {
             applicationIdSuffix ".targeted"
             manifestPlaceholders = [probeLabel: "Package Probe - Targeted"]
         }
-        all {
+        queryall {
             dimension "visibility"
             applicationIdSuffix ".all"
             manifestPlaceholders = [probeLabel: "Package Probe - QUERY_ALL"]
