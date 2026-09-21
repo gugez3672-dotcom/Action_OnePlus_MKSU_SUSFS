@@ -204,6 +204,7 @@ for marker, expected in strict_ioctl_perms.items():
     if block.count(".perm_check = always_allow") != expected:
         raise SystemExit(f"unexpected permission block for {marker}")
     block = block.replace(".perm_check = always_allow", ".perm_check = manager_or_root")
+    block = block.replace(".perm_check = manager_or_root ", ".perm_check = manager_or_root")
     text = text[:start] + block + text[end:]
 dispatch.write_text(text)
 
