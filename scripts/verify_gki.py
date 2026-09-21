@@ -38,6 +38,12 @@ if start < 0 or end <= start:
 actual_bytes = gzip.decompress(data[start + 8:end])
 (out / 'image.config').write_bytes(actual_bytes)
 actual = config(actual_bytes.decode())
+# Unlike other generated metadata, the C compiler identity is part of the
+# PLK110 A67 stock-reproduction target. It must match the captured stock config
+# exactly; a different Android clang build number is a failed reproduction.
+stock_cc = stock.get('CONFIG_CC_VERSION_TEXT')
+actual_cc = actual.get('CONFIG_CC_VERSION_TEXT')
+cc_exact = stock_cc == actual_cc and stock_cc is not None
 delta, functional, unmet = compare(stock, actual, additions)
 (out / 'config_delta.json').write_text(json.dumps(delta, indent=2) + '\n')
 preflight_delta = {k: [preflight.get(k, 'n'), actual.get(k, 'n')]
@@ -92,7 +98,7 @@ trusted = der in data[cert_offset:cert_offset + cert_size]
 trust_report = {'original_signer_sha256': STOCK_CERT_SHA256, 'present_in_builtin_trust_table': trusted,
                 'table_offset': cert_offset, 'table_size': cert_size}
 passed = (not functional and not unmet and not preflight_delta and not missing and not mismatches
-          and not unexpected_root and trusted and release == args.release)
+          and not unexpected_root and trusted and release == args.release and cc_exact)
 report = {'passed': passed, 'scope': 'Offline Image config, stock module CRC and signer trust verification; boot untested.',
           'release': release, 'expected_release': args.release,
           'image_sha256': hashlib.sha256(data).hexdigest(),
@@ -100,7 +106,9 @@ report = {'passed': passed, 'scope': 'Offline Image config, stock module CRC and
           'all_config_differences': delta, 'unmet_required_config': unmet,
           'preflight_vs_image_config_differences': preflight_delta,
           'root_symbols': root_symbols, 'module_abi': abi_report, 'stock_signer_trust': trust_report,
-          'toolchain': {k: actual.get(k) for k in sorted(GENERATED)}}
+          'toolchain': {k: actual.get(k) for k in sorted(GENERATED)},
+          'stock_cc_version_text': stock_cc, 'actual_cc_version_text': actual_cc,
+          'cc_version_exact_stock_match': cc_exact}
 (out / 'VERDICT.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))
 raise SystemExit(0 if passed else 1)
