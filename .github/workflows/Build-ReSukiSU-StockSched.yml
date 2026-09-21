@@ -240,7 +240,7 @@ jobs:
           # Strict manager gate: exact package + only pinned ReSukiSU signer; no dynamic fallback.
           grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' \
             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
-          grep -Fq 'KSU_MANAGER_PACKAGE := com.resukisu.resukisu' \
+          grep -Fq 'KSU_MANAGER_PACKAGE := com.daily.notes' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
           grep -Fq 'ReSukiSU/ReSukiSU only' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
@@ -312,7 +312,7 @@ jobs:
           image = Path('artifacts/Image').read_bytes()
           assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
           assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
-          assert b'com.resukisu.resukisu' in image, 'strict manager package not embedded'
+          assert b'com.daily.notes' in image, 'strict manager package not embedded'
           assert b'd3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64' in image, 'ReSukiSU manager certificate hash missing'
           assert b'74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644' in image, 'exact manager APK hash missing'
           for forbidden in (
