@@ -17,7 +17,7 @@ count = int(subprocess.check_output(
 version = 30700 + count
 
 STRICT_MANAGER_PACKAGE = "com.daily.notes"
-STRICT_MANAGER_APK_SHA256 = "60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325"
+STRICT_MANAGER_APK_SHA256 = "346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2"
 
 kbuild = ksu / "kernel/Kbuild"
 text = kbuild.read_text()
@@ -48,7 +48,7 @@ text = apk_sign.read_text()
 keys_start = text.index("static apk_sign_key_t apk_sign_keys[] = {")
 keys_end = text.index("\n};", keys_start) + len("\n};")
 strict_keys = """static apk_sign_key_t apk_sign_keys[] = {
-    { 878, "74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3" }, /* custom com.daily.notes only */
+    { 878, "06de283eff2a368fa627b9cc10a1c313ec752d05f16184d4764a6b09c4854df9" }, /* final Daily Notes only */
 };"""
 text = text[:keys_start] + strict_keys + text[keys_end:]
 
