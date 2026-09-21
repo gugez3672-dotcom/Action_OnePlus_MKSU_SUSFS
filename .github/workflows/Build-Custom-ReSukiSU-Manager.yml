@@ -92,14 +92,16 @@ jobs:
           # Fix launcher icon switching after applicationId changes.
           settings_repo = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/settings/SettingsPlatformRepository.kt")
           t = settings_repo.read_text()
-          old = '''        val packageName = application.packageName
-        val main = ComponentName(packageName, "$packageName.ui.MainActivity")
-        val alias = ComponentName(packageName, "$packageName.ui.MainActivityAlias")
-'''
-          new = '''        val packageName = application.packageName
-        val main = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivity")
-        val alias = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivityAlias")
-'''
+          old = (
+              '        val packageName = application.packageName\n'
+              '        val main = ComponentName(packageName, "$packageName.ui.MainActivity")\n'
+              '        val alias = ComponentName(packageName, "$packageName.ui.MainActivityAlias")\n'
+          )
+          new = (
+              '        val packageName = application.packageName\n'
+              '        val main = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivity")\n'
+              '        val alias = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivityAlias")\n'
+          )
           if t.count(old) != 1:
               raise SystemExit("unexpected launcher icon toggle implementation")
           settings_repo.write_text(t.replace(old, new, 1))
