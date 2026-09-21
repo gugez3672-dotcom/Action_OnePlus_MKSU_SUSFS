@@ -44,6 +44,11 @@ env:
   VERIFIED_STOCK_COMMIT: 34e24abcfaac6fc9db1279ad073c15af216fd664
   REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
 
+  # A67 stock compiler identity captured from the running stock kernel config.
+  AOSP_CLANG_PREBUILT_COMMIT: 6578910c1318205358de024832082401b56e6e6c
+  EXPECTED_CLANG_BUILD: "14043575"
+  EXPECTED_LLVM_COMMIT: b3a530ec6537146650e42be89f1089e9a3588460
+
 jobs:
   resukisu-stock-sched:
     runs-on: ubuntu-24.04
@@ -129,6 +134,69 @@ jobs:
             echo "modules=$MODULES_COMMIT"
             echo "cctv18_reference=$CCTV18_REFERENCE_COMMIT"
           } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+
+      - name: Restore exact A67 stock clang 14043575
+        run: |
+          set -euo pipefail
+          dst="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86"
+          tarball="$GITHUB_WORKSPACE/aosp-clang-r536225.tar.gz"
+          url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/$AOSP_CLANG_PREBUILT_COMMIT/clang-r536225.tar.gz"
+
+          test -d "$dst/clang-r536225"
+          test -x "$dst/clang-r536225/bin/clang"
+          "$dst/clang-r536225/bin/clang" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION_BEFORE.txt"
+
+          curl --fail --location --retry 4 --retry-delay 3 "$url" --output "$tarball"
+          rm -rf "$dst/clang-r536225"
+          mkdir -p "$dst/clang-r536225"
+          tar -xzf "$tarball" -C "$dst/clang-r536225"
+
+          CLANG="$dst/clang-r536225/bin/clang"
+          LLD="$dst/clang-r536225/bin/ld.lld"
+          test -x "$CLANG"
+          test -x "$LLD"
+
+          "$CLANG" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION.txt"
+          "$LLD" --version | tee "$GITHUB_WORKSPACE/artifacts/LLD_VERSION.txt"
+
+          stock_cc=$(sed -n 's/^CONFIG_CC_VERSION_TEXT="\(.*\)"$/\1/p'             "$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config")
+          actual_cc=$("$CLANG" --version | head -n 1)
+          test -n "$stock_cc"
+          test "$actual_cc" = "$stock_cc"
+          printf '%s\n' "$actual_cc" | grep -Fq "Android ($EXPECTED_CLANG_BUILD"
+          printf '%s\n' "$actual_cc" | grep -Fq "based on r536225"
+          printf '%s\n' "$actual_cc" | grep -Fq "clang version 19.0.1"
+          printf '%s\n' "$actual_cc" | grep -Fq "$EXPECTED_LLVM_COMMIT"
+          "$LLD" --version | grep -Fq "LLD 19.0.1"
+
+          # The synced OnePlus prebuilt project itself stays in place; only the
+          # clang-r536225 payload is replaced.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          repo = Path("kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86")
+          raw = subprocess.check_output(
+              ["git", "-C", str(repo), "status", "--porcelain=v1", "-z"]
+          ).decode(errors="replace")
+          entries = [x for x in raw.split("\0") if x]
+          bad = []
+          for entry in entries:
+              path = entry[3:] if len(entry) >= 4 else ""
+              if " -> " in path:
+                  path = path.split(" -> ", 1)[-1]
+              if not path.startswith("clang-r536225/"):
+                  bad.append(entry)
+          if bad:
+              raise SystemExit("unexpected prebuilt paths changed: " + repr(bad[:20]))
+          PY
+
+          {
+            echo "aosp_clang_prebuilt_commit=$AOSP_CLANG_PREBUILT_COMMIT"
+            echo "expected_android_build=$EXPECTED_CLANG_BUILD"
+            echo "expected_llvm_commit=$EXPECTED_LLVM_COMMIT"
+            echo "stock_cc=$stock_cc"
+            sha256sum "$tarball" "$CLANG" "$LLD"
+          } > "$GITHUB_WORKSPACE/artifacts/TOOLCHAIN_PROVENANCE.txt"
 
       - name: Apply only proven A67 stock build-system adaptations
         run: |
@@ -237,18 +305,20 @@ jobs:
           # Deliberately exclude unrelated performance/network/scheduler changes.
           ! grep -Eq '^CONFIG_(KPM|MQ_IOSCHED_ADIOS|REKERNEL|BBG|TCP_CONG_BRUTAL)=y$'             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
 
-          # Strict manager gate: exact package + only pinned ReSukiSU signer; no dynamic fallback.
+          # Strict manager gate: fixed package + fixed private signer; no dynamic fallback.
           grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' \
             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
           grep -Fq 'KSU_MANAGER_PACKAGE := com.daily.notes' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
-          grep -Fq 'final Daily Notes only' \
+          grep -Fq 'Daily Notes fixed signer' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
           ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
-          grep -Fq 'KSU_MANAGER_APK_SHA256 := 346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2' \
+          grep -Fq '{ 890, "7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e" }' \
+            kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
+          ! grep -Fq 'KSU_MANAGER_APK_SHA256' \
             kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
-          grep -Fq 'check_apk_file_sha256' \
+          ! grep -Fq 'check_apk_file_sha256' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
           grep -Fq 'if (ksu_get_uid_t(current_uid()) != 0 && !is_manager())' \
             kernel_workspace/kernel_platform/KernelSU/kernel/supercall/supercall.c
@@ -313,8 +383,10 @@ jobs:
           assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
           assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
           assert b'com.daily.notes' in image, 'strict manager package not embedded'
-          assert b'06de283eff2a368fa627b9cc10a1c313ec752d05f16184d4764a6b09c4854df9' in image, 'final Daily Notes certificate hash missing'
-          assert b'346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2' in image, 'exact manager APK hash missing'
+          assert b'7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e' in image, 'fixed Daily Notes certificate hash missing'
+          assert b'06de283eff2a368fa627b9cc10a1c313ec752d05f16184d4764a6b09c4854df9' not in image, 'old Daily Notes certificate hash still present'
+          assert b'346f9be72eca3a574986ddf0ee40294ede2c6146d024d1c44e8e860d4d5a6fd2' not in image, 'old exact APK hash gate still present'
+          assert b'9e6da35ae18f9721e5d82a58d6f162cb9ff30921152f8194456b5c56b0f2e6c4' not in image, 'new APK hash must not be embedded in durable gate'
           for forbidden in (
               b'74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3',
               b'd3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64',
@@ -333,6 +405,10 @@ jobs:
           grep -qx 'CONFIG_SCHED_CLASS_EXT=y' artifacts/image.config
           grep -qx 'CONFIG_MODVERSIONS=y' artifacts/image.config
           grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
+          stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
+          image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
+          test "$image_cc" = "$stock_cc"
+          printf '%s\n' "$image_cc" | grep -Fq 'Android (14043575'
           grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
 
           python3 - <<'PY'
