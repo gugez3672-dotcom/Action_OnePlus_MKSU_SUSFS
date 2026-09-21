@@ -1,0 +1,57 @@
+name: Build Package Visibility Probe
+
+on:
+  push:
+    branches:
+      - package-visibility-probe-20260921
+    paths:
+      - 'settings.gradle'
+      - 'build.gradle'
+      - 'app/**'
+      - '.github/workflows/build-package-visibility-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build three probe APKs
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/plain/debug/app-plain-debug.apk out/PackageProbe-Plain.apk
+          cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk out/PackageProbe-Targeted.apk
+          cp app/build/outputs/apk/all/debug/app-all-debug.apk out/PackageProbe-QUERY_ALL.apk
+          sha256sum out/*.apk | tee out/SHA256SUMS.txt
+
+      - name: Upload probe APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-visibility-probe-apks
+          path: out/*
+          if-no-files-found: error
