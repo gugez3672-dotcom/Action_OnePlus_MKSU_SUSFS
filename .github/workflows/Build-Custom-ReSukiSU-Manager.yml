@@ -22,10 +22,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Build
+      - name: Build permanent-signed dual managers
+        env:
+          MANAGER_KEYSTORE_B64: ${{ secrets.MANAGER_KEYSTORE_B64 }}
+          MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: bash .github/build_dual.sh
       - uses: actions/upload-artifact@v7
         with:
-          name: DailyNotes-2.4.3-dual-ci
+          name: DailyNotes-2.4.3-dual-final
           path: out/*
           retention-days: 30
