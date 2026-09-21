@@ -58,7 +58,7 @@ jobs:
           mkdir -p out
           cp app/build/outputs/apk/plain/debug/app-plain-debug.apk out/PackageProbe-Plain.apk
           cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk out/PackageProbe-Targeted.apk
-          cp app/build/outputs/apk/all/debug/app-all-debug.apk out/PackageProbe-QUERY_ALL.apk
+          cp app/build/outputs/apk/queryall/debug/app-queryall-debug.apk out/PackageProbe-QUERY_ALL.apk
           sha256sum out/*.apk | tee out/SHA256SUMS.txt
 
       - name: Upload probe APKs
