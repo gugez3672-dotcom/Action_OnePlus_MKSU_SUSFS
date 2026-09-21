@@ -235,7 +235,18 @@ jobs:
           git -C kernel_workspace/kernel_platform/common diff --check
 
           # Deliberately exclude unrelated performance/network/scheduler changes.
-          ! grep -Eq '^CONFIG_(KPM|MQ_IOSCHED_ADIOS|REKERNEL|BBG|TCP_CONG_BRUTAL)=y
+          ! grep -Eq '^CONFIG_(KPM|MQ_IOSCHED_ADIOS|REKERNEL|BBG|TCP_CONG_BRUTAL)=y$'             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+
+          # Strict manager gate: exact package + only pinned ReSukiSU signer; no dynamic fallback.
+          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' \
+            baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+          grep -Fq 'KSU_MANAGER_PACKAGE := com.resukisu.resukisu' \
+            kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
+          grep -Fq 'ReSukiSU/ReSukiSU only' \
+            kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
+          ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
+            kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
+
       - name: Record source and patch state
         run: |
           set -euo pipefail
@@ -336,111 +347,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: PLK110-A67-ReSukiSU-SUSFS-StrictManager-${{ github.run_number }}
-          path: artifacts/
-          if-no-files-found: warn
-          compression-level: 6
-          retention-days: 14
-             baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
-
-          # Strict manager gate: only the pinned ReSukiSU package/certificate is accepted.
-          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' \
-            baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
-          grep -Fq 'KSU_MANAGER_PACKAGE := com.resukisu.resukisu' \
-            kernel_workspace/kernel_platform/KernelSU/kernel/Kbuild
-          grep -Fq 'ReSukiSU/ReSukiSU only' \
-            kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
-          ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
-            kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
-
-      - name: Record source and patch state
-        run: |
-          set -euo pipefail
-          common=kernel_workspace/kernel_platform/common
-          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
-          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
-          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
-          cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
-          cp "$common/certs/plk110_stock.pem" artifacts/
-          git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
-          git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/RESUKISU_KLEAF_ADAPTATION.patch
-          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
-          tar -czf artifacts/SUSFS4OKI_ADDED_SOURCES.tar.gz             -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
-
-          printf 'resukisu=%s\nsusfs4oki=%s\n' "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT"             >> artifacts/SOURCE_PINS.txt
-
-          git -C "$common" diff --name-only -z | xargs -0 -r git -C "$common" update-index --assume-unchanged
-          test -z "$(git -C "$common" status -uno --porcelain)"
-          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
-
-      - name: Preflight exact stock config plus declared root delta
-        run: |
-          set -euo pipefail
-          bash scripts/build_gki.sh preflight
-          python3 scripts/verify_gki.py             --preflight             --additions baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
-
-      - name: Build exact A67 GKI
-        run: bash scripts/build_gki.sh build
-
-      - name: Verify Image config, stock module CRCs and signer trust
-        run: |
-          set -euo pipefail
-          python3 scripts/verify_gki.py             --additions baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
-
-      - name: Verify ReSukiSU and SUSFS compiled
-        run: |
-          set -euo pipefail
-          grep -Eq ' [Tt] kernelsu_init$' artifacts/System.map
-          grep -Eq ' [Tt] susfs_init$' artifacts/System.map
-          python3 - <<'PY'
-          from pathlib import Path
-          image = Path('artifacts/Image').read_bytes()
-          assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
-          assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
-          PY
-
-      - name: Gate stock scheduler and Oplus vendor-module compatibility
-        run: |
-          set -euo pipefail
-          grep -qx 'CONFIG_SCHED_CLASS_EXT=y' artifacts/image.config
-          grep -qx 'CONFIG_MODVERSIONS=y' artifacts/image.config
-          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
-
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
-          abi = verdict['module_abi']
-          assert verdict['passed'] is True
-          assert abi['missing'] == []
-          assert abi['crc_mismatches'] == {}
-          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
-              'PASS\n'
-              f"stock vendor modules captured: {abi['phone_module_count']}\n"
-              f"matched kernel symbol CRCs: {abi['matched']}\n"
-              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
-              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
-              'android_vh_scx_restore_flags ABI preserved\n'
-          )
-          PY
-
-      - name: Package verified Image only
-        run: bash scripts/package_resukisu_gki.sh
-
-      - name: Generate checksums
-        if: always()
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts
-          (
-            cd artifacts
-            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
-          )
-
-      - name: Upload diagnostics and verified package
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: PLK110-A67-ReSukiSU-SUSFS-StockScheduler-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6
