@@ -3,10 +3,10 @@ name: Build Custom ReSukiSU Manager
 on:
   push:
     branches:
-      - resukisu-custom-manager
+      - resukisu-manager-relocated-20260921
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
-      - '.github/custom-manager-trigger'
+      - '.github/custom-manager-trigger-relocated'
 
 permissions:
   contents: read
@@ -211,6 +211,80 @@ jobs:
           assert "ManagerUpdateInfo? = null" in updater.read_text()
           PY
 
+      - name: Relocate internal namespace and public component names
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("source/manager")
+
+          text_ext = {".kt", ".java", ".xml", ".kts", ".gradle", ".properties", ".pro", ".txt", ".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".toml", ".json"}
+          replacements = [
+              ("com.resukisu.resukisu", "com.daily.notes"),
+              ("com/resukisu/resukisu", "com/daily/notes"),
+              ("Java_com_resukisu_resukisu", "Java_com_daily_notes"),
+              ("KernelSUApplication", "NotesApplication"),
+              ("MainActivityAlias", "NotesAlias"),
+              ("MainActivity", "NotesActivity"),
+              ("WebUIActivity", "DocumentActivity"),
+              ("BackgroundCropActivity", "ImageCropActivity"),
+              ("MagicaService", "SyncService"),
+              ("DownloadService", "TransferService"),
+              ("BootCompletedReceiver", "StartupReceiver"),
+              ("AppZygotePreload", "PreloadInitializer"),
+          ]
+
+          changed = 0
+          for p in root.rglob("*"):
+              if not p.is_file() or p.suffix.lower() not in text_ext:
+                  continue
+              try:
+                  t = p.read_text()
+              except UnicodeDecodeError:
+                  continue
+              nt = t
+              for old, new in replacements:
+                  nt = nt.replace(old, new)
+              if nt != t:
+                  p.write_text(nt)
+                  changed += 1
+
+          # Java public classes must keep filename == public class name.
+          renames = {
+              root / "app/src/main/java/com/resukisu/resukisu/KernelSUApplication.kt": root / "app/src/main/java/com/resukisu/resukisu/NotesApplication.kt",
+              root / "app/src/main/java/com/resukisu/resukisu/magica/MagicaService.java": root / "app/src/main/java/com/resukisu/resukisu/magica/SyncService.java",
+              root / "app/src/main/java/com/resukisu/resukisu/magica/BootCompletedReceiver.java": root / "app/src/main/java/com/resukisu/resukisu/magica/StartupReceiver.java",
+              root / "app/src/main/java/com/resukisu/resukisu/magica/AppZygotePreload.java": root / "app/src/main/java/com/resukisu/resukisu/magica/PreloadInitializer.java",
+          }
+          for src, dst in renames.items():
+              if src.exists():
+                  src.rename(dst)
+
+          print(f"relocated_text_files={changed}")
+
+          # Fail closed: public runtime namespace and obvious component names
+          # must no longer expose ReSukiSU identity.
+          bad_tokens = [
+              "com.resukisu.resukisu",
+              "com/resukisu/resukisu",
+              "Java_com_resukisu_resukisu",
+          ]
+          leftovers = []
+          for p in root.rglob("*"):
+              if not p.is_file() or p.suffix.lower() not in text_ext:
+                  continue
+              try:
+                  t = p.read_text()
+              except UnicodeDecodeError:
+                  continue
+              for token in bad_tokens:
+                  if token in t:
+                      leftovers.append((str(p), token))
+          if leftovers:
+              raise SystemExit("namespace leftovers: " + repr(leftovers[:20]))
+          PY
+
       - name: Restore permanent Daily Notes signing key
         working-directory: source/manager
         env:
@@ -313,6 +387,17 @@ jobs:
           ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND'
           echo "launcher_visibility=none"
           echo "ordinary_package_visibility=native_AppsFilter"
+
+          # Public component identities must no longer expose ReSukiSU namespace.
+          if printf '%s\n' "$MANIFEST_DUMP" | grep -Fq 'com.resukisu.resukisu'; then
+            echo "Old ReSukiSU namespace remains in final manifest"
+            exit 1
+          fi
+          if printf '%s\n' "$MANIFEST_DUMP" | grep -Eq 'MagicaService|WebUIActivity|DownloadService|MainActivity|KernelSUApplication'; then
+            echo "Old public component names remain in final manifest"
+            exit 1
+          fi
+          echo "public_component_namespace=relocated"
 
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
