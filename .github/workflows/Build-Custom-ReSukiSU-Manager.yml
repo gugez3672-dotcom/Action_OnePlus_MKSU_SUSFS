@@ -18,6 +18,8 @@ env:
   KEY_ALIAS: notes
   KEYSTORE_PASSWORD: ChangeMe_2026_Custom_Manager
   KEY_PASSWORD: ChangeMe_2026_Custom_Manager
+  EXPECTED_MANAGER_CERT_SHA256: 7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e
+  EXPECTED_MANAGER_CERT_SIZE: "890"
 
 jobs:
   build:
@@ -209,17 +211,33 @@ jobs:
           assert "ManagerUpdateInfo? = null" in updater.read_text()
           PY
 
-      - name: Generate private manager signing key
+      - name: Restore permanent Daily Notes signing key
         working-directory: source/manager
+        env:
+          MANAGER_KEYSTORE_B64: ${{ secrets.MANAGER_KEYSTORE_B64 }}
+          MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          keytool -genkeypair             -alias "${KEY_ALIAS}"             -keyalg RSA             -keysize 2048             -validity 36500             -storetype JKS             -keystore key.jks             -storepass "${KEYSTORE_PASSWORD}"             -keypass "${KEY_PASSWORD}"             -dname "CN=Notes, OU=Mobile, O=Local, L=Chengdu, ST=Sichuan, C=CN"
+          test -n "$MANAGER_KEYSTORE_B64"
+          test -n "$MANAGER_KEYSTORE_PASSWORD"
+          printf '%s' "$MANAGER_KEYSTORE_B64" | base64 -d > key.jks
+          test -s key.jks
+
+          keytool -list -keystore key.jks -storepass "$MANAGER_KEYSTORE_PASSWORD" -alias "${KEY_ALIAS}" >/dev/null
+          keytool -exportcert             -alias "${KEY_ALIAS}"             -keystore key.jks             -storepass "$MANAGER_KEYSTORE_PASSWORD"             -file manager-cert.der >/dev/null
+
+          CERT_SIZE=$(stat -c%s manager-cert.der)
+          CERT_SHA256=$(sha256sum manager-cert.der | awk '{print $1}')
+          echo "permanent_cert_size=$CERT_SIZE"
+          echo "permanent_cert_sha256=$CERT_SHA256"
+          test "$CERT_SIZE" = "$EXPECTED_MANAGER_CERT_SIZE"
+          test "$CERT_SHA256" = "$EXPECTED_MANAGER_CERT_SHA256"
 
           {
             echo "KEYSTORE_FILE=key.jks"
-            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
+            echo "KEYSTORE_PASSWORD=$MANAGER_KEYSTORE_PASSWORD"
             echo "KEY_ALIAS=${KEY_ALIAS}"
-            echo "KEY_PASSWORD=${KEY_PASSWORD}"
+            echo "KEY_PASSWORD=$MANAGER_KEYSTORE_PASSWORD"
           } >> gradle.properties
 
       - name: Build custom manager APK
@@ -253,11 +271,16 @@ jobs:
 
       - name: Repack with exact ksud and v2-sign
         working-directory: source
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
           python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${KEYSTORE_PASSWORD}"             -S "${KEY_PASSWORD}"             -n ReSukiSU_v4.2.0-rc2_35154-custom             --no-strip
 
       - name: Verify package signature and identity
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
           APK=$(find source/dist -maxdepth 1 -type f -name '*.apk' | head -n 1)
@@ -298,6 +321,8 @@ jobs:
 
           CERT_SIZE=$(stat -c%s manager-cert.der)
           CERT_SHA256=$(sha256sum manager-cert.der | awk '{print $1}')
+          test "$CERT_SIZE" = "$EXPECTED_MANAGER_CERT_SIZE"
+          test "$CERT_SHA256" = "$EXPECTED_MANAGER_CERT_SHA256"
           APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')
           APK_SIZE=$(stat -c%s "$APK")
 
