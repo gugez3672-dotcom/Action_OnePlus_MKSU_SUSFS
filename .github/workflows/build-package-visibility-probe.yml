@@ -1,15 +1,15 @@
-name: Build APK Raw Read Probe
+name: Build Blind APK Scanner
 
 on:
   push:
     branches:
-      - apk-raw-read-probe-20260921
+      - blind-apk-scan-probe-20260921
     paths:
       - 'settings.gradle'
       - 'build.gradle'
       - 'app/**'
       - '.github/workflows/build-package-visibility-probe.yml'
-      - '.github/raw-read-trigger'
+      - '.github/blind-scan-trigger'
   workflow_dispatch:
 
 jobs:
@@ -56,12 +56,12 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/APK-Raw-Read-Probe.apk
-          sha256sum out/APK-Raw-Read-Probe.apk | tee out/SHA256SUMS.txt
+          cp app/build/outputs/apk/debug/app-debug.apk out/Blind-APK-Scanner.apk
+          sha256sum out/Blind-APK-Scanner.apk | tee out/SHA256SUMS.txt
 
       - name: Upload probe APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk-raw-read-probe
+          name: blind-apk-scanner
           path: out/*
           if-no-files-found: error
