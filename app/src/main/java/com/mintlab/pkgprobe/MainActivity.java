@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
+import android.os.SystemClock;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -21,6 +22,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,12 +31,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class MainActivity extends Activity {
-    private static final String TARGET = "com.daily.notes";
-
     private static final String[] TERMS = new String[] {
             "ReSukiSU",
             "KernelSU",
             "kernelsu",
+            "SUKISU",
+            "SukiSU",
             "SUSFS",
             "susfs",
             "ksud",
@@ -42,7 +44,10 @@ public class MainActivity extends Activity {
             "/data/adb/ksu",
             "libkernelsu.so",
             "libksud.so",
-            "libadbroot.so"
+            "libadbroot.so",
+            "magisk",
+            "zygisk",
+            "lsposed"
     };
 
     private TextView output;
@@ -62,14 +67,14 @@ public class MainActivity extends Activity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
 
         scan = new Button(this);
-        scan.setText("开始扫描");
+        scan.setText("开始盲扫");
         scan.setOnClickListener(v -> startProbe());
 
         Button copy = new Button(this);
         copy.setText("复制报告");
         copy.setOnClickListener(v -> {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(ClipData.newPlainText("APK Raw Read Probe", lastReport));
+            cm.setPrimaryClip(ClipData.newPlainText("Blind APK Scan", lastReport));
             Toast.makeText(this, "报告已复制", Toast.LENGTH_SHORT).show();
         });
 
@@ -89,12 +94,12 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(root);
-        startProbe();
+        lineToUi("Blind APK Scanner ready.\nNo target package name is built into this probe.\n");
     }
 
     private void startProbe() {
         scan.setEnabled(false);
-        output.setText("Scanning as ordinary app UID...\n");
+        output.setText("Scanning visible third-party APKs as ordinary app UID...\n");
         new Thread(() -> {
             String report;
             try {
@@ -108,143 +113,161 @@ public class MainActivity extends Activity {
                 output.setText(r);
                 scan.setEnabled(true);
             });
-        }, "raw-apk-probe").start();
+        }, "blind-apk-scan").start();
     }
 
     private String runProbe() {
-        StringBuilder s = new StringBuilder();
         PackageManager pm = getPackageManager();
+        StringBuilder s = new StringBuilder();
 
-        line(s, "APK Raw Read Probe v1");
+        line(s, "Blind APK Scanner v1");
         line(s, "probe.package = " + getPackageName());
         line(s, "probe.uid     = " + Process.myUid());
         line(s, "android       = " + Build.VERSION.RELEASE + " / API " + Build.VERSION.SDK_INT);
-        line(s, "target        = " + TARGET);
         line(s, "root/shizuku  = NOT USED");
+        line(s, "target.package= NONE");
+        line(s, "scope         = visible non-system apps, excluding self");
         line(s, "");
 
-        ApplicationInfo ai;
+        List<ApplicationInfo> all;
         try {
-            ai = pm.getApplicationInfo(TARGET, 0);
-            line(s, "=== A. Package visibility ===");
-            line(s, "RESULT      = VISIBLE");
-            line(s, "sourceDir   = " + ai.sourceDir);
-            line(s, "publicDir   = " + ai.publicSourceDir);
-            line(s, "dataDir     = " + ai.dataDir);
+            all = pm.getInstalledApplications(0);
         } catch (Throwable t) {
-            line(s, "=== A. Package visibility ===");
-            line(s, "RESULT      = NOT AVAILABLE");
-            line(s, shortErr(t));
+            line(s, "getInstalledApplications FAILED: " + shortErr(t));
             return s.toString();
         }
-        line(s, "");
 
-        File apk = new File(ai.sourceDir);
-        line(s, "=== B. Raw base.apk file access ===");
-        line(s, "exists      = " + apk.exists());
-        line(s, "canRead     = " + apk.canRead());
-        line(s, "length      = " + apk.length());
-        try (FileInputStream in = new FileInputStream(apk)) {
-            byte[] head = new byte[64];
-            int n = in.read(head);
-            line(s, "FileInputStream = SUCCESS, firstRead=" + n + " bytes");
-            line(s, "zip.magic       = " + (n >= 4 && head[0] == 'P' && head[1] == 'K'));
-        } catch (Throwable t) {
-            line(s, "FileInputStream = FAILED");
-            line(s, shortErr(t));
+        Collections.sort(all, Comparator.comparing(a -> a.packageName == null ? "" : a.packageName));
+
+        List<ApplicationInfo> apps = new ArrayList<>();
+        for (ApplicationInfo ai : all) {
+            if (ai.packageName == null) continue;
+            if (getPackageName().equals(ai.packageName)) continue;
+            boolean system = (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            if (system) continue;
+            apps.add(ai);
         }
+
+        line(s, "visible.apps      = " + all.size());
+        line(s, "thirdparty.apps   = " + apps.size());
         line(s, "");
 
-        line(s, "=== C. ZipFile APK access ===");
-        Map<String, Integer> totalHits = new LinkedHashMap<>();
-        for (String term : TERMS) totalHits.put(term, 0);
+        long t0 = SystemClock.elapsedRealtime();
+        long totalApkBytes = 0;
+        long totalScannedBytes = 0;
+        int readable = 0;
+        int zipOpened = 0;
+        int failed = 0;
+        int hitPackages = 0;
 
-        long scannedBytes = 0;
-        int scannedEntries = 0;
-        List<String> interestingNames = new ArrayList<>();
+        List<String> hitsSummary = new ArrayList<>();
 
-        try (ZipFile zip = new ZipFile(apk)) {
-            line(s, "ZipFile.open = SUCCESS");
-            line(s, "entry.count  = " + zip.size());
+        int index = 0;
+        for (ApplicationInfo ai : apps) {
+            index++;
+            String pkg = ai.packageName;
+            File apk = new File(ai.sourceDir == null ? "" : ai.sourceDir);
+            long fileLen = apk.length();
+            totalApkBytes += Math.max(0, fileLen);
 
-            Enumeration<? extends ZipEntry> en = zip.entries();
-            while (en.hasMoreElements()) {
-                ZipEntry e = en.nextElement();
-                String name = e.getName();
+            boolean canRead = apk.canRead();
+            if (canRead) readable++;
 
-                if (name.startsWith("classes") && name.endsWith(".dex")
-                        || name.startsWith("lib/") && name.endsWith(".so")
-                        || name.equals("resources.arsc")
-                        || name.equals("AndroidManifest.xml")) {
-                    interestingNames.add(name + " (" + e.getSize() + " bytes)");
-                }
-            }
+            long pkgStart = SystemClock.elapsedRealtime();
+            Map<String,Integer> totals = new LinkedHashMap<>();
+            for (String term : TERMS) totals.put(term, 0);
+            long scanned = 0;
+            int entries = 0;
 
-            Collections.sort(interestingNames);
-            line(s, "interesting entries:");
-            for (String n : interestingNames) line(s, "  " + n);
-            line(s, "");
+            try (FileInputStream ignored = new FileInputStream(apk);
+                 ZipFile zip = new ZipFile(apk)) {
+                zipOpened++;
+                Enumeration<? extends ZipEntry> en = zip.entries();
 
-            line(s, "=== D. In-process content scan ===");
-            en = zip.entries();
-            while (en.hasMoreElements()) {
-                ZipEntry e = en.nextElement();
-                String name = e.getName();
-                boolean scanEntry =
-                        (name.startsWith("classes") && name.endsWith(".dex"))
-                        || (name.startsWith("lib/") && name.endsWith(".so"))
-                        || name.equals("resources.arsc")
-                        || name.equals("AndroidManifest.xml");
+                while (en.hasMoreElements()) {
+                    ZipEntry e = en.nextElement();
+                    String name = e.getName();
 
-                if (!scanEntry || e.isDirectory()) continue;
+                    boolean scanEntry =
+                            (name.startsWith("classes") && name.endsWith(".dex"))
+                            || (name.startsWith("lib/") && name.endsWith(".so"))
+                            || name.equals("resources.arsc")
+                            || name.equals("AndroidManifest.xml");
 
-                Map<String, Integer> entryHits;
-                try (InputStream in = zip.getInputStream(e)) {
-                    ScanResult rr = scanStream(in);
-                    entryHits = rr.hits;
-                    scannedBytes += rr.bytes;
-                    scannedEntries++;
-                }
+                    if (!scanEntry || e.isDirectory()) continue;
+                    entries++;
 
-                boolean any = false;
-                for (String term : TERMS) {
-                    int c = entryHits.get(term);
-                    if (c > 0) {
-                        if (!any) {
-                            line(s, "[" + name + "]");
-                            any = true;
+                    try (InputStream in = zip.getInputStream(e)) {
+                        ScanResult rr = scanStream(in);
+                        scanned += rr.bytes;
+                        for (String term : TERMS) {
+                            int c = rr.hits.get(term);
+                            if (c > 0) totals.put(term, totals.get(term) + c);
                         }
-                        line(s, "  " + term + " = " + c);
-                        totalHits.put(term, totalHits.get(term) + c);
                     }
                 }
+            } catch (Throwable t) {
+                failed++;
             }
 
-            line(s, "");
-            line(s, "scan.entries = " + scannedEntries);
-            line(s, "scan.bytes   = " + scannedBytes);
-            line(s, "");
-            line(s, "=== E. Aggregate fingerprints ===");
-            boolean anyTotal = false;
+            totalScannedBytes += scanned;
+            boolean hit = false;
+            int totalHits = 0;
+            StringBuilder detail = new StringBuilder();
             for (String term : TERMS) {
-                int c = totalHits.get(term);
-                line(s, term + " = " + c);
-                if (c > 0) anyTotal = true;
+                int c = totals.get(term);
+                if (c > 0) {
+                    hit = true;
+                    totalHits += c;
+                    if (detail.length() > 0) detail.append(", ");
+                    detail.append(term).append("=").append(c);
+                }
             }
-            line(s, "");
-            line(s, "fingerprint.hit = " + anyTotal);
 
-        } catch (Throwable t) {
-            line(s, "ZipFile.open = FAILED");
-            line(s, shortErr(t));
+            long pkgMs = SystemClock.elapsedRealtime() - pkgStart;
+            if (hit) {
+                hitPackages++;
+                hitsSummary.add(String.format("%03d/%03d  %s  hits=%d  scan=%.2fMB  time=%dms\n    %s",
+                        index, apps.size(), pkg, totalHits, scanned / 1048576.0, pkgMs, detail));
+            }
+
+            final int done = index;
+            if (done == 1 || done % 10 == 0 || done == apps.size()) {
+                final long elapsed = SystemClock.elapsedRealtime() - t0;
+                runOnUiThread(() -> output.setText(
+                        "Blind scan running...\n" +
+                        "apps " + done + "/" + apps.size() + "\n" +
+                        "elapsed " + elapsed + " ms\n"));
+            }
+        }
+
+        long elapsedMs = SystemClock.elapsedRealtime() - t0;
+
+        line(s, "=== RESULTS ===");
+        line(s, "thirdparty.apps   = " + apps.size());
+        line(s, "readable.apks     = " + readable);
+        line(s, "zip.opened        = " + zipOpened);
+        line(s, "scan.failed       = " + failed);
+        line(s, "hit.packages      = " + hitPackages);
+        line(s, String.format("apk.bytes.total   = %d (%.2f MB)", totalApkBytes, totalApkBytes / 1048576.0));
+        line(s, String.format("scan.bytes.total  = %d (%.2f MB)", totalScannedBytes, totalScannedBytes / 1048576.0));
+        line(s, "elapsed.ms        = " + elapsedMs);
+        line(s, String.format("elapsed.seconds   = %.3f", elapsedMs / 1000.0));
+        line(s, "");
+
+        line(s, "=== MATCHED PACKAGES ===");
+        if (hitsSummary.isEmpty()) {
+            line(s, "(none)");
+        } else {
+            for (String x : hitsSummary) line(s, x);
         }
 
         line(s, "");
-        line(s, "=== Interpretation ===");
-        line(s, "If FileInputStream/ZipFile = SUCCESS, an ordinary QUERY_ALL app");
-        line(s, "can read the installed APK bytes on this ROM without root.");
-        line(s, "If fingerprint counts > 0, it can also find those strings");
-        line(s, "inside DEX/native libraries using only its own app process.");
+        line(s, "=== INTERPRETATION ===");
+        line(s, "This build contains no target package name.");
+        line(s, "It enumerates every visible third-party package and scans its base APK.");
+        line(s, "Only DEX, native .so, resources.arsc and AndroidManifest.xml are scanned.");
+        line(s, "Package names in MATCHED PACKAGES were discovered only after enumeration.");
 
         return s.toString();
     }
@@ -306,6 +329,10 @@ public class MainActivity extends Activity {
             this.bytes = bytes;
             this.hits = hits;
         }
+    }
+
+    private void lineToUi(String x) {
+        output.setText(x);
     }
 
     private static void line(StringBuilder s, String x) {
