@@ -137,22 +137,63 @@ jobs:
 
           tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
-          # Fix launcher icon switching after applicationId changes.
+          # Hidden/private build has no launcher entry. The upstream alternate-icon
+          # switch must never toggle MainActivity/MainActivityAlias because doing so
+          # can disable the only explicitly launchable Activity.
           settings_repo = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/settings/SettingsPlatformRepository.kt")
           t = settings_repo.read_text()
-          old = (
-              '        val packageName = application.packageName\n'
-              '        val main = ComponentName(packageName, "$packageName.ui.MainActivity")\n'
-              '        val alias = ComponentName(packageName, "$packageName.ui.MainActivityAlias")\n'
+
+          old_snapshot = '            useAltIcon = settings.getBoolean("use_alt_icon", false),\n'
+          if t.count(old_snapshot) != 1:
+              raise SystemExit("unexpected alternate-icon snapshot implementation")
+          t = t.replace(old_snapshot, '            useAltIcon = false,\n', 1)
+
+          old_branch = (
+              '            is PlatformSetting.AlternateIcon -> {\n'
+              '                settings.putBoolean("use_alt_icon", setting.enabled)\n'
+              '                toggleLauncherIcon(setting.enabled)\n'
+              '            }\n'
           )
-          new = (
-              '        val packageName = application.packageName\n'
-              '        val main = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivity")\n'
-              '        val alias = ComponentName(packageName, "com.resukisu.resukisu.ui.MainActivityAlias")\n'
+          new_branch = (
+              '            is PlatformSetting.AlternateIcon ->\n'
+              '                settings.putBoolean("use_alt_icon", false)\n'
           )
-          if t.count(old) != 1:
-              raise SystemExit("unexpected launcher icon toggle implementation")
-          settings_repo.write_text(t.replace(old, new, 1))
+          if t.count(old_branch) != 1:
+              raise SystemExit("unexpected alternate-icon update implementation")
+          t = t.replace(old_branch, new_branch, 1)
+
+          fn_start = t.index("    private fun toggleLauncherIcon(useAlt: Boolean) {")
+          fn_end = t.index("\n    private fun loadModuleUpdatePreference()", fn_start)
+          t = t[:fn_start] + t[fn_end + 1:]
+          settings_repo.write_text(t)
+
+          # Remove the alternate-icon control from the hidden manager UI.
+          theme_settings = Path("source/manager/app/src/main/java/com/resukisu/resukisu/ui/screen/themeSettings/ThemeSettings.kt")
+          t = theme_settings.read_text()
+          t = t.replace("import androidx.compose.material.icons.twotone.Android\n", "", 1)
+          icon_item = (
+              '        item {\n'
+              '            // 图标切换\n'
+              '            SettingsSwitchWidget(\n'
+              '                icon = Icons.TwoTone.Android,\n'
+              '                title = stringResource(R.string.icon_switch_title),\n'
+              '                description = stringResource(R.string.icon_switch_summary),\n'
+              '                checked = settingsUiState.useAltIcon,\n'
+              '                onCheckedChange = { enabled ->\n'
+              '                    settingsViewModel.dispatch(SettingsUiAction.SetAlternateIcon(enabled))\n'
+              '                }\n'
+              '            )\n'
+              '        }\n\n'
+          )
+          if t.count(icon_item) != 1:
+              raise SystemExit("unexpected alternate-icon UI layout")
+          theme_settings.write_text(t.replace(icon_item, "", 1))
+
+          # Fail closed: the private build must contain no code path that toggles
+          # MainActivity/MainActivityAlias through the alternate-icon setting.
+          repo_text = settings_repo.read_text()
+          if "toggleLauncherIcon(" in repo_text:
+              raise SystemExit("alternate-icon component toggle still present")
 
           # Replace only the primary anime artwork with a notebook icon.
           primary_icon = Path("source/manager/app/src/main/res/drawable/ic_launcher_foreground.xml")
