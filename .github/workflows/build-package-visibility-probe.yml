@@ -15,7 +15,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
@@ -35,23 +35,48 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK 36
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build three probe APKs
-        run: gradle :app:assembleDebug --stacktrace
-
-      - name: Collect APKs
+        id: build
+        shell: bash
         run: |
-          mkdir -p out
-          cp app/build/outputs/apk/plain/debug/app-plain-debug.apk out/PackageProbe-Plain.apk
-          cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk out/PackageProbe-Targeted.apk
-          cp app/build/outputs/apk/all/debug/app-all-debug.apk out/PackageProbe-QUERY_ALL.apk
-          sha256sum out/*.apk | tee out/SHA256SUMS.txt
+          set +e
+          gradle :app:assembleDebug --stacktrace 2>&1 | tee probe-build.log
+          code=${PIPESTATUS[0]}
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 0 ]; then
+            echo "SUCCESS" > probe-build-status.txt
+            mkdir -p probe-output
+            cp app/build/outputs/apk/plain/debug/app-plain-debug.apk probe-output/PackageProbe-Plain.apk
+            cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk probe-output/PackageProbe-Targeted.apk
+            cp app/build/outputs/apk/all/debug/app-all-debug.apk probe-output/PackageProbe-QUERY_ALL.apk
+            sha256sum probe-output/*.apk | tee probe-output/SHA256SUMS.txt
+          else
+            echo "FAILED (exit=$code)" > probe-build-status.txt
+          fi
+          exit 0
+
+      - name: Commit build status and APKs to probe branch
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f probe-build-status.txt probe-build.log
+          if [ -d probe-output ]; then git add -f probe-output; fi
+          git commit -m "Package probe build result" || true
+          git push origin HEAD:package-visibility-probe-20260921
 
       - name: Upload probe APKs
+        if: steps.build.outputs.code == '0'
         uses: actions/upload-artifact@v4
         with:
           name: package-visibility-probe-apks
-          path: out/*
+          path: probe-output/*
           if-no-files-found: error
+
+      - name: Fail workflow if Gradle build failed
+        if: steps.build.outputs.code != '0'
+        run: exit 1
