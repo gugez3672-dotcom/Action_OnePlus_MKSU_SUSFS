@@ -246,6 +246,23 @@ jobs:
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
           ! grep -Fq 'ksu_is_dynamic_manager_enabled()' \
             kernel_workspace/kernel_platform/KernelSU/kernel/manager/apk_sign.c
+          grep -Fq 'if (ksu_get_uid_t(current_uid()) != 0 && !is_manager())' \
+            kernel_workspace/kernel_platform/KernelSU/kernel/supercall/supercall.c
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('kernel_workspace/kernel_platform/KernelSU/kernel/supercall/dispatch.c').read_text()
+          for marker in (
+              '.cmd = KSU_IOCTL_GET_INFO,',
+              '.cmd = KSU_IOCTL_GET_INFO_LEGACY,',
+              '.cmd = KSU_IOCTL_CHECK_SAFEMODE,',
+              '.cmd = KSU_IOCTL_GET_FULL_VERSION,',
+          ):
+              start = p.index(marker)
+              end = p.index('    },', start)
+              block = p[start:end]
+              assert '.perm_check = manager_or_root' in block, marker
+              assert '.perm_check = always_allow' not in block, marker
+          PY
 
       - name: Record source and patch state
         run: |
