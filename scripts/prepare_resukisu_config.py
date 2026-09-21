@@ -16,7 +16,7 @@ count = int(subprocess.check_output(
 ).strip())
 version = 30700 + count
 
-STRICT_MANAGER_PACKAGE = "com.resukisu.resukisu"
+STRICT_MANAGER_PACKAGE = "com.daily.notes"
 STRICT_MANAGER_APK_SHA256 = "74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644"
 
 kbuild = ksu / "kernel/Kbuild"
