@@ -1,1 +1,4 @@
-trigger: retry after fixing ReSukiSU KSU_SRC for Bazel/Kleaf sandbox
+trigger: strict manager hardening build
+base: 236356536ab2cac02f31254c3629a17610f65c37
+policy: package + pinned ReSukiSU signer + no dynamic manager + no foreign driver/info access
+manager: v4.2.0-rc2 / driver 35154
