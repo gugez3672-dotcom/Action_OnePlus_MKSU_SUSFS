@@ -17,7 +17,7 @@ count = int(subprocess.check_output(
 version = 30700 + count
 
 STRICT_MANAGER_PACKAGE = "com.daily.notes"
-STRICT_MANAGER_APK_SHA256 = "74fe5f9cbaa0ca3c8baa087dc1e54444aa497d7ff776e069c986a6066104e644"
+STRICT_MANAGER_APK_SHA256 = "60393acabc044ebd4bcfbc3d23534a823b0c1a4d3d26b5defd3d0a6917b82325"
 
 kbuild = ksu / "kernel/Kbuild"
 text = kbuild.read_text()
@@ -48,7 +48,7 @@ text = apk_sign.read_text()
 keys_start = text.index("static apk_sign_key_t apk_sign_keys[] = {")
 keys_end = text.index("\n};", keys_start) + len("\n};")
 strict_keys = """static apk_sign_key_t apk_sign_keys[] = {
-    { EXPECTED_SIZE_RESUKISU, EXPECTED_HASH_RESUKISU }, /* ReSukiSU/ReSukiSU only */
+    { 878, "74b8819b440c3ca3e1df33e49bff33e0115aab37271eec2c1e85e407c4a5d3a3" }, /* custom com.daily.notes only */
 };"""
 text = text[:keys_start] + strict_keys + text[keys_end:]
 
@@ -233,7 +233,7 @@ text = text.replace(
 )
 path.write_text(text)
 print(f"Pinned ReSukiSU metadata: version={version}, commit={commit}")
-print(f"Strict manager package: {STRICT_MANAGER_PACKAGE}; only ReSukiSU certificate accepted; dynamic manager disabled.")
+print(f"Strict manager package: {STRICT_MANAGER_PACKAGE}; only custom certificate accepted; dynamic manager disabled.")
 print(f"Exact manager APK SHA-256: {STRICT_MANAGER_APK_SHA256}")
 print("Strict manager I/O: foreign apps cannot obtain the KSU driver fd or read KSU info/version ioctls.")
 print("Added ReSukiSU/SUSFS as a post-defconfig fragment; stock gki_defconfig remains untouched.")
