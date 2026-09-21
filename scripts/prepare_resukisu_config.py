@@ -61,6 +61,63 @@ apk_sign.write_text(text)
 assert "EXPECTED_SIZE_OFFICIAL" not in text[keys_start:keys_start + len(strict_keys) + 64]
 assert "ksu_is_dynamic_manager_enabled()" not in text
 
+# Do not hand a KernelSU driver fd to arbitrary apps that know the reboot magic.
+# The real manager is already identified by throne_tracker and receives its fd
+# through the manager setuid path; root/ksud remains allowed.
+supercall = ksu / "kernel/supercall/supercall.c"
+text = supercall.read_text()
+include_anchor = '#include "klog.h" // IWYU pragma: keep\n'
+if include_anchor not in text:
+    raise SystemExit("unexpected supercall include layout")
+text = text.replace(
+    include_anchor,
+    include_anchor + '#include "manager/manager_identity.h"\n',
+    1,
+)
+fd_anchor = """    if (magic2 == KSU_INSTALL_MAGIC2) {
+        int fd = ksu_install_fd();
+"""
+if text.count(fd_anchor) != 1:
+    raise SystemExit("unexpected KSU fd install block")
+text = text.replace(
+    fd_anchor,
+    """    if (magic2 == KSU_INSTALL_MAGIC2) {
+        if (ksu_get_uid_t(current_uid()) != 0 && !is_manager()) {
+            /* Swallow the KSU magic without exposing a driver fd. */
+            return 0;
+        }
+        int fd = ksu_install_fd();
+""",
+    1,
+)
+supercall.write_text(text)
+
+# Even if an fd is somehow inherited/passed, do not expose basic KSU state to
+# an unrecognized app. This makes foreign managers behave as if KSU is absent.
+dispatch = ksu / "kernel/supercall/dispatch.c"
+text = dispatch.read_text()
+strict_ioctl_perms = {
+    '.cmd = KSU_IOCTL_GET_INFO,': 1,
+    '.cmd = KSU_IOCTL_GET_INFO_LEGACY,': 1,
+    '.cmd = KSU_IOCTL_CHECK_SAFEMODE,': 1,
+    '.cmd = KSU_IOCTL_GET_FULL_VERSION,': 1,
+}
+for marker, expected in strict_ioctl_perms.items():
+    start = text.index(marker)
+    end = text.index("    },", start)
+    block = text[start:end]
+    if block.count(".perm_check = always_allow") != expected:
+        raise SystemExit(f"unexpected permission block for {marker}")
+    block = block.replace(".perm_check = always_allow", ".perm_check = manager_or_root")
+    text = text[:start] + block + text[end:]
+dispatch.write_text(text)
+
+assert 'if (ksu_get_uid_t(current_uid()) != 0 && !is_manager())' in supercall.read_text()
+for marker in strict_ioctl_perms:
+    start = text.index(marker)
+    end = text.index("    },", start)
+    assert ".perm_check = manager_or_root" in text[start:end]
+
 fragment = kp / "common/arch/arm64/configs/plk110_resukisu.fragment"
 fragment.write_text(
     Path("baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions").read_text()
@@ -81,4 +138,5 @@ text = text.replace(
 path.write_text(text)
 print(f"Pinned ReSukiSU metadata: version={version}, commit={commit}")
 print(f"Strict manager package: {STRICT_MANAGER_PACKAGE}; only ReSukiSU certificate accepted; dynamic manager disabled.")
+print("Strict manager I/O: foreign apps cannot obtain the KSU driver fd or read KSU info/version ioctls.")
 print("Added ReSukiSU/SUSFS as a post-defconfig fragment; stock gki_defconfig remains untouched.")
