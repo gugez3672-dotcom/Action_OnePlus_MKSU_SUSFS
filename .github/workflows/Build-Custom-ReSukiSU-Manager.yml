@@ -84,32 +84,17 @@ jobs:
           # actual authorization boundary.
           ksu_cli = Path("source/manager/app/src/main/java/com/resukisu/resukisu/data/shell/KsuCli.kt")
           t = ksu_cli.read_text()
-          import re
-          pattern = r'    suspend fun isOfficialSignature\\(packageResourcePath: String\\): Boolean =\\n        withContext\\(Dispatchers\\.IO\\) \\{.*?\\n        \\}\\n'
-          t, n = re.subn(
-              pattern,
-              '    suspend fun isOfficialSignature(packageResourcePath: String): Boolean = true\\n',
-              t,
-              count=1,
-              flags=re.S,
-          )
-          if n != 1:
-              raise SystemExit("unexpected isOfficialSignature layout")
+          start = t.index("    suspend fun isOfficialSignature")
+          end = t.index("\n    suspend fun getFeatureStatus", start)
+          t = t[:start] + "    suspend fun isOfficialSignature(packageResourcePath: String): Boolean = true\n" + t[end:]
           ksu_cli.write_text(t)
 
           # Exact-APK locking and upstream manager updates are incompatible.
           updater = Path("source/manager/app/src/main/java/com/resukisu/resukisu/domain/usecase/CheckManagerUpdateUseCase.kt")
           t = updater.read_text()
-          pattern = r'    suspend operator fun invoke\\(channel: ManagerUpdateChannel\\): ManagerUpdateInfo\\? =\\n        when \\(channel\\) \\{.*?\\n        \\}\\n'
-          t, n = re.subn(
-              pattern,
-              '    suspend operator fun invoke(channel: ManagerUpdateChannel): ManagerUpdateInfo? = null\\n',
-              t,
-              count=1,
-              flags=re.S,
-          )
-          if n != 1:
-              raise SystemExit("unexpected manager update usecase layout")
+          start = t.index("    suspend operator fun invoke")
+          end = t.index("\n}", start)
+          t = t[:start] + "    suspend operator fun invoke(channel: ManagerUpdateChannel): ManagerUpdateInfo? = null\n" + t[end:]
           updater.write_text(t)
 
           out = gradle.read_text()
