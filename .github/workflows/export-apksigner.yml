@@ -28,7 +28,7 @@ jobs:
           set -euxo pipefail
           mkdir -p signer
           cp /usr/local/lib/android/sdk/build-tools/35.0.0/lib/apksigner.jar signer/
-          cp /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign signer/
+          cp /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign signer/\n          cp /usr/local/lib/android/sdk/build-tools/35.0.0/aapt signer/\n          cp /usr/local/lib/android/sdk/build-tools/35.0.0/aapt2 signer/
           sha256sum signer/* > signer/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
