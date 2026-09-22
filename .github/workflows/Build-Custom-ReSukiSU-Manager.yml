@@ -1,6 +1,7 @@
 name: Build Custom ReSukiSU Manager
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - resukisu-custom-manager
