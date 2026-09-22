@@ -362,19 +362,25 @@ jobs:
           test -n "${MANAGER_KEYSTORE_B64}"
           test -n "${MANAGER_KEYSTORE_PASSWORD}"
 
-          printf '%s' "${MANAGER_KEYSTORE_B64}" | base64 --decode > key.jks
+          # GitHub's multiline secret field can preserve a trailing CR/LF when
+          # the value was pasted from a text file. The actual JKS password has
+          # no newline, so normalize only CR/LF here.
+          KEYSTORE_PASS="$(printf '%s' "${MANAGER_KEYSTORE_PASSWORD}" | tr -d '\r\n')"
+          test -n "${KEYSTORE_PASS}"
+
+          printf '%s' "${MANAGER_KEYSTORE_B64}" | tr -d '\r\n ' | base64 --decode > key.jks
           chmod 600 key.jks
 
           keytool -list \
             -keystore key.jks \
-            -storepass "${MANAGER_KEYSTORE_PASSWORD}" \
+            -storepass "${KEYSTORE_PASS}" \
             -alias "${KEY_ALIAS}" >/dev/null
 
           {
             echo "KEYSTORE_FILE=key.jks"
-            echo "KEYSTORE_PASSWORD=${MANAGER_KEYSTORE_PASSWORD}"
+            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASS}"
             echo "KEY_ALIAS=${KEY_ALIAS}"
-            echo "KEY_PASSWORD=${MANAGER_KEYSTORE_PASSWORD}"
+            echo "KEY_PASSWORD=${KEYSTORE_PASS}"
           } >> gradle.properties
 
       - name: Build custom manager APK
@@ -412,13 +418,15 @@ jobs:
           MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${MANAGER_KEYSTORE_PASSWORD}"             -S "${MANAGER_KEYSTORE_PASSWORD}"             -n ReSukiSU_v4.2.0-rc2_35154-custom             --no-strip
+          KEYSTORE_PASS="$(printf '%s' "${MANAGER_KEYSTORE_PASSWORD}" | tr -d '\r\n')"
+          python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${KEYSTORE_PASS}"             -S "${KEYSTORE_PASS}"             -n ReSukiSU_v4.2.0-rc2_35154-custom             --no-strip
 
       - name: Verify package signature and identity
         env:
           MANAGER_KEYSTORE_PASSWORD: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
+          KEYSTORE_PASS="$(printf '%s' "${MANAGER_KEYSTORE_PASSWORD}" | tr -d '\r\n')"
           APK=$(find source/dist -maxdepth 1 -type f -name '*.apk' | head -n 1)
           test -n "$APK"
 
@@ -454,7 +462,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
 
-          keytool -exportcert             -alias "${KEY_ALIAS}"             -keystore source/manager/key.jks             -storepass "${MANAGER_KEYSTORE_PASSWORD}"             -file manager-cert.der >/dev/null
+          keytool -exportcert             -alias "${KEY_ALIAS}"             -keystore source/manager/key.jks             -storepass "${KEYSTORE_PASS}"             -file manager-cert.der >/dev/null
 
           CERT_SIZE=$(stat -c%s manager-cert.der)
           CERT_SHA256=$(sha256sum manager-cert.der | awk '{print $1}')
