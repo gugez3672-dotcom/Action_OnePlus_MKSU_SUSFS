@@ -89,15 +89,15 @@ jobs:
 
           APK_SHA256=$(sha256sum DailyNotes-DN29-final-gate-signed.apk | awk '{print $1}')
           APK_SIZE=$(stat -c%s DailyNotes-DN29-final-gate-signed.apk)
-          cat > final-identity.txt <<EOF
-source_run_id=${SOURCE_RUN_ID}
-source_artifact_id=${SOURCE_ARTIFACT_ID}
-package=${PKG}
-apk_sha256=${APK_SHA256}
-apk_size=${APK_SIZE}
-cert_sha256=${CERT_SHA256}
-gate_cert_expected=${EXPECTED_CERT_SHA256}
-EOF
+          {
+            echo "source_run_id=${SOURCE_RUN_ID}"
+            echo "source_artifact_id=${SOURCE_ARTIFACT_ID}"
+            echo "package=${PKG}"
+            echo "apk_sha256=${APK_SHA256}"
+            echo "apk_size=${APK_SIZE}"
+            echo "cert_sha256=${CERT_SHA256}"
+            echo "gate_cert_expected=${EXPECTED_CERT_SHA256}"
+          } > final-identity.txt
           cat final-identity.txt
 
       - name: Upload final gate-signed APK
