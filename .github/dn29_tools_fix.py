@@ -171,7 +171,7 @@ new_runner = r'''    fun runScriptInTerminal(path: String) {
             val encodingProbe = execRoot(
                 "HEX=$($busybox hexdump -n 3 -e '3/1 \"%02x\"' " + shellQuote(path) + " 2>/dev/null); " +
                     "if $busybox grep -q \"$(printf '\\r')\" " + shellQuote(path) + "; then CR=1; else CR=0; fi; " +
-                    "printf '%s %s' \"$HEX\" \"$CR\""
+                    "printf '%s %s' \"\$HEX\" \"\$CR\""
             ).out.trim()
             val probeParts = encodingProbe.split(' ', limit = 2)
             val hasBom = probeParts.firstOrNull()?.lowercase(Locale.ROOT)?.startsWith("efbbbf") == true
@@ -251,8 +251,8 @@ new_runner = r'''    fun runScriptInTerminal(path: String) {
 
             val cleanup = cleanupPath?.let {
                 "; __dn_ec=$?; rm -f -- " + shellQuote(it) +
-                    "; printf '\\n[脚本结束，退出码 %s]\\n' \"$__dn_ec\""
-            } ?: "; __dn_ec=$?; printf '\\n[脚本结束，退出码 %s]\\n' \"$__dn_ec\""
+                    "; printf '\\n[脚本结束，退出码 %s]\\n' \"\$__dn_ec\""
+            } ?: "; __dn_ec=$?; printf '\\n[脚本结束，退出码 %s]\\n' \"\$__dn_ec\""
 
             session.sendLine(
                 interpreter + " " + shellQuote(runPath) + cleanup
@@ -276,7 +276,10 @@ p.write_text(t)
 
 assert 'getSharedPreferences("daily_notes_root_tools"' in t
 assert 'toolPrefs.edit().putString("last_file_path"' in t
-assert 'selectedEntry = entry\\n                                                    showActions = true' in t
+assert 'onTap = {' in t
+assert 'selectedEntry = entry' in t
+assert 'showActions = true' in t
+assert 'else if (isTextLike(entry.name))' not in t
 assert '正在识别脚本' in t
 assert 'BusyBox ash' in t
 assert '/system/bin/sh " + shellQuote(path)' not in t
