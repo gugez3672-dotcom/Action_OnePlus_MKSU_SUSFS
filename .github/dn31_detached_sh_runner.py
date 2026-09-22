@@ -128,6 +128,6 @@ p.write_text(t)
 assert "fun runScriptDetached(path: String)" in t
 assert "Root 后台运行（独立）" in t
 assert "for cg in /acct /dev/cg2_bpf /sys/fs/cgroup /dev/memcg/apps" in t
-assert "cat /proc/$$/cgroup" in t
+assert "cat /proc/\\$\\$/cgroup" in t
 assert "exec $busybox setsid" in t
 assert "manager cgroup" in t
