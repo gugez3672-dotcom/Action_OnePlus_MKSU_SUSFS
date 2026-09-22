@@ -350,6 +350,7 @@ jobs:
           python3 .github/dn25_tools_patch_v2.py
           python3 .github/dn28_tools_patch.py
           python3 .github/dn29_tools_fix.py
+          python3 .github/dn30_elf_runner_fix.py
 
       - name: Generate private manager signing key
         working-directory: source/manager
