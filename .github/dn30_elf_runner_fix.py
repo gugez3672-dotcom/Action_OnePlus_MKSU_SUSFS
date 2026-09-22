@@ -43,7 +43,7 @@ new = r'''    fun runScriptInTerminal(path: String) {
                         terminalOutput = (
                             terminalOutput +
                                 "\n[ELF 可执行文件复制失败]\n" +
-                                copied.out + "\n" + copied.err + "\n"
+                                copied.out + "\n"
                         ).takeLast(180_000)
                         terminalRunning = false
                         terminalHint = "ELF 准备失败"
