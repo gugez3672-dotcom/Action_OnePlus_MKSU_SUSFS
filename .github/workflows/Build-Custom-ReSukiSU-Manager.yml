@@ -341,12 +341,13 @@ jobs:
           assert '#1B1E23' in colors.read_text()
           PY
 
-      - name: Apply DN23 launcher UI patch
+      - name: Apply launcher and tools patches
         run: |
           set -euo pipefail
           python3 .github/dn23_manager_patch.py
           git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml
           git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml
+          python3 .github/dn25_tools_patch.py
 
       - name: Generate private manager signing key
         working-directory: source/manager
@@ -426,9 +427,9 @@ jobs:
 
           VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" | head -n 1)
           echo "versionName=$VERSION_NAME"
-          test "$VERSION_NAME" = "v4.2.0-rc2-DN23"
+          test "$VERSION_NAME" = "V4.2.0"
 
-          # DN23 must have a normal desktop launcher entry.
+          # Custom manager must have a normal desktop launcher entry.
           printf '%s\n' "$BADGING" | grep -q "^launchable-activity:"
 
           # Only launcher exposure is retained; deep-link/share filters stay removed.
