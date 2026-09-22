@@ -11,7 +11,7 @@ text = gradle.read_text()
 needle = 'versionName = managerVersionName'
 if text.count(needle) != 1:
     raise SystemExit("unexpected versionName assignment")
-gradle.write_text(text.replace(needle, 'versionName = "v4.2.0-rc2-DN23"', 1))
+gradle.write_text(text.replace(needle, 'versionName = "V4.2.0"', 1))
 
 # 2) Desktop launcher: expose only MAIN/LAUNCHER on main + alternate alias.
 manifest = Path("source/manager/app/src/main/AndroidManifest.xml")
@@ -141,7 +141,7 @@ superuser.write_text(text)
 # They are recovered directly from the pinned source commit by the workflow in a later step.
 
 # Assertions.
-assert 'versionName = "v4.2.0-rc2-DN23"' in gradle.read_text()
+assert 'versionName = "V4.2.0"' in gradle.read_text()
 assert 'android.intent.category.LAUNCHER' in manifest.read_text()
 assert 'toggleLauncherIcon(setting.enabled)' in settings_repo.read_text()
 assert 'com.resukisu.resukisu.ui.MainActivity"' in settings_repo.read_text()
