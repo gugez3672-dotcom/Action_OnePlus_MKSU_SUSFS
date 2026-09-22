@@ -350,8 +350,7 @@ jobs:
             .github/dn28_tools_patch.py \
             .github/dn29_tools_fix.py \
             .github/dn30_elf_runner_fix.py \
-            .github/dn31_detached_sh_runner.py \
-            .github/dn32_task_removal_cleanup.py
+            .github/dn31_detached_sh_runner.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -364,7 +363,6 @@ jobs:
           python3 .github/dn29_tools_fix.py
           python3 .github/dn30_elf_runner_fix.py
           python3 .github/dn31_detached_sh_runner.py
-          python3 .github/dn32_task_removal_cleanup.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
