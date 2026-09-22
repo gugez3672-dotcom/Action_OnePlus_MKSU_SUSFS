@@ -341,6 +341,13 @@ jobs:
           assert '#1B1E23' in colors.read_text()
           PY
 
+      - name: Apply DN23 launcher UI patch
+        run: |
+          set -euo pipefail
+          python3 .github/dn23_manager_patch.py
+          git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml
+          git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml
+
       - name: Generate private manager signing key
         working-directory: source/manager
         run: |
