@@ -10,7 +10,7 @@ on:
       - '.github/custom-manager-trigger'
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   RESUKISU_COMMIT: 6ec8d9a8a8be30878c388504cacf8ae7849c757b
@@ -501,3 +501,22 @@ jobs:
           name: ReSukiSU-35154-com.daily.notes
           path: custom-manager/
           retention-days: 30
+
+      - name: Publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp custom-manager/ReSukiSU_v4.2.0-rc2_35154_com.daily.notes.apk custom-manager/DailyNotes.apk
+
+          if gh release view manager-latest --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload manager-latest custom-manager/DailyNotes.apk \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create manager-latest custom-manager/DailyNotes.apk \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${GITHUB_SHA}" \
+              --title "Daily Notes Manager" \
+              --notes "Automated fixed-certificate signed manager build."
+          fi
