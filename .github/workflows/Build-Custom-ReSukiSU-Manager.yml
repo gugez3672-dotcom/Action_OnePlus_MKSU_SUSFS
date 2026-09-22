@@ -424,20 +424,21 @@ jobs:
           test "$PKG" = "${CUSTOM_PACKAGE}"
           test "$LABEL" = "Daily Notes"
 
-          # There must be no launcher entry in the final APK.
-          if printf '%s\n' "$BADGING" | grep -q "^launchable-activity:"; then
-            echo "Unexpected launcher activity remains"
-            exit 1
-          fi
+          VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" | head -n 1)
+          echo "versionName=$VERSION_NAME"
+          test "$VERSION_NAME" = "v4.2.0-rc2-DN23"
 
-          # Manifest-level visibility sanity checks.
+          # DN23 must have a normal desktop launcher entry.
+          printf '%s\n' "$BADGING" | grep -q "^launchable-activity:"
+
+          # Only launcher exposure is retained; deep-link/share filters stay removed.
           MANIFEST_DUMP=$("$AAPT" dump xmltree "$APK" AndroidManifest.xml)
-          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.category.LAUNCHER'
-          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.MAIN'
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.category.LAUNCHER'
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.MAIN'
           ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.VIEW'
           ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND'
-          echo "launcher_visibility=none"
-          echo "ordinary_package_visibility=native_AppsFilter"
+          ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND_MULTIPLE'
+          echo "launcher_visibility=enabled"
 
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
