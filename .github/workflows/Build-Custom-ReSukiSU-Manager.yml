@@ -341,6 +341,16 @@ jobs:
           assert '#1B1E23' in colors.read_text()
           PY
 
+      - name: Validate manager patch scripts
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .github/dn23_manager_patch.py \
+            .github/dn25_tools_patch_v2.py \
+            .github/dn28_tools_patch.py \
+            .github/dn29_tools_fix.py \
+            .github/dn30_elf_runner_fix.py
+
       - name: Apply launcher and tools patches
         run: |
           set -euo pipefail
