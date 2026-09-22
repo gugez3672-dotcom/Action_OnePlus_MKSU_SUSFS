@@ -347,7 +347,7 @@ jobs:
           python3 .github/dn23_manager_patch.py
           git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_foreground_alt.xml
           git -C source show "${RESUKISU_COMMIT}:manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml" > source/manager/app/src/main/res/drawable/ic_launcher_monochrome_alt.xml
-          python3 .github/dn25_tools_patch.py
+          python3 .github/dn25_tools_patch_v2.py
 
       - name: Generate private manager signing key
         working-directory: source/manager
