@@ -1,0 +1,111 @@
+name: Resign DN29 Manager With Permanent Gate Key
+
+on:
+  push:
+    branches:
+      - resukisu-custom-manager
+    paths:
+      - '.github/workflows/Resign-DN29-Manager.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN_ID: '35681160806'
+  SOURCE_ARTIFACT_ID: '10675318147'
+  EXPECTED_PACKAGE: com.daily.notes
+  EXPECTED_CERT_SHA256: 7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e
+  KEY_ALIAS: notes
+
+jobs:
+  resign:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Setup Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download exact DN29 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" \
+            -o dn29-artifact.zip
+          mkdir input
+          unzip -o dn29-artifact.zip -d input >/dev/null
+          APK=$(find input -maxdepth 2 -type f -name '*.apk' | head -n 1)
+          test -n "${APK}"
+          echo "INPUT_APK=${APK}" >> "${GITHUB_ENV}"
+          sha256sum "${APK}"
+
+      - name: Restore permanent manager keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.MANAGER_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${KEYSTORE_B64}"
+          test -n "${KS_PASS}"
+          printf '%s' "${KEYSTORE_B64}" | base64 -d > permanent-manager.jks
+          test -s permanent-manager.jks
+          keytool -list -keystore permanent-manager.jks -storepass "${KS_PASS}" -alias "${KEY_ALIAS}" >/dev/null
+
+      - name: Re-sign exact DN29 APK
+        env:
+          KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          AAPT=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt 2>/dev/null | sort -V | tail -n 1)
+          test -x "${APKSIGNER}"
+          test -x "${AAPT}"
+
+          "${APKSIGNER}" sign \
+            --ks permanent-manager.jks \
+            --ks-key-alias "${KEY_ALIAS}" \
+            --ks-pass "pass:${KS_PASS}" \
+            --key-pass "pass:${KS_PASS}" \
+            --out DailyNotes-DN29-final-gate-signed.apk \
+            "${INPUT_APK}"
+
+          "${APKSIGNER}" verify --verbose --print-certs DailyNotes-DN29-final-gate-signed.apk | tee apksigner-final.txt
+
+          CERT_SHA256=$(sed -n 's/.*certificate SHA-256 digest: //p' apksigner-final.txt | head -n 1 | tr 'A-F' 'a-f')
+          test -n "${CERT_SHA256}"
+          echo "cert_sha256=${CERT_SHA256}"
+          test "${CERT_SHA256}" = "${EXPECTED_CERT_SHA256}"
+
+          BADGING=$("${AAPT}" dump badging DailyNotes-DN29-final-gate-signed.apk)
+          PKG=$(printf '%s\n' "${BADGING}" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)
+          test "${PKG}" = "${EXPECTED_PACKAGE}"
+
+          APK_SHA256=$(sha256sum DailyNotes-DN29-final-gate-signed.apk | awk '{print $1}')
+          APK_SIZE=$(stat -c%s DailyNotes-DN29-final-gate-signed.apk)
+          cat > final-identity.txt <<EOF
+source_run_id=${SOURCE_RUN_ID}
+source_artifact_id=${SOURCE_ARTIFACT_ID}
+package=${PKG}
+apk_sha256=${APK_SHA256}
+apk_size=${APK_SIZE}
+cert_sha256=${CERT_SHA256}
+gate_cert_expected=${EXPECTED_CERT_SHA256}
+EOF
+          cat final-identity.txt
+
+      - name: Upload final gate-signed APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: DN29-final-gate-signed
+          path: |
+            DailyNotes-DN29-final-gate-signed.apk
+            apksigner-final.txt
+            final-identity.txt
+          retention-days: 30
