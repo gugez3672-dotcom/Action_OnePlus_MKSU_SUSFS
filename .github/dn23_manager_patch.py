@@ -90,16 +90,13 @@ settings_repo.write_text(text)
 theme = Path("source/manager/app/src/main/java/com/resukisu/resukisu/ui/screen/themeSettings/ThemeSettings.kt")
 text = theme.read_text()
 if "Icons.TwoTone.Android" not in text:
-    import_anchor = "import androidx.compose.material.icons.twotone.Archive\n"
-    if import_anchor not in text:
-        # use any stable icon import as insertion point
-        import_anchor = "import androidx.compose.material.icons.twotone.Check\n"
+    import_anchor = "import androidx.compose.material.icons.twotone.Animation\n"
     if import_anchor not in text:
         raise SystemExit("theme icon import anchor missing")
     text = text.replace(import_anchor, import_anchor + "import androidx.compose.material.icons.twotone.Android\n", 1)
 
 if "icon_switch_title" not in text:
-    anchor = "        item {\n            // DPI"
+    anchor = "        item {\n            // 显示更多模块信息"
     icon_item = '''        item {
             // 图标切换
             SettingsSwitchWidget(
