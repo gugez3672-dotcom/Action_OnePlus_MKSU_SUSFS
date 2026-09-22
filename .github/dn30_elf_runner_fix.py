@@ -97,18 +97,186 @@ new = r'''    fun runScriptInTerminal(path: String) {
             val hasBom = probeParts.firstOrNull()?.lowercase(Locale.ROOT)?.startsWith("efbbbf") == true
             val hasCr = probeParts.getOrNull(1) == "1"
 
+            // Self-extracting shell scripts often append a raw gzip/zip payload.
+            // Removing every CR byte from such a file corrupts the embedded archive.
+            // Detect NUL bytes in the full file when small, otherwise sample head+tail.
+            val hasEmbeddedBinary = execRoot(
+                "SIZE=$($busybox stat -c %s " + shellQuote(path) + " 2>/dev/null || echo 0); " +
+                    "if [ \"\$SIZE\" -le 2097152 ]; then " +
+                    "  if $busybox hexdump -v -e '1/1 \"%02x\\n\"' " + shellQuote(path) +
+                    " | $busybox grep -q '^00            var interpreterLabel = "BusyBox ash"
+            var interpreter = "$busybox ash"
+
+            if (shebang.isNotBlank()) {
+                when {
+                    shebang.contains("bash") -> {
+                        val bashPath = execRoot("command -v bash 2>/dev/null || true").out
+                            .lineSequence().firstOrNull()?.trim().orEmpty()
+                        if (bashPath.isNotBlank()) {
+                            interpreter = shellQuote(bashPath)
+                            interpreterLabel = "bash"
+                        } else {
+                            terminalOutput = (
+                                terminalOutput +
+                                    "\n[脚本要求 bash，但当前 Root 环境未找到 bash]\n" +
+                                    "Shebang: " + shebang + "\n"
+                            ).takeLast(180_000)
+                            terminalRunning = false
+                            terminalHint = "缺少 bash"
+                            cleanupPath?.let { execRoot("rm -f -- " + shellQuote(it)) }
+                            return@launch
+                        }
+                    }
+
+                    shebang.contains("busybox") && (shebang.endsWith(" sh") || shebang.endsWith(" ash")) -> {
+                        interpreter = "$busybox ash"
+                        interpreterLabel = "BusyBox ash"
+                    }
+
+                    shebang.endsWith("/sh") || shebang == "sh" || shebang.endsWith(" ash") || shebang == "ash" -> {
+                        interpreter = "$busybox ash"
+                        interpreterLabel = "BusyBox ash"
+                    }
+
+                    shebang.startsWith("/") -> {
+                        interpreter = shebang
+                        interpreterLabel = shebang
+                    }
+                }
+            }
+
+            session.sendLine("cd " + shellQuote(parent))
+            val displayPath = path.substringAfterLast('/')
+            terminalOutput = (
+                terminalOutput +
+                    "\n# Root 执行: " + displayPath +
+                    "\n# 解释器: " + interpreterLabel +
+                    (if (hasBom || shouldNormalizeCr) "\n# 已临时规范化 BOM/CRLF" else "") +
+                    (if (hasEmbeddedBinary && hasCr)
+                        "\n# 检测到内嵌二进制数据，已保留原始字节（未清洗 CRLF）"
+                     else "") +
+                    "\n"
+            ).takeLast(180_000)
+
+            val cleanup = cleanupPath?.let {
+                "; __dn_ec=$?; rm -f -- " + shellQuote(it) +
+                    "; printf '\n[脚本结束，退出码 %s]\n' \"\$__dn_ec\""
+            } ?: "; __dn_ec=$?; printf '\n[脚本结束，退出码 %s]\n' \"\$__dn_ec\""
+
+            session.sendLine(interpreter + " " + shellQuote(runPath) + cleanup)
+            terminalHint = "脚本运行中 · $interpreterLabel"
+        }
+    }'''
+
+t = t[:start] + new + t[end:]
+p.write_text(t)
+
+assert 'magic == "7f454c46"' in t
+assert 'ELF 原生可执行文件' in t
+assert '直接执行（不经 BusyBox ash）' in t
+assert 'session.sendLine(shellQuote(execPath) + cleanup)' in t
+assert '正在识别文件类型' in t
+assert 'hasEmbeddedBinary' in t
+assert 'shouldNormalizeCr = hasCr && !hasEmbeddedBinary' in t
+assert '内嵌二进制数据，已保留原始字节' in t
+; then BIN=1; else BIN=0; fi; " +
+                    "else " +
+                    "  if { $busybox head -c 131072 " + shellQuote(path) + "; " +
+                    "$busybox tail -c 131072 " + shellQuote(path) + "; } " +
+                    "| $busybox hexdump -v -e '1/1 \"%02x\\n\"' | $busybox grep -q '^00            var interpreterLabel = "BusyBox ash"
+            var interpreter = "$busybox ash"
+
+            if (shebang.isNotBlank()) {
+                when {
+                    shebang.contains("bash") -> {
+                        val bashPath = execRoot("command -v bash 2>/dev/null || true").out
+                            .lineSequence().firstOrNull()?.trim().orEmpty()
+                        if (bashPath.isNotBlank()) {
+                            interpreter = shellQuote(bashPath)
+                            interpreterLabel = "bash"
+                        } else {
+                            terminalOutput = (
+                                terminalOutput +
+                                    "\n[脚本要求 bash，但当前 Root 环境未找到 bash]\n" +
+                                    "Shebang: " + shebang + "\n"
+                            ).takeLast(180_000)
+                            terminalRunning = false
+                            terminalHint = "缺少 bash"
+                            cleanupPath?.let { execRoot("rm -f -- " + shellQuote(it)) }
+                            return@launch
+                        }
+                    }
+
+                    shebang.contains("busybox") && (shebang.endsWith(" sh") || shebang.endsWith(" ash")) -> {
+                        interpreter = "$busybox ash"
+                        interpreterLabel = "BusyBox ash"
+                    }
+
+                    shebang.endsWith("/sh") || shebang == "sh" || shebang.endsWith(" ash") || shebang == "ash" -> {
+                        interpreter = "$busybox ash"
+                        interpreterLabel = "BusyBox ash"
+                    }
+
+                    shebang.startsWith("/") -> {
+                        interpreter = shebang
+                        interpreterLabel = shebang
+                    }
+                }
+            }
+
+            session.sendLine("cd " + shellQuote(parent))
+            val displayPath = path.substringAfterLast('/')
+            terminalOutput = (
+                terminalOutput +
+                    "\n# Root 执行: " + displayPath +
+                    "\n# 解释器: " + interpreterLabel +
+                    (if (hasBom || hasCr) "\n# 已临时规范化 BOM/CRLF" else "") +
+                    "\n"
+            ).takeLast(180_000)
+
+            val cleanup = cleanupPath?.let {
+                "; __dn_ec=$?; rm -f -- " + shellQuote(it) +
+                    "; printf '\n[脚本结束，退出码 %s]\n' \"\$__dn_ec\""
+            } ?: "; __dn_ec=$?; printf '\n[脚本结束，退出码 %s]\n' \"\$__dn_ec\""
+
+            session.sendLine(interpreter + " " + shellQuote(runPath) + cleanup)
+            terminalHint = "脚本运行中 · $interpreterLabel"
+        }
+    }'''
+
+t = t[:start] + new + t[end:]
+p.write_text(t)
+
+assert 'magic == "7f454c46"' in t
+assert 'ELF 原生可执行文件' in t
+assert '直接执行（不经 BusyBox ash）' in t
+assert 'session.sendLine(shellQuote(execPath) + cleanup)' in t
+assert '正在识别文件类型' in t
+; " +
+                    "then BIN=1; else BIN=0; fi; " +
+                    "fi; printf '%s' \"\$BIN\""
+            ).out.trim() == "1"
+
             var runPath = path
             var cleanupPath: String? = null
-            if (hasBom || hasCr) {
+            val shouldNormalizeCr = hasCr && !hasEmbeddedBinary
+            if (hasBom || shouldNormalizeCr) {
                 val tempName = ".dn_run_" + System.currentTimeMillis() + "_" + path.substringAfterLast('/')
                 val tempPath = joinPath(parent, tempName)
-                val normalize = if (hasBom) {
-                    "$busybox tail -c +4 " + shellQuote(path) +
-                        " | $busybox tr -d '\r' > " + shellQuote(tempPath)
-                } else {
-                    "$busybox tr -d '\r' < " + shellQuote(path) +
-                        " > " + shellQuote(tempPath)
+
+                // BOM removal is byte-safe. CR removal is only allowed for text-only files.
+                val normalize = when {
+                    hasBom && shouldNormalizeCr ->
+                        "$busybox tail -c +4 " + shellQuote(path) +
+                            " | $busybox tr -d '\r' > " + shellQuote(tempPath)
+                    hasBom ->
+                        "$busybox tail -c +4 " + shellQuote(path) +
+                            " > " + shellQuote(tempPath)
+                    else ->
+                        "$busybox tr -d '\r' < " + shellQuote(path) +
+                            " > " + shellQuote(tempPath)
                 }
+
                 val normalized = execRoot(normalize + "; chmod 700 " + shellQuote(tempPath))
                 if (normalized.success) {
                     runPath = tempPath
