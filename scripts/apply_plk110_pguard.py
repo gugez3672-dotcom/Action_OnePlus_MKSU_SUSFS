@@ -1,4 +1,4 @@
-# Apply PLK110 A67 Partition Guard v1 as the only kernel delta on top of #11.
+# Apply PLK110 A67 Partition Guard v2 as the only kernel delta on top of #11.
 from pathlib import Path
 
 common = Path("kernel_workspace/kernel_platform/common")
@@ -14,11 +14,11 @@ def replace_once(rel, old, new):
 pguard_c = r"""
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * PLK110 A67 Partition Guard v1
+ * PLK110 A67 Partition Guard v2
  *
  * Runtime-only guard for destructive raw block-device operations. It is
  * intentionally outside firmware/bootloader paths and does not alter normal
- * filesystem I/O. Dynamic modem NV/calibration partitions are audit-only in v1.
+ * filesystem I/O. Dynamic modem NV/calibration partitions remain quiet pass-through.
  */
 #include <linux/blkdev.h>
 #include <linux/cred.h>
@@ -31,7 +31,7 @@ pguard_c = r"""
 
 #include "blk.h"
 
-#define PLK110_PGUARD_VERSION "PLK110-PGuard-v1"
+#define PLK110_PGUARD_VERSION "PLK110-PGuard-v2"
 #define PLK110_PGUARD_MAX_RANGES 256
 #define PLK110_PGUARD_GPT_SECTORS 64
 
@@ -62,7 +62,7 @@ static const char plk110_pguard_version[] __used = PLK110_PGUARD_VERSION;
  * runtime should never raw-write on this frozen A67 baseline.
  *
  * AUDIT: device-specific NV/calibration state which can have legitimate
- * runtime writers. v1 records attempts but deliberately does not block them.
+ * runtime writers. These ranges deliberately remain pass-through and silent.
  *
  * MARKER: identifies an internal PLK110 UFS LUN so its primary/backup GPT can
  * be protected without blocking normal I/O to the marker partition itself.
@@ -145,6 +145,30 @@ static const struct plk110_pguard_rule plk110_pguard_rules[] = {
 	{ "pvmfw", PLK110_PG_HARD },
 	{ "pvmfw_a", PLK110_PG_HARD },
 	{ "pvmfw_b", PLK110_PG_HARD },
+	{ "pvmfw_signed", PLK110_PG_HARD },
+	{ "pvmfw_signed_a", PLK110_PG_HARD },
+	{ "pvmfw_signed_b", PLK110_PG_HARD },
+	{ "qtvm_dtbo", PLK110_PG_HARD },
+	{ "qtvm_dtbo_a", PLK110_PG_HARD },
+	{ "qtvm_dtbo_b", PLK110_PG_HARD },
+	{ "oplus_storagefw", PLK110_PG_HARD },
+	{ "oplus_storagefw_a", PLK110_PG_HARD },
+	{ "oplus_storagefw_b", PLK110_PG_HARD },
+	{ "cdt", PLK110_PG_HARD },
+	{ "cdt_a", PLK110_PG_HARD },
+	{ "cdt_b", PLK110_PG_HARD },
+	{ "ddr", PLK110_PG_HARD },
+	{ "ddr_a", PLK110_PG_HARD },
+	{ "ddr_b", PLK110_PG_HARD },
+	{ "ocdt", PLK110_PG_HARD },
+	{ "ocdt_a", PLK110_PG_HARD },
+	{ "ocdt_b", PLK110_PG_HARD },
+	{ "dinfo", PLK110_PG_HARD },
+	{ "dinfo_a", PLK110_PG_HARD },
+	{ "dinfo_b", PLK110_PG_HARD },
+	{ "uefivarstore", PLK110_PG_HARD },
+	{ "uefivarstore_a", PLK110_PG_HARD },
+	{ "uefivarstore_b", PLK110_PG_HARD },
 	{ "secretkeeper", PLK110_PG_HARD },
 	{ "secretkeeper_a", PLK110_PG_HARD },
 	{ "secretkeeper_b", PLK110_PG_HARD },
@@ -528,6 +552,22 @@ int plk110_pguard_check_bytes(struct block_device *bdev, u64 start, u64 len,
 """
 (common / "block/plk110_partition_guard.c").write_text(pguard_c.lstrip())
 
+(common / "include/linux/plk110_pguard.h").write_text(r"""
+/* SPDX-License-Identifier: GPL-2.0-only */
+#ifndef _LINUX_PLK110_PGUARD_H
+#define _LINUX_PLK110_PGUARD_H
+#include <linux/blkdev.h>
+#ifdef CONFIG_PLK110_PARTITION_GUARD
+bool plk110_pguard_disk_managed(struct block_device *bdev);
+#else
+static inline bool plk110_pguard_disk_managed(struct block_device *bdev)
+{
+	return false;
+}
+#endif
+#endif
+""".lstrip())
+
 makefile = common / "block/Makefile"
 text = makefile.read_text()
 anchor = "obj-$(CONFIG_BLOCK_HOLDER_DEPRECATED)\t+= holder.o\n"
@@ -553,8 +593,9 @@ config PLK110_PARTITION_GUARD
 \t  Block destructive raw writes, discard, secure erase and zeroout against
 \t  selected PLK110 boot-chain/verified-boot partitions and the primary/
 \t  backup GPT while Android is running. Dynamic modem NV/calibration
-\t  partitions are audit-only in v1 to avoid disrupting legitimate firmware
-\t  maintenance. This does not affect bootloader/Fastboot/EDL operations.
+\t  partitions remain pass-through to avoid disrupting legitimate firmware
+\t  maintenance. v2 also blocks destructive raw SCSI/UFS passthrough paths.
+\t  This does not affect bootloader/Fastboot/EDL operations.
 
 """
 kconfig.write_text(text.replace(anchor, entry, 1))
@@ -643,7 +684,7 @@ replace_once(
     """\tmight_sleep();
 
 \t/*
-\t * PLK110 PGuard v1 lower-layer backstop. This catches destructive bios
+\t * PLK110 PGuard v2 lower-layer backstop. This catches destructive bios
 \t * resubmitted by stackers such as dm-linear, while the helper fast-paths
 \t * ordinary named filesystem partitions.
 \t */
@@ -790,8 +831,166 @@ replace_once(
 """,
 )
 
-print("Applied PLK110 Partition Guard v1.")
+# Raw SCSI passthrough through /dev/block/sdX bypasses normal filesystem BIO
+# classification. Preserve read-only inquiry/health commands, but deny outbound
+# or explicitly destructive commands on a managed internal UFS disk.
+replace_once(
+    "drivers/scsi/sd.c",
+    '#include <scsi/scsi_ioctl.h>\n',
+    '#include <scsi/scsi_ioctl.h>\n#include <scsi/sg.h>\n#include <linux/plk110_pguard.h>\n',
+)
+replace_once(
+    "drivers/scsi/sd.c",
+    """static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg)
+""",
+    """static bool plk110_pguard_scsi_destructive_opcode(u8 opcode)
+{
+	switch (opcode) {
+	case 0x04: /* FORMAT UNIT */
+	case 0x0a: /* WRITE(6) */
+	case 0x0d: /* WRITE SAME(32) */
+	case 0x15: /* MODE SELECT(6) */
+	case 0x19: /* ERASE */
+	case 0x2a: /* WRITE(10) */
+	case 0x2e: /* WRITE AND VERIFY(10) */
+	case 0x3b: /* WRITE BUFFER / firmware download */
+	case 0x3f: /* WRITE LONG */
+	case 0x41: /* WRITE SAME(10) */
+	case 0x42: /* UNMAP */
+	case 0x48: /* SANITIZE */
+	case 0x4c: /* LOG SELECT */
+	case 0x55: /* MODE SELECT(10) */
+	case 0x5f: /* PERSISTENT RESERVE OUT */
+	case 0x83: /* EXTENDED COPY */
+	case 0x89: /* COMPARE AND WRITE */
+	case 0x8a: /* WRITE(16) */
+	case 0x8b: /* ORWRITE(16) */
+	case 0x93: /* WRITE SAME(16) */
+	case 0x94: /* ZBC OUT */
+	case 0xaa: /* WRITE(12) */
+	case 0xae: /* WRITE AND VERIFY(12) */
+	case 0xb5: /* SECURITY PROTOCOL OUT */
+	case 0xea: /* WRITE LONG(2) */
+		return true;
+	default:
+		return false;
+	}
+}
+
+static int sd_ioctl(struct block_device *bdev, blk_mode_t mode,
+		    unsigned int cmd, unsigned long arg)
+""",
+)
+replace_once(
+    "drivers/scsi/sd.c",
+    """	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO))
+		return -ENOIOCTLCMD;
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+""",
+    """	if (bdev_is_partition(bdev) && !capable(CAP_SYS_RAWIO))
+		return -ENOIOCTLCMD;
+
+#ifdef CONFIG_PLK110_PARTITION_GUARD
+	if (plk110_pguard_disk_managed(bdev) &&
+	    (cmd == SG_IO || cmd == SCSI_IOCTL_SEND_COMMAND)) {
+		u8 opcode = 0;
+		bool outbound = false;
+
+		if (cmd == SG_IO) {
+			struct sg_io_hdr hdr;
+
+			if (copy_from_user(&hdr, p, sizeof(hdr)))
+				return -EFAULT;
+			if (!hdr.cmdp || !hdr.cmd_len)
+				return -EINVAL;
+			if (copy_from_user(&opcode, hdr.cmdp, sizeof(opcode)))
+				return -EFAULT;
+			outbound = hdr.dxfer_direction == SG_DXFER_TO_DEV ||
+				   hdr.dxfer_direction == SG_DXFER_TO_FROM_DEV;
+		} else {
+			Scsi_Ioctl_Command __user *sic = p;
+			unsigned int inlen;
+
+			if (get_user(inlen, &sic->inlen) ||
+			    copy_from_user(&opcode, &sic->data[0], sizeof(opcode)))
+				return -EFAULT;
+			outbound = inlen != 0;
+		}
+
+		if (outbound || plk110_pguard_scsi_destructive_opcode(opcode)) {
+			pr_warn_ratelimited(
+				"PGuard: DENY SCSI-PASSTHRU disk=%s cmd=0x%x opcode=0x%02x pid=%d uid=%u comm=%s\n",
+				disk->disk_name, cmd, opcode, task_pid_nr(current),
+				__kuid_val(current_uid()), current->comm);
+			return -EPERM;
+		}
+	}
+#endif
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+""",
+)
+
+# UFS BSG on this exact baseline does not accept raw SCSI COMMAND UPIUs, but it
+# can persistently mutate descriptors/attributes/flags and advanced RPMB state.
+# Block only those mutations and leave read/query diagnostics untouched.
+replace_once(
+    "drivers/ufs/core/ufs_bsg.c",
+    """	bsg_reply->reply_payload_rcv_len = 0;
+
+	ufshcd_rpm_get_sync(hba);
+
+	msgcode = bsg_request->msgcode;
+""",
+    """	bsg_reply->reply_payload_rcv_len = 0;
+
+	msgcode = bsg_request->msgcode;
+#ifdef CONFIG_PLK110_PARTITION_GUARD
+	if (msgcode == UPIU_TRANSACTION_QUERY_REQ) {
+		u8 qop = bsg_request->upiu_req.qr.opcode;
+
+		if (qop == UPIU_QUERY_OPCODE_WRITE_DESC ||
+		    qop == UPIU_QUERY_OPCODE_WRITE_ATTR ||
+		    qop == UPIU_QUERY_OPCODE_SET_FLAG ||
+		    qop == UPIU_QUERY_OPCODE_CLEAR_FLAG ||
+		    qop == UPIU_QUERY_OPCODE_TOGGLE_FLAG) {
+			pr_warn_ratelimited(
+				"PGuard: DENY UFS-BSG query-op=0x%02x pid=%d uid=%u comm=%s\n",
+				qop, task_pid_nr(current), __kuid_val(current_uid()),
+				current->comm);
+			return -EPERM;
+		}
+	}
+
+	if (msgcode == UPIU_TRANSACTION_ARPMB_CMD &&
+	    job->request_len >= sizeof(struct ufs_rpmb_request)) {
+		struct ufs_rpmb_request *rpmb_req = job->request;
+		u16 type = be16_to_cpu(rpmb_req->ehs_req.meta.req_resp_type);
+
+		if (type == UFS_RPMB_WRITE_KEY ||
+		    type == UFS_RPMB_WRITE ||
+		    type == UFS_RPMB_SEC_CONF_WRITE ||
+		    type == UFS_RPMB_PURGE_ENABLE) {
+			pr_warn_ratelimited(
+				"PGuard: DENY UFS-BSG RPMB type=0x%04x pid=%d uid=%u comm=%s\n",
+				type, task_pid_nr(current), __kuid_val(current_uid()),
+				current->comm);
+			return -EPERM;
+		}
+	}
+#endif
+
+	ufshcd_rpm_get_sync(hba);
+
+""",
+)
+
+print("Applied PLK110 Partition Guard v2.")
 print("Hard-protect: GPT + expanded PLK110 SM8850 boot/verified-boot/subsystem firmware raw writes.")
-print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")
+print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")\nprint("Raw passthrough: blocks destructive SCSI/UFS-BSG mutation paths.")
 print("Quiet pass-through: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
 print("Normal filesystem I/O, userdata/super contents and firmware/bootloader paths are unchanged.")
