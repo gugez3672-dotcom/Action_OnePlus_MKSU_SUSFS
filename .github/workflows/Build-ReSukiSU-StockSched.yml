@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: plk110-a67-resukisu-susfs-pguard-v1
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   DEVICE: PLK110
@@ -114,7 +114,21 @@ jobs:
           mkdir -p .repo/local_manifests
           printf '%s\n'             '<?xml version="1.0" encoding="UTF-8"?>'             '<manifest>'             '  <remove-project name="kernel_platform/prebuilts/asuite" />'             '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />'             '</manifest>'             > .repo/local_manifests/prune-unused-test-prebuilts.xml
 
-          repo sync -c --no-tags --no-clone-bundle -j2
+          # GitHub/CodeLinaro occasionally stalls a fresh runner mid-sync.
+          # Bound each attempt and reuse the partial checkout on retry; source pins
+          # below still guarantee that a successful run lands on the exact #11 baseline.
+          sync_ok=0
+          for attempt in 1 2 3; do
+            echo "repo sync attempt $attempt/3"
+            if timeout --signal=TERM --kill-after=60s 1800s \
+              repo sync -c --no-tags --no-clone-bundle --fail-fast -j2; then
+              sync_ok=1
+              break
+            fi
+            echo "repo sync attempt $attempt failed or timed out; retrying from partial checkout"
+            sleep 10
+          done
+          test "$sync_ok" -eq 1
 
           git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
           git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
@@ -301,6 +315,26 @@ jobs:
           python3 -m py_compile scripts/apply_plk110_pguard.py
           python3 scripts/prepare_resukisu_config.py
           python3 scripts/apply_plk110_pguard.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c").read_text()
+          required = (
+              "xbl", "xbl_config", "xbl_ac_config", "abl", "uefi", "uefisecapp",
+              "tz", "tz_ac_config", "tz_qti_config", "hyp", "hyp_ac_config",
+              "aop", "aop_config", "devcfg", "engineering_cdt", "oplus_sec",
+              "pvmfw", "secretkeeper", "qupfw", "keymaster", "cpucp",
+              "cpucp_dtb", "soccp", "soccp_debug", "soccp_dcd", "shrm",
+              "bluetooth", "dsp", "pdp", "pdp_cdb", "dcp", "tme_fw",
+              "tme_config", "tme_seq_patch", "multiimgqti", "multiimgoem",
+              "spuservice", "imagefv", "featenabler", "boot", "init_boot",
+              "vendor_boot", "dtbo", "vbmeta", "vbmeta_system",
+              "vbmeta_vendor", "recovery", "modem", "efisp",
+          )
+          missing = [name for name in required if f'"{name}"' not in src]
+          assert not missing, f"PGuard static partition coverage missing: {missing}"
+          assert "plk110_pguard_check_bio" in src
+          assert "primary-gpt" in src and "backup-gpt" in src
+          PY
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
           git -C kernel_workspace/kernel_platform/common diff --check
 
