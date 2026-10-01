@@ -15,7 +15,7 @@ test "$(git -C AnyKernelSource rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
 mkdir AnyKernel3
 git -C AnyKernelSource archive HEAD | tar -x -C AnyKernel3
 cp artifacts/Image AnyKernel3/Image
-sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 ReSukiSU + SUSFS stock scheduler ABI/' AnyKernel3/anykernel.sh
+sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 ReSukiSU + SUSFS #11-PGuard v1/' AnyKernel3/anykernel.sh
 sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
 sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
 sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
@@ -38,7 +38,7 @@ done
 
 (
   cd AnyKernel3
-  zip -r9 ../artifacts/PLK110_A67_ReSukiSU_SUSFS_StockScheduler_NoKPM.zip .
+  zip -r9 ../artifacts/PLK110_A67_ReSukiSU_SUSFS_PGuardV1_StockScheduler_NoKPM.zip .
 )
 cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
 printf 'anykernel=%s\nresukisu=%s\nsusfs4oki=%s\nverified_stock_run=%s\nverified_stock_commit=%s\n' \
@@ -47,7 +47,7 @@ printf 'anykernel=%s\nresukisu=%s\nsusfs4oki=%s\nverified_stock_run=%s\nverified
 
 cat > artifacts/READ_ME.txt <<'EOF'
 Target: OnePlus 15 PLK110, PLK110_16.0.8.302(CN01), A67 kernel 6.12.23.
-ReSukiSU + SUSFS; KPM, extra scheduler, ADIOS, Re-Kernel, BBR/Brutal,
+ReSukiSU + SUSFS + PLK110 Partition Guard v1; KPM, extra scheduler, ADIOS, Re-Kernel, BBR/Brutal,
 Droidspaces, BBG and extra network patches are intentionally excluded.
 
 The build starts from the exact verified A67 OnePlus common/module source pins.
@@ -56,6 +56,10 @@ Offline validation requires:
 2. all captured stock vendor-module required symbol CRCs still match;
 3. the original stock module signer certificate remains trusted;
 4. CONFIG_SCHED_CLASS_EXT remains enabled.
+
+Partition Guard v1 blocks Android-runtime raw destructive access to selected
+boot-chain/verified-boot partitions and recognized internal-UFS GPT sectors.
+Dynamic modem NV/calibration partitions remain audit-only in v1.
 
 The AnyKernel package replaces only the boot kernel Image and contains no
 vendor modules, device trees, init_boot, vendor_boot, vendor_dlkm or system_dlkm.
