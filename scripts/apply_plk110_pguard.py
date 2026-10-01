@@ -163,12 +163,12 @@ static const struct plk110_pguard_rule plk110_pguard_rules[] = {
 	{ "ocdt", PLK110_PG_HARD },
 	{ "ocdt_a", PLK110_PG_HARD },
 	{ "ocdt_b", PLK110_PG_HARD },
-	{ "dinfo", PLK110_PG_HARD },
-	{ "dinfo_a", PLK110_PG_HARD },
-	{ "dinfo_b", PLK110_PG_HARD },
-	{ "uefivarstore", PLK110_PG_HARD },
-	{ "uefivarstore_a", PLK110_PG_HARD },
-	{ "uefivarstore_b", PLK110_PG_HARD },
+	{ "dinfo", PLK110_PG_AUDIT },
+	{ "dinfo_a", PLK110_PG_AUDIT },
+	{ "dinfo_b", PLK110_PG_AUDIT },
+	{ "uefivarstore", PLK110_PG_AUDIT },
+	{ "uefivarstore_a", PLK110_PG_AUDIT },
+	{ "uefivarstore_b", PLK110_PG_AUDIT },
 	{ "secretkeeper", PLK110_PG_HARD },
 	{ "secretkeeper_a", PLK110_PG_HARD },
 	{ "secretkeeper_b", PLK110_PG_HARD },
@@ -920,7 +920,9 @@ replace_once(
 			outbound = inlen != 0;
 		}
 
-		if (outbound || plk110_pguard_scsi_destructive_opcode(opcode)) {
+		(void)outbound;
+
+		if (plk110_pguard_scsi_destructive_opcode(opcode)) {
 			pr_warn_ratelimited(
 				"PGuard: DENY SCSI-PASSTHRU disk=%s cmd=0x%x opcode=0x%02x pid=%d uid=%u comm=%s\n",
 				disk->disk_name, cmd, opcode, task_pid_nr(current),
@@ -959,10 +961,9 @@ replace_once(
 		    qop == UPIU_QUERY_OPCODE_CLEAR_FLAG ||
 		    qop == UPIU_QUERY_OPCODE_TOGGLE_FLAG) {
 			pr_warn_ratelimited(
-				"PGuard: DENY UFS-BSG query-op=0x%02x pid=%d uid=%u comm=%s\n",
+				"PGuard: AUDIT UFS-BSG query-op=0x%02x pid=%d uid=%u comm=%s\n",
 				qop, task_pid_nr(current), __kuid_val(current_uid()),
 				current->comm);
-			return -EPERM;
 		}
 	}
 
@@ -976,10 +977,9 @@ replace_once(
 		    type == UFS_RPMB_SEC_CONF_WRITE ||
 		    type == UFS_RPMB_PURGE_ENABLE) {
 			pr_warn_ratelimited(
-				"PGuard: DENY UFS-BSG RPMB type=0x%04x pid=%d uid=%u comm=%s\n",
+				"PGuard: AUDIT UFS-BSG RPMB type=0x%04x pid=%d uid=%u comm=%s\n",
 				type, task_pid_nr(current), __kuid_val(current_uid()),
 				current->comm);
-			return -EPERM;
 		}
 	}
 #endif
@@ -991,6 +991,6 @@ replace_once(
 
 print("Applied PLK110 Partition Guard v2.")
 print("Hard-protect: GPT + expanded PLK110 SM8850 boot/verified-boot/subsystem firmware raw writes.")
-print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")\nprint("Raw passthrough: blocks destructive SCSI/UFS-BSG mutation paths.")
+print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")\nprint("Raw passthrough: blocks destructive SCSI CDBs; UFS-BSG/RPMB mutations are audit-only.")
 print("Quiet pass-through: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
 print("Normal filesystem I/O, userdata/super contents and firmware/bootloader paths are unchanged.")
