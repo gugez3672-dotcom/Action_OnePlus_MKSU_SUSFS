@@ -924,7 +924,7 @@ replace_once(
 
 		if (plk110_pguard_scsi_destructive_opcode(opcode)) {
 			pr_warn_ratelimited(
-				"PGuard: DENY SCSI-PASSTHRU disk=%s cmd=0x%x opcode=0x%02x pid=%d uid=%u comm=%s\n",
+				"PGuard: DENY SCSI-PASSTHRU disk=%s cmd=0x%x opcode=0x%02x pid=%d uid=%u comm=%s\\n",
 				disk->disk_name, cmd, opcode, task_pid_nr(current),
 				__kuid_val(current_uid()), current->comm);
 			return -EPERM;
@@ -961,7 +961,7 @@ replace_once(
 		    qop == UPIU_QUERY_OPCODE_CLEAR_FLAG ||
 		    qop == UPIU_QUERY_OPCODE_TOGGLE_FLAG) {
 			pr_warn_ratelimited(
-				"PGuard: AUDIT UFS-BSG query-op=0x%02x pid=%d uid=%u comm=%s\n",
+				"PGuard: AUDIT UFS-BSG query-op=0x%02x pid=%d uid=%u comm=%s\\n",
 				qop, task_pid_nr(current), __kuid_val(current_uid()),
 				current->comm);
 		}
@@ -977,7 +977,7 @@ replace_once(
 		    type == UFS_RPMB_SEC_CONF_WRITE ||
 		    type == UFS_RPMB_PURGE_ENABLE) {
 			pr_warn_ratelimited(
-				"PGuard: AUDIT UFS-BSG RPMB type=0x%04x pid=%d uid=%u comm=%s\n",
+				"PGuard: AUDIT UFS-BSG RPMB type=0x%04x pid=%d uid=%u comm=%s\\n",
 				type, task_pid_nr(current), __kuid_val(current_uid()),
 				current->comm);
 		}
