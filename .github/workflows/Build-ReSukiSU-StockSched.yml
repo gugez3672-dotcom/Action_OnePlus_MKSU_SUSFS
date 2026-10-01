@@ -295,9 +295,10 @@ jobs:
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
           grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
 
-      - name: Configure frozen #11 baseline + Partition Guard v1
+      - name: Configure frozen kernel 11 baseline + Partition Guard v1
         run: |
           set -euo pipefail
+          python3 -m py_compile scripts/apply_plk110_pguard.py
           python3 scripts/prepare_resukisu_config.py
           python3 scripts/apply_plk110_pguard.py
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
@@ -409,8 +410,198 @@ jobs:
           grep -qx 'CONFIG_SCHED_CLASS_EXT=y' artifacts/image.config
           grep -qx 'CONFIG_MODVERSIONS=y' artifacts/image.config
           grep -qx 'CONFIG_PLK110_PARTITION_GUARD=y' artifacts/image.config
-          grep -Eq ' [Tt] plk110_pguard_check_bytes$' artifacts/System.map
-          grep -Eq ' [Tt] plk110_pguard_register_partition$' artifacts/System.map
+          grep -Eq ' [Tt] plk110_pguard_check_bytes          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
+          stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
+          image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
+          test "$image_cc" = "$stock_cc"
+          printf '%s\n' "$image_cc" | grep -Fq 'Android (14043575'
+          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          abi = verdict['module_abi']
+          assert verdict['passed'] is True
+          assert abi['missing'] == []
+          assert abi['crc_mismatches'] == {}
+          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
+              'PASS\n'
+              f"stock vendor modules captured: {abi['phone_module_count']}\n"
+              f"matched kernel symbol CRCs: {abi['matched']}\n"
+              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
+              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
+              'android_vh_scx_restore_flags ABI preserved\n'
+          )
+          PY
+
+      - name: Package verified Image only
+        run: bash scripts/package_resukisu_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
+          )
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
+ artifacts/System.map
+          grep -Eq ' [Tt] plk110_pguard_check_bio          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
+          stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
+          image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
+          test "$image_cc" = "$stock_cc"
+          printf '%s\n' "$image_cc" | grep -Fq 'Android (14043575'
+          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          abi = verdict['module_abi']
+          assert verdict['passed'] is True
+          assert abi['missing'] == []
+          assert abi['crc_mismatches'] == {}
+          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
+              'PASS\n'
+              f"stock vendor modules captured: {abi['phone_module_count']}\n"
+              f"matched kernel symbol CRCs: {abi['matched']}\n"
+              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
+              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
+              'android_vh_scx_restore_flags ABI preserved\n'
+          )
+          PY
+
+      - name: Package verified Image only
+        run: bash scripts/package_resukisu_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
+          )
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
+ artifacts/System.map
+          grep -Eq ' [Tt] plk110_pguard_disk_managed          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
+          stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
+          image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
+          test "$image_cc" = "$stock_cc"
+          printf '%s\n' "$image_cc" | grep -Fq 'Android (14043575'
+          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          abi = verdict['module_abi']
+          assert verdict['passed'] is True
+          assert abi['missing'] == []
+          assert abi['crc_mismatches'] == {}
+          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
+              'PASS\n'
+              f"stock vendor modules captured: {abi['phone_module_count']}\n"
+              f"matched kernel symbol CRCs: {abi['matched']}\n"
+              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
+              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
+              'android_vh_scx_restore_flags ABI preserved\n'
+          )
+          PY
+
+      - name: Package verified Image only
+        run: bash scripts/package_resukisu_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
+          )
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
+ artifacts/System.map
+          grep -Eq ' [Tt] plk110_pguard_register_partition          grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
+          stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
+          image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
+          test "$image_cc" = "$stock_cc"
+          printf '%s\n' "$image_cc" | grep -Fq 'Android (14043575'
+          grep -Eq '__trace(iter|point)_android_vh_scx_restore_flags' artifacts/Module.symvers
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          abi = verdict['module_abi']
+          assert verdict['passed'] is True
+          assert abi['missing'] == []
+          assert abi['crc_mismatches'] == {}
+          Path('artifacts/STOCK_SCHEDULER_ABI_GATE.txt').write_text(
+              'PASS\n'
+              f"stock vendor modules captured: {abi['phone_module_count']}\n"
+              f"matched kernel symbol CRCs: {abi['matched']}\n"
+              f"resolved by existing modules: {abi['resolved_by_existing_modules']}\n"
+              'CONFIG_SCHED_CLASS_EXT=y preserved\n'
+              'android_vh_scx_restore_flags ABI preserved\n'
+          )
+          PY
+
+      - name: Package verified Image only
+        run: bash scripts/package_resukisu_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (
+            cd artifacts
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0               | sort -z               | xargs -0 -r sha256sum               > SHA256SUMS.txt
+          )
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14
+ artifacts/System.map
           grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
           stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
           image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
