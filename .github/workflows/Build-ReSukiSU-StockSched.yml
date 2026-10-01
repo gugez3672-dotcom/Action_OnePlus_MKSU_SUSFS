@@ -160,7 +160,12 @@ jobs:
           test -x "$dst/clang-r536225/bin/clang"
           "$dst/clang-r536225/bin/clang" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION_BEFORE.txt"
 
-          curl --fail --location --retry 4 --retry-delay 3 "$url" --output "$tarball"
+          # AOSP archive is >500 MiB and transient HTTP/2 stream resets have
+          # killed otherwise valid builds. Force HTTP/1.1 and retry all transport
+          # failures; the compiler payload itself is still verified below.
+          curl --http1.1 --fail --location \
+            --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 30 \
+            "$url" --output "$tarball"
           rm -rf "$dst/clang-r536225"
           mkdir -p "$dst/clang-r536225"
           tar -xzf "$tarball" -C "$dst/clang-r536225"
