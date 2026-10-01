@@ -41,8 +41,8 @@ done
   zip -r9 ../artifacts/PLK110_A67_ReSukiSU_SUSFS_PGuardV1_StockScheduler_NoKPM.zip .
 )
 cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
-printf 'anykernel=%s\nresukisu=%s\nsusfs4oki=%s\nverified_stock_run=%s\nverified_stock_commit=%s\n' \
-  "$ANYKERNEL_COMMIT" "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT" "$VERIFIED_STOCK_RUN" "$VERIFIED_STOCK_COMMIT" \
+printf 'anykernel=%s\nresukisu=%s\nsusfs4oki=%s\nverified_stock_run=%s\nverified_stock_commit=%s\npguard=%s\n' \
+  "$ANYKERNEL_COMMIT" "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT" "$VERIFIED_STOCK_RUN" "$VERIFIED_STOCK_COMMIT" "PLK110-PGuard-v1" \
   >> artifacts/SOURCE_PINS.txt
 
 cat > artifacts/READ_ME.txt <<'EOF'
@@ -60,6 +60,9 @@ Offline validation requires:
 Partition Guard v1 blocks Android-runtime raw destructive access to selected
 boot-chain/verified-boot partitions and recognized internal-UFS GPT sectors.
 Dynamic modem NV/calibration partitions remain audit-only in v1.
+Once this kernel is running, Android-runtime raw writes to boot/init_boot/
+vendor_boot/dtbo/vbmeta are intentionally denied. Use the already-tested
+patched ABL Fastboot path for later kernel maintenance or rollback.
 
 The AnyKernel package replaces only the boot kernel Image and contains no
 vendor modules, device trees, init_boot, vendor_boot, vendor_dlkm or system_dlkm.
