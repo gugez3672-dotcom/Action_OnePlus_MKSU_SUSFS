@@ -347,6 +347,8 @@ jobs:
           cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
           cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
+          cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v1_source.c
+          cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v1_patcher.py
           cp "$common/certs/plk110_stock.pem" artifacts/
           git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
           git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/RESUKISU_KLEAF_ADAPTATION.patch
