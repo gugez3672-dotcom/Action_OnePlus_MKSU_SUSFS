@@ -348,8 +348,8 @@ jobs:
           ufs = Path("kernel_workspace/kernel_platform/common/drivers/ufs/core/ufs_bsg.c").read_text()
           assert "PGuard: DENY SCSI-PASSTHRU" in sd
           assert "plk110_pguard_scsi_destructive_opcode" in sd
-          assert "PGuard: DENY UFS-BSG query-op" in ufs
-          assert "PGuard: DENY UFS-BSG RPMB" in ufs
+          assert "PGuard: AUDIT UFS-BSG query-op" in ufs
+          assert "PGuard: AUDIT UFS-BSG RPMB" in ufs
           PY
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
           git -C kernel_workspace/kernel_platform/common diff --check
