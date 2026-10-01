@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - resukisu-strict-manager
+      - resukisu-pguard-v1
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -13,7 +13,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: plk110-a67-resukisu-susfs-strict-manager
+  group: plk110-a67-resukisu-susfs-pguard-v1
   cancel-in-progress: false
 
 env:
@@ -295,10 +295,11 @@ jobs:
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
           grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
 
-      - name: Configure minimal ReSukiSU + SUSFS only
+      - name: Configure frozen #11 baseline + Partition Guard v1
         run: |
           set -euo pipefail
           python3 scripts/prepare_resukisu_config.py
+          python3 scripts/apply_plk110_pguard.py
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
           git -C kernel_workspace/kernel_platform/common diff --check
 
@@ -380,7 +381,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           image = Path('artifacts/Image').read_bytes()
-          assert b'ReSukiSU-6ec8d9a8@PLK110-A67' in image, 'wrong ReSukiSU version metadata'
+          assert b'ReSukiSU-6ec8d9a8@PLK110-A67-PGuard' in image, 'wrong ReSukiSU/PGuard version metadata'
+          assert b'PLK110-PGuard-v1' in image, 'Partition Guard v1 marker missing'
           assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
           assert b'com.daily.notes' in image, 'strict manager package not embedded'
           assert b'7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e' in image, 'fixed Daily Notes certificate hash missing'
@@ -404,6 +406,9 @@ jobs:
           set -euo pipefail
           grep -qx 'CONFIG_SCHED_CLASS_EXT=y' artifacts/image.config
           grep -qx 'CONFIG_MODVERSIONS=y' artifacts/image.config
+          grep -qx 'CONFIG_PLK110_PARTITION_GUARD=y' artifacts/image.config
+          grep -Eq ' [Tt] plk110_pguard_check_bytes$' artifacts/System.map
+          grep -Eq ' [Tt] plk110_pguard_register_partition$' artifacts/System.map
           grep -qx '# CONFIG_KSU_MULTI_MANAGER_SUPPORT is not set' artifacts/image.config
           stock_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' baselines/PLK110_16.0.8.302_stock.config)
           image_cc=$(grep '^CONFIG_CC_VERSION_TEXT=' artifacts/image.config)
@@ -446,7 +451,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-ReSukiSU-SUSFS-StrictManager-${{ github.run_number }}
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6
