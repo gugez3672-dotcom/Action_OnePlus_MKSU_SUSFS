@@ -331,10 +331,6 @@ void plk110_pguard_register_partition(struct block_device *bdev)
 	strscpy(slot->name, name, sizeof(slot->name));
 	spin_unlock_irqrestore(&plk110_pguard_lock, flags);
 
-	pr_info("PGuard: register disk=%s target=%s start=%llu sectors=%llu mode=%u\n",
-		bdev->bd_disk->disk_name, name,
-		(unsigned long long)bdev->bd_start_sect,
-		(unsigned long long)bdev_nr_sectors(bdev), mode);
 }
 
 static bool plk110_pguard_lookup_overlap(struct block_device *bdev,
@@ -428,11 +424,12 @@ int plk110_pguard_check_bio(struct bio *bio)
 					  bio_sectors(bio));
 			return -EPERM;
 		}
-		if (mode == PLK110_PG_AUDIT)
-			plk110_pguard_log("AUDIT-BIO", op, bdev, name,
-					  bdev->bd_start_sect + bio->bi_iter.bi_sector,
-					  bio_sectors(bio));
-		return 0;
+		/*
+	 * Dynamic NV/calibration partitions are intentionally pass-through.
+	 * Keep them silent in the steady state: PGuard logs only actual denies
+	 * and exceptional internal failures.
+	 */
+	return 0;
 	}
 
 	/*
@@ -472,9 +469,6 @@ int plk110_pguard_check_sectors(struct block_device *bdev, sector_t sector,
 					  abs_sector, nr_sectors);
 			return -EPERM;
 		}
-		if (direct_mode == PLK110_PG_AUDIT)
-			plk110_pguard_log("AUDIT", op, bdev, direct_name,
-					  abs_sector, nr_sectors);
 	}
 
 	if (plk110_pguard_lookup_overlap(bdev, abs_sector, nr_sectors,
@@ -484,10 +478,6 @@ int plk110_pguard_check_sectors(struct block_device *bdev, sector_t sector,
 					  abs_sector, nr_sectors);
 			return -EPERM;
 		}
-		if (hit.mode == PLK110_PG_AUDIT &&
-		    direct_mode != PLK110_PG_AUDIT)
-			plk110_pguard_log("AUDIT", op, bdev, hit.name,
-					  abs_sector, nr_sectors);
 	}
 
 	if (!managed)
@@ -803,5 +793,5 @@ replace_once(
 print("Applied PLK110 Partition Guard v1.")
 print("Hard-protect: GPT + expanded PLK110 SM8850 boot/verified-boot/subsystem firmware raw writes.")
 print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")
-print("Audit-only: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
+print("Quiet pass-through: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
 print("Normal filesystem I/O, userdata/super contents and firmware/bootloader paths are unchanged.")
