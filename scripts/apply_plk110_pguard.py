@@ -991,6 +991,7 @@ replace_once(
 
 print("Applied PLK110 Partition Guard v2.")
 print("Hard-protect: GPT + expanded PLK110 SM8850 boot/verified-boot/subsystem firmware raw writes.")
-print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")\nprint("Raw passthrough: blocks destructive SCSI CDBs; UFS-BSG/RPMB mutations are audit-only.")
+print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")
+print("Raw passthrough: blocks destructive SCSI CDBs; UFS-BSG/RPMB mutations are audit-only.")
 print("Quiet pass-through: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
 print("Normal filesystem I/O, userdata/super contents and firmware/bootloader paths are unchanged.")
