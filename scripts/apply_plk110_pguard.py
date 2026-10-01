@@ -261,6 +261,86 @@ static bool plk110_pguard_lookup_overlap(struct block_device *bdev,
 	return found;
 }
 
+bool plk110_pguard_disk_managed(struct block_device *bdev)
+{
+	unsigned long flags;
+	unsigned int i;
+	bool managed = false;
+
+	if (!bdev)
+		return false;
+
+	spin_lock_irqsave(&plk110_pguard_lock, flags);
+	for (i = 0; i < plk110_pguard_nr_ranges; i++) {
+		if (plk110_pguard_ranges[i].disk == bdev->bd_disk) {
+			managed = true;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&plk110_pguard_lock, flags);
+	return managed;
+}
+
+int plk110_pguard_check_bio(struct bio *bio)
+{
+	struct block_device *bdev;
+	enum plk110_pguard_mode mode;
+	enum req_op op;
+	const char *name;
+
+	if (!bio || !bio_sectors(bio))
+		return 0;
+
+	op = bio_op(bio);
+	switch (op) {
+	case REQ_OP_WRITE:
+	case REQ_OP_DISCARD:
+	case REQ_OP_SECURE_ERASE:
+	case REQ_OP_WRITE_ZEROES:
+		break;
+	default:
+		return 0;
+	}
+
+	bdev = bio->bi_bdev;
+	if (!bdev)
+		return 0;
+
+	/*
+	 * Normal filesystem I/O reaches this hook on its named partition before
+	 * blk_partition_remap(). Known non-protected/marker partitions are safe
+	 * to pass immediately. Managed-UFS BLKPG mutation is blocked separately.
+	 */
+	if (bdev->bd_meta_info) {
+		name = (const char *)bdev->bd_meta_info->volname;
+		mode = plk110_pguard_name_mode(name);
+		if (mode == PLK110_PG_HARD) {
+			plk110_pguard_log("DENY-BIO", op, bdev, name,
+					  bdev->bd_start_sect + bio->bi_iter.bi_sector,
+					  bio_sectors(bio));
+			return -EPERM;
+		}
+		if (mode == PLK110_PG_AUDIT)
+			plk110_pguard_log("AUDIT-BIO", op, bdev, name,
+					  bdev->bd_start_sect + bio->bi_iter.bi_sector,
+					  bio_sectors(bio));
+		return 0;
+	}
+
+	/*
+	 * Do not scan dm/loop/zram traffic. Stacked targets resubmit lower bios;
+	 * a dm-linear bypass reaches the physical PLK110 sdX UFS disk here.
+	 */
+	if (bdev->bd_disk->disk_name[0] != 's' ||
+	    bdev->bd_disk->disk_name[1] != 'd')
+		return 0;
+	if (!plk110_pguard_disk_managed(bdev))
+		return 0;
+
+	return plk110_pguard_check_sectors(bdev, bio->bi_iter.bi_sector,
+					   bio_sectors(bio), op);
+}
+
 int plk110_pguard_check_sectors(struct block_device *bdev, sector_t sector,
 				sector_t nr_sectors, unsigned int op)
 {
@@ -389,6 +469,8 @@ if text.count(anchor) != 1:
 decl = """
 #ifdef CONFIG_PLK110_PARTITION_GUARD
 void plk110_pguard_register_partition(struct block_device *bdev);
+bool plk110_pguard_disk_managed(struct block_device *bdev);
+int plk110_pguard_check_bio(struct bio *bio);
 int plk110_pguard_check_sectors(struct block_device *bdev, sector_t sector,
 \t\t\t\tsector_t nr_sectors, unsigned int op);
 int plk110_pguard_check_bytes(struct block_device *bdev, u64 start, u64 len,
@@ -396,6 +478,14 @@ int plk110_pguard_check_bytes(struct block_device *bdev, u64 start, u64 len,
 #else
 static inline void plk110_pguard_register_partition(struct block_device *bdev)
 {
+}
+static inline bool plk110_pguard_disk_managed(struct block_device *bdev)
+{
+\treturn false;
+}
+static inline int plk110_pguard_check_bio(struct bio *bio)
+{
+\treturn 0;
 }
 static inline int plk110_pguard_check_sectors(struct block_device *bdev,
 \t\t\t\t\t       sector_t sector,
@@ -442,6 +532,31 @@ replace_once(
 \tplk110_pguard_register_partition(bdev);
 
 \t/* delay uevent until 'holders' subdir is created */
+""",
+)
+
+replace_once(
+    "block/blk-core.c",
+    """\tmight_sleep();
+
+\t/*
+\t * For a REQ_NOWAIT based request, return -EOPNOTSUPP
+""",
+    """\tmight_sleep();
+
+\t/*
+\t * PLK110 PGuard v1 lower-layer backstop. This catches destructive bios
+\t * resubmitted by stackers such as dm-linear, while the helper fast-paths
+\t * ordinary named filesystem partitions.
+\t */
+\tif (unlikely(plk110_pguard_check_bio(bio))) {
+\t\tbio->bi_status = BLK_STS_IOERR;
+\t\tbio_endio(bio);
+\t\treturn;
+\t}
+
+\t/*
+\t * For a REQ_NOWAIT based request, return -EOPNOTSUPP
 """,
 )
 
@@ -506,6 +621,28 @@ replace_once(
 
 replace_once(
     "block/ioctl.c",
+    """\tif (bdev_is_partition(bdev))
+\t\treturn -EINVAL;
+
+\tif (p.pno <= 0)
+""",
+    """\tif (bdev_is_partition(bdev))
+\t\treturn -EINVAL;
+
+\t/* Prevent synthetic overlapping partitions from bypassing cached guards. */
+\tif (plk110_pguard_disk_managed(bdev)) {
+\t\tpr_warn_ratelimited("PGuard: DENY BLKPG op=%d disk=%s pid=%d uid=%u comm=%s\\n",
+\t\t\t\t    op, bdev->bd_disk->disk_name, task_pid_nr(current),
+\t\t\t\t    __kuid_val(current_uid()), current->comm);
+\t\treturn -EPERM;
+\t}
+
+\tif (p.pno <= 0)
+""",
+)
+
+replace_once(
+    "block/ioctl.c",
     """\terr = blk_validate_byte_range(bdev, start, len);
 \tif (err)
 \t\treturn err;
@@ -558,5 +695,6 @@ replace_once(
 
 print("Applied PLK110 Partition Guard v1.")
 print("Hard-protect: GPT + static boot/verified-boot/baseband firmware raw writes.")
+print("Lower-layer bio backstop: blocks dm-linear/whole-disk LBA bypass attempts.")
 print("Audit-only: modemst/fsg/fsc/persist/oplusreserve calibration/NV state.")
 print("Normal filesystem I/O, userdata/super contents and firmware/bootloader paths are unchanged.")
