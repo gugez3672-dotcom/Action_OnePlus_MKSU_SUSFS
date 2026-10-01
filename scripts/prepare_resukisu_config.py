@@ -30,7 +30,7 @@ replacement = (
     "# resolve correctly inside Bazel/Kleaf's sandbox.\n"
     "KSU_SRC := $(srctree)/drivers/kernelsu\n"
     f"KSU_VERSION := {version}\n"
-    f"KSU_VERSION_FULL := ReSukiSU-{commit}@PLK110-A67\n\n"
+    f"KSU_VERSION_FULL := ReSukiSU-{commit}@PLK110-A67-PGuard\n\n"
     f"KSU_MANAGER_PACKAGE := {STRICT_MANAGER_PACKAGE}\n\n"
     "$(info -- $(REPO_NAME) version code: $(KSU_VERSION))\n"
     "$(info -- $(REPO_NAME) version name: $(KSU_VERSION_FULL))\n\n"
