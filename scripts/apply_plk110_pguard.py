@@ -631,9 +631,8 @@ replace_once(
 
 \t/* Prevent synthetic overlapping partitions from bypassing cached guards. */
 \tif (plk110_pguard_disk_managed(bdev)) {
-\t\tpr_warn_ratelimited("PGuard: DENY BLKPG op=%d disk=%s pid=%d uid=%u comm=%s\\n",
-\t\t\t\t    op, bdev->bd_disk->disk_name, task_pid_nr(current),
-\t\t\t\t    __kuid_val(current_uid()), current->comm);
+\t\tpr_warn_ratelimited("PGuard: DENY BLKPG op=%d disk=%s\\n",
+\t\t\t\t    op, bdev->bd_disk->disk_name);
 \t\treturn -EPERM;
 \t}
 
