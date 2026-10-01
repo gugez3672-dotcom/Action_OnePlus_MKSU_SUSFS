@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - resukisu-pguard-v1
+      - resukisu-pguard-v2
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -13,7 +13,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: plk110-a67-resukisu-susfs-pguard-v1
+  group: plk110-a67-resukisu-susfs-pguard-v2
   cancel-in-progress: true
 
 env:
@@ -314,7 +314,7 @@ jobs:
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
           grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
 
-      - name: Configure frozen kernel 11 baseline + Partition Guard v1
+      - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/apply_plk110_pguard.py
@@ -327,7 +327,9 @@ jobs:
               "xbl", "xbl_config", "xbl_ac_config", "abl", "uefi", "uefisecapp",
               "tz", "tz_ac_config", "tz_qti_config", "hyp", "hyp_ac_config",
               "aop", "aop_config", "devcfg", "engineering_cdt", "oplus_sec",
-              "pvmfw", "secretkeeper", "qupfw", "keymaster", "cpucp",
+              "pvmfw", "pvmfw_signed", "qtvm_dtbo", "oplus_storagefw",
+              "cdt", "ddr", "ocdt", "dinfo", "uefivarstore",
+              "secretkeeper", "qupfw", "keymaster", "cpucp",
               "cpucp_dtb", "soccp", "soccp_debug", "soccp_dcd", "shrm",
               "bluetooth", "dsp", "pdp", "pdp_cdb", "dcp", "tme_fw",
               "tme_config", "tme_seq_patch", "multiimgqti", "multiimgoem",
@@ -342,6 +344,12 @@ jobs:
           assert '"AUDIT-BIO"' not in src and '"AUDIT"' not in src
           assert 'PGuard: register disk=' not in src
           assert 'PGuard: %s op=%s' in src
+          sd = Path("kernel_workspace/kernel_platform/common/drivers/scsi/sd.c").read_text()
+          ufs = Path("kernel_workspace/kernel_platform/common/drivers/ufs/core/ufs_bsg.c").read_text()
+          assert "PGuard: DENY SCSI-PASSTHRU" in sd
+          assert "plk110_pguard_scsi_destructive_opcode" in sd
+          assert "PGuard: DENY UFS-BSG query-op" in ufs
+          assert "PGuard: DENY UFS-BSG RPMB" in ufs
           PY
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
           git -C kernel_workspace/kernel_platform/common diff --check
@@ -390,8 +398,8 @@ jobs:
           cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
           cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
-          cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v1_source.c
-          cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v1_patcher.py
+          cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v2_source.c
+          cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v2_patcher.py
           cp "$common/certs/plk110_stock.pem" artifacts/
           git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
           git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/RESUKISU_KLEAF_ADAPTATION.patch
@@ -427,7 +435,7 @@ jobs:
           from pathlib import Path
           image = Path('artifacts/Image').read_bytes()
           assert b'ReSukiSU-6ec8d9a8@PLK110-A67-PGuard' in image, 'wrong ReSukiSU/PGuard version metadata'
-          assert b'PLK110-PGuard-v1' in image, 'Partition Guard v1 marker missing'
+          assert b'PLK110-PGuard-v2' in image, 'Partition Guard v2 marker missing'
           assert b'SUSFS' in image or b'susfs' in image, 'SUSFS metadata/string not found'
           assert b'com.daily.notes' in image, 'strict manager package not embedded'
           assert b'7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e' in image, 'fixed Daily Notes certificate hash missing'
@@ -498,7 +506,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV1-${{ github.run_number }}
+          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV2-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6
