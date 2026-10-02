@@ -45,7 +45,9 @@ class PrivateSpaceStage3 final : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
         api_ = api;
+        env_ = env;
         env->GetJavaVM(&vm_);
+        LOGI("stage3 loaded in zygote");
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
@@ -54,6 +56,9 @@ public:
         const char *name = envName(args->nice_name);
         if (name != nullptr) {
             target_ = std::strcmp(name, kTargetProcess) == 0;
+            if (target_) {
+                LOGI("launcher target matched: %s", name);
+            }
             env_->ReleaseStringUTFChars(args->nice_name, name);
         }
 
