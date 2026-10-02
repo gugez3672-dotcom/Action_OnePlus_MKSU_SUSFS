@@ -1,0 +1,77 @@
+name: Build A67 Private Space Stage1
+
+on:
+  push:
+    branches:
+      - a67-private-space-stage1-20261002
+    paths:
+      - "a67-private-space-stage1/**"
+      - ".github/workflows/a67-private-space-stage1.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Build helper DEX
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/a67-private-space-stage1"
+          mkdir -p "$ROOT/build/java" "$ROOT/build/dex"
+          javac -source 8 -target 8             -d "$ROOT/build/java"             "$ROOT/helper/com/a67/psflag/FlagHandler.java"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/d8"             --min-api 26             --output "$ROOT/build/dex"             "$ROOT/build/java/com/a67/psflag/FlagHandler.class"
+          test -s "$ROOT/build/dex/classes.dex"
+
+      - name: Build arm64 Zygisk library
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/a67-private-space-stage1"
+          NDK="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+          "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"             -S "$ROOT/native"             -B "$ROOT/build/native"             -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake"             -DANDROID_ABI=arm64-v8a             -DANDROID_PLATFORM=android-26             -DANDROID_STL=c++_static             -DCMAKE_BUILD_TYPE=Release
+          "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"             --build "$ROOT/build/native" --config Release -j2
+          test -s "$ROOT/build/native/liba67psflag.so"
+
+      - name: Package module
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/a67-private-space-stage1"
+          OUT="$ROOT/build/package"
+          rm -rf "$OUT"
+          mkdir -p "$OUT/zygisk"
+          cp "$ROOT/module/module.prop" "$OUT/module.prop"
+          cp "$ROOT/module/customize.sh" "$OUT/customize.sh"
+          cp "$ROOT/build/dex/classes.dex" "$OUT/payload.dex"
+          cp "$ROOT/build/native/liba67psflag.so" "$OUT/zygisk/arm64-v8a.so"
+          chmod 0755 "$OUT/customize.sh"
+          (
+            cd "$OUT"
+            zip -9 -r "$ROOT/build/A67_PrivateSpace_Stage1_v1.zip" .
+          )
+          sha256sum "$ROOT/build/A67_PrivateSpace_Stage1_v1.zip"             | tee "$ROOT/build/A67_PrivateSpace_Stage1_v1.sha256"
+          file "$OUT/zygisk/arm64-v8a.so"
+          readelf -h "$OUT/zygisk/arm64-v8a.so" | head -30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: A67_PrivateSpace_Stage1_v1
+          path: |
+            a67-private-space-stage1/build/A67_PrivateSpace_Stage1_v1.zip
+            a67-private-space-stage1/build/A67_PrivateSpace_Stage1_v1.sha256
+          if-no-files-found: error
