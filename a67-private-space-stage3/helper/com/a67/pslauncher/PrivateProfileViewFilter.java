@@ -69,7 +69,7 @@ public final class PrivateProfileViewFilter implements ViewTreeObserver.OnGlobal
 
         if (tag != null && itemInfoClass.isInstance(tag)) {
             UserHandle user = (UserHandle) getUserMethod.invoke(tag);
-            int id = user != null ? user.getIdentifier() : -1;
+            int id = user != null ? user.hashCode() : -1;
 
             if (id == privateUserId) {
                 if (view.getVisibility() != View.GONE) {
