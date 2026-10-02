@@ -1,0 +1,6 @@
+id=a67_private_space_stage1
+name=A67 Private Space Stage 1
+version=1.0
+versionCode=1
+author=A67 Lab
+description=Settings-only test. User 0 com.android.settings sees enablePrivateSpaceFeatures=true. No system_server hook, no system file replacement.
