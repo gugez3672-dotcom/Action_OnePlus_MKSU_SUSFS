@@ -1,4 +1,4 @@
-#include "zygisk.hpp"
+#include <sys/types.h>\n#include "zygisk.hpp"
 
 #include <android/log.h>
 #include <fcntl.h>
