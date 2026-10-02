@@ -1,0 +1,6 @@
+id=a67_private_space_stage3
+name=A67 Private Space Stage 3 Launcher Filter
+version=3.0-test1
+versionCode=30
+author=A67 Lab
+description=Launcher-only visual filter for PRIVATE profile user 13. Hides launcher views tagged with user13 ItemInfo. No launcher DB changes, no framework replacement.
