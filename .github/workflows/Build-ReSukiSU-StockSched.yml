@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - resukisu-pguard-v2
+      - resukisu-pguard-v2-susfs-post230
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -13,7 +13,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: plk110-a67-resukisu-susfs-pguard-v2
+  group: plk110-a67-resukisu-susfs-pguard-v2-susfs-post230
   cancel-in-progress: true
 
 env:
@@ -314,6 +314,33 @@ jobs:
           grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
           grep -q '^#define SUSFS_VERSION' include/linux/susfs.h
 
+      - name: Backport audited SUSFS post-2.3.0 fixes
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/apply_susfs_post230_fixes.py
+          python3 scripts/apply_susfs_post230_fixes.py
+
+          common=kernel_workspace/kernel_platform/common
+          git -C "$common" diff --check
+          test "$(git -C kernel_workspace/kernel_platform/KernelSU rev-parse HEAD)" = "$RESUKISU_COMMIT"
+
+          grep -Fq 'bool is_mnt_ksu_unshared = false;' "$common/fs/namespace.c"
+          grep -Fq 'buf->f_flags = calculate_f_flags(mnt);' "$common/fs/statfs.c"
+          grep -Fq 'int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf)' "$common/fs/statfs.c"
+          grep -Fq 'bool                                    is_statically;' "$common/include/linux/susfs.h"
+
+          cat > artifacts/SUSFS_POST230_FIXSET.txt <<'EOF'
+          base_okI=cctv18/susfs4oki@8dce4337bcd15807c5449bbeff6e02a967138db0
+          upstream_branch=simonpunk/susfs4ksu:gki-android16-6.12
+          included=c8f64e41e3dea2cd44754d7472d3cd0bc0b40784
+          included=2528bdb0e2e76d26b9b174a8314ac115c9f00b3c
+          included=889b537e556a1308cd08eeae95413b579e0d0ac8
+          included=ebbc112e84d21e31ab2aca9aee8aa972ee92ec72
+          included=b213c54126fb243595ce7876e91d84d6e0861fec
+          excluded=acaa54751730196129fc3da740da08447d6ee679 KernelSU upstream sync
+          excluded=8b6cd18a160ff4678e00ec976688af6373021f54 Kbuild migration outside audited fixset
+          EOF
+
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
           set -euo pipefail
@@ -390,6 +417,24 @@ jobs:
               assert '.perm_check = always_allow' not in block, marker
           PY
 
+      - name: Publish exact A67 stock IKCONFIG
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/prepare_stock_ikconfig.py
+          python3 scripts/prepare_stock_ikconfig.py
+
+          common=kernel_workspace/kernel_platform/common
+          public="$common/arch/arm64/configs/plk110_a67_stock_ikconfig"
+          cmp -s baselines/PLK110_16.0.8.302_stock.config "$public"
+          grep -qx 'CONFIG_IKCONFIG=y' "$public"
+          grep -qx 'CONFIG_IKCONFIG_PROC=y' "$public"
+          ! grep -Eq '^CONFIG_(KSU|KSU_SUSFS|PLK110_PARTITION_GUARD)=' "$public"
+          grep -Fqx '$(obj)/config_data: arch/arm64/configs/plk110_a67_stock_ikconfig FORCE' "$common/kernel/Makefile"
+          git -C "$common" diff --check
+
+          cp "$public" artifacts/PLK110_A67_PUBLIC_IKCONFIG.config
+          sha256sum "$public" > artifacts/PUBLIC_IKCONFIG_SHA256.txt
+
       - name: Record source and patch state
         run: |
           set -euo pipefail
@@ -400,13 +445,19 @@ jobs:
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
           cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v2_source.c
           cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v2_patcher.py
+          cp scripts/apply_susfs_post230_fixes.py artifacts/
+          cp scripts/prepare_stock_ikconfig.py artifacts/
+          cp "$common/arch/arm64/configs/plk110_a67_stock_ikconfig" artifacts/
           cp "$common/certs/plk110_stock.pem" artifacts/
           git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
           git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/RESUKISU_KLEAF_ADAPTATION.patch
           git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
           tar -czf artifacts/SUSFS4OKI_ADDED_SOURCES.tar.gz             -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
 
-          printf 'resukisu=%s\nsusfs4oki=%s\n' "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT"             >> artifacts/SOURCE_PINS.txt
+          printf 'resukisu=%s\nsusfs4oki=%s\nsusfs_upstream_fixset=%s\n' \
+            "$RESUKISU_COMMIT" "$SUSFS4OKI_COMMIT" \
+            'c8f64e41,2528bdb0,889b537e,ebbc112e,b213c541' \
+            >> artifacts/SOURCE_PINS.txt
 
           git -C "$common" diff --name-only -z | xargs -0 -r git -C "$common" update-index --assume-unchanged
           test -z "$(git -C "$common" status -uno --porcelain)"
@@ -421,10 +472,30 @@ jobs:
       - name: Build exact A67 GKI
         run: bash scripts/build_gki.sh build
 
-      - name: Verify Image config, stock module CRCs and signer trust
+      - name: Verify internal config, stock public IKCONFIG, module CRCs and signer trust
         run: |
           set -euo pipefail
           python3 scripts/verify_gki.py             --additions baselines/PLK110_16.0.8.302_expected_resukisu_susfs.config.additions
+
+          common=kernel_workspace/kernel_platform/common
+          "$common/scripts/extract-ikconfig" artifacts/Image > artifacts/image.public.extract-ikconfig.config
+          cmp -s baselines/PLK110_16.0.8.302_stock.config artifacts/image.public.config
+          cmp -s baselines/PLK110_16.0.8.302_stock.config artifacts/image.public.extract-ikconfig.config
+          grep -qx 'CONFIG_IKCONFIG=y' artifacts/image.config
+          grep -qx 'CONFIG_IKCONFIG_PROC=y' artifacts/image.config
+          grep -qx 'CONFIG_KSU=y' artifacts/image.config
+          grep -qx 'CONFIG_KSU_SUSFS=y' artifacts/image.config
+          grep -qx 'CONFIG_PLK110_PARTITION_GUARD=y' artifacts/image.config
+          ! grep -Eq '^CONFIG_(KSU|KSU_SUSFS|PLK110_PARTITION_GUARD)=' artifacts/image.public.config
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          verdict = json.loads(Path('artifacts/VERDICT.json').read_text())
+          assert verdict['passed'] is True
+          assert verdict['public_ikconfig']['exact_stock_match'] is True
+          assert verdict['public_ikconfig']['extracted_sha256'] == verdict['public_ikconfig']['stock_sha256']
+          PY
 
       - name: Verify ReSukiSU and SUSFS compiled
         run: |
