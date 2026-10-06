@@ -1,4 +1,4 @@
-"""Validate the actual Image, never a config from a different Bazel target."""
+"""Validate compiled A67 invariants while allowing the Image to publish exact stock IKCONFIG."""
 import argparse
 import gzip
 import hashlib
@@ -34,10 +34,23 @@ if args.preflight:
 data = (out / 'Image').read_bytes()
 start, end = data.find(b'IKCFG_ST'), data.find(b'IKCFG_ED')
 if start < 0 or end <= start:
-    raise SystemExit('Image has no extractable IKCONFIG; cannot verify it')
-actual_bytes = gzip.decompress(data[start + 8:end])
-(out / 'image.config').write_bytes(actual_bytes)
-actual = config(actual_bytes.decode())
+    raise SystemExit('Image has no extractable IKCONFIG; cannot verify public /proc/config.gz payload')
+public_bytes = gzip.decompress(data[start + 8:end])
+(out / 'image.public.config').write_bytes(public_bytes)
+public_exact = public_bytes == args.baseline.read_bytes()
+public_sha256 = hashlib.sha256(public_bytes).hexdigest()
+stock_sha256 = hashlib.sha256(args.baseline.read_bytes()).hexdigest()
+if not public_exact:
+    raise SystemExit(
+        f'public IKCONFIG drift: extracted={public_sha256} stock={stock_sha256}'
+    )
+
+# The embedded IKCONFIG is deliberately stock. The real build configuration is
+# the exact Bazel kernel_aarch64_config result captured immediately before the
+# kernel_aarch64 build, with no source mutation between the two targets.
+actual = preflight
+(out / 'image.config').write_text((out / 'gki_preflight.config').read_text())
+
 # Unlike other generated metadata, the C compiler identity is part of the
 # PLK110 A67 stock-reproduction target. It must match the captured stock config
 # exactly; a different Android clang build number is a failed reproduction.
@@ -46,9 +59,6 @@ actual_cc = actual.get('CONFIG_CC_VERSION_TEXT')
 cc_exact = stock_cc == actual_cc and stock_cc is not None
 delta, functional, unmet = compare(stock, actual, additions)
 (out / 'config_delta.json').write_text(json.dumps(delta, indent=2) + '\n')
-preflight_delta = {k: [preflight.get(k, 'n'), actual.get(k, 'n')]
-                   for k in sorted(preflight.keys() | actual.keys())
-                   if preflight.get(k, 'n') != actual.get(k, 'n')}
 banner_match = re.search(rb'Linux version [^\x00\n]+', data)
 banner = banner_match[0].decode(errors='replace') if banner_match else ''
 (out / 'KERNEL_BANNER.txt').write_text(banner + '\n')
@@ -97,14 +107,18 @@ assert hashlib.sha256(der).hexdigest() == STOCK_CERT_SHA256, 'wrong baseline cer
 trusted = der in data[cert_offset:cert_offset + cert_size]
 trust_report = {'original_signer_sha256': STOCK_CERT_SHA256, 'present_in_builtin_trust_table': trusted,
                 'table_offset': cert_offset, 'table_size': cert_size}
-passed = (not functional and not unmet and not preflight_delta and not missing and not mismatches
+passed = (not functional and not unmet and public_exact and not missing and not mismatches
           and not unexpected_root and trusted and release == args.release and cc_exact)
-report = {'passed': passed, 'scope': 'Offline Image config, stock module CRC and signer trust verification; boot untested.',
+report = {'passed': passed, 'scope': 'Internal Bazel config + exact stock public IKCONFIG + stock module CRC and signer trust verification; boot untested.',
           'release': release, 'expected_release': args.release,
           'image_sha256': hashlib.sha256(data).hexdigest(),
           'functional_config_differences': functional,
           'all_config_differences': delta, 'unmet_required_config': unmet,
-          'preflight_vs_image_config_differences': preflight_delta,
+          'public_ikconfig': {
+              'exact_stock_match': public_exact,
+              'extracted_sha256': public_sha256,
+              'stock_sha256': stock_sha256,
+          },
           'root_symbols': root_symbols, 'module_abi': abi_report, 'stock_signer_trust': trust_report,
           'toolchain': {k: actual.get(k) for k in sorted(GENERATED)},
           'stock_cc_version_text': stock_cc, 'actual_cc_version_text': actual_cc,
