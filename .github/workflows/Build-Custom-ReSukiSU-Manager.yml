@@ -422,10 +422,32 @@ jobs:
           cp source/manager/app/build/outputs/apk/custom/custom-base.apk "$REL/custom-base.apk"
 
       - name: Fetch exact upstream ksud from matching commit
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p upstream-ksud
-          curl -fL --retry 3             "https://nightly.link/ReSukiSU/ReSukiSU/actions/runs/${UPSTREAM_MANAGER_RUN}/ksud-aarch64-linux-android.zip"             -o upstream-ksud.zip
+
+          # ReSukiSU/ReSukiSU was renamed to Baka-SU/BakaSU.
+          # Verify the historical successful upstream run is for our pin.
+          curl --fail --location --retry 3 \
+            "https://api.github.com/repos/Baka-SU/BakaSU/actions/runs/${UPSTREAM_MANAGER_RUN}" \
+            | jq -e --arg commit "${RESUKISU_COMMIT}" \
+              '.conclusion == "success" and .head_sha == $commit'
+
+          # Same upstream Actions artifact ID from run 35234729417.
+          # Direct GitHub download first; nightly.link fallback for a token
+          # scoped only to this repository's Actions API.
+          if ! curl --fail --location --retry 2 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/Baka-SU/BakaSU/actions/artifacts/10503532068/zip" \
+            --output upstream-ksud.zip; then
+            curl --fail --location --retry 3 \
+              "https://nightly.link/Baka-SU/BakaSU/actions/runs/${UPSTREAM_MANAGER_RUN}/ksud-aarch64-linux-android.zip" \
+              --output upstream-ksud.zip
+          fi
+
+          unzip -t upstream-ksud.zip >/dev/null
           unzip -o upstream-ksud.zip -d upstream-ksud >/dev/null
           KSUD=$(find upstream-ksud -type f -name 'ksud' | head -n 1)
           test -n "$KSUD"
