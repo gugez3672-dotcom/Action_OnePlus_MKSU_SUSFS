@@ -13,3 +13,5 @@ pguard=unchanged-v2
 
 # KSU 3877 experimental SELinux timing-side-channel port
 # Do not flash without source review and boot/device validation.
+
+# Retry experimental #25: adapt stock A67 SELinux RCU header insertion
