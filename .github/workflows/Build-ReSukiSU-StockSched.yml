@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - resukisu-pguard-v2-susfs-post230
+      - resukisu-pguard-v2-ksu3877-experimental
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -13,7 +14,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: plk110-a67-resukisu-susfs-pguard-v2-susfs-post230
+  group: plk110-a67-resukisu-susfs-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -341,6 +342,24 @@ jobs:
           excluded=8b6cd18a160ff4678e00ec976688af6373021f54 Kbuild migration outside audited fixset
           EOF
 
+      - name: EXPERIMENTAL port of KernelSU PR 3877 SELinux side-channel fix
+        if: github.ref_name == 'resukisu-pguard-v2-ksu3877-experimental'
+        run: |
+          set -euo pipefail
+          mkdir -p kernel_workspace/ksu3877
+          git -C kernel_workspace/ksu3877 init
+          git -C kernel_workspace/ksu3877 remote add origin https://github.com/tiann/KernelSU.git
+          git -C kernel_workspace/ksu3877 fetch --depth=1 origin a85dcbcfc3b09ae410f31aae124d04f3777fdf1c
+          git -C kernel_workspace/ksu3877 checkout --detach FETCH_HEAD
+          test "$(git -C kernel_workspace/ksu3877 rev-parse HEAD)" = "a85dcbcfc3b09ae410f31aae124d04f3777fdf1c"
+          python3 -m py_compile scripts/port_ksu_3877_selinux_hide.py
+          python3 scripts/port_ksu_3877_selinux_hide.py
+          git -C kernel_workspace/kernel_platform/common diff --check
+          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+          grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/common/security/selinux/hooks.c
+          grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/KernelSU/kernel/feature/selinux_hide.c
+          echo 'EXPERIMENTAL BUILD: do not flash without SELinux runtime review' >> artifacts/KSUPR3877_EXPERIMENTAL.txt
+
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
           set -euo pipefail
@@ -577,7 +596,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-ReSukiSU-SUSFS-PGuardV2-${{ github.run_number }}
+          name: PLK110-A67-PGuardV2-${{ github.run_number }}-${{ github.ref_name }}
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6
