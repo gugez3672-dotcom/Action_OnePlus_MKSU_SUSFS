@@ -35,6 +35,7 @@ new = '''        if (o.kind == "delete" && source in setOf(
 if s.count(old) != 1: raise SystemExit("DN41 delete guard drift")
 s = s.replace(old,new)
 p.write_text(s)
-assert s.count('Modifier.weight(1f)) {') >= 8
+assert '@Composable fun option(title: String, modifier: Modifier, action: () -> Unit)' in s
+assert 'Box(modifier.height(48.dp).clickable {' in s
 assert 'if (o.kind == "delete" && source in setOf(' in s
 print("DN41 menu RowScope and system-root deletion guards validated.")
