@@ -104,7 +104,7 @@ if [ ! -f "${'$'}P" ] || [ -L "${'$'}P" ]; then echo '源文件已改变类型';
 CURRENT=$(${'$'}BB sha256sum -- "${'$'}P" | ${'$'}BB cut -d ' ' -f1)
 if [ "${'$'}CURRENT" != "${'$'}EXPECTED" ]; then echo '文件被外部修改，拒绝覆盖'; exit 71; fi
 TMP="${'$'}P.dn-temp-${'$'}${'$'}"
-BACKUP="${'
+BACKUP="${'$'}P.dn-bak-$(date +%s)-${'$'}${'$'}"
 if ! ${'$'}BB cp -a -- "${'$'}P" "${'$'}TMP"; then echo '临时副本失败'; exit 72; fi
 if ! printf '%s' ${shellQuote(encoded)} | ${'$'}BB base64 -d > "${'$'}TMP"; then
   ${'$'}BB rm -f -- "${'$'}TMP"; echo '临时文件写入失败'; exit 73
@@ -140,9 +140,6 @@ echo "保存成功，备份 ${'$'}BACKUP"
     }
 
 '''+s[b:]
-# Fix the backup date substitution to use standard $(date...) rather than arithmetic expansion.
-s=s.replace('BACKUP="${'$'}P.dn-bak-$((${'$'}BB date +%s))-${'$'}${'$'}"',
-    'BACKUP="${'$'}P.dn-bak-$(${'$'}BB date +%s)-${'$'}${'$'}"') if False else s
 a=s.index('    if (showEditor) {\n        AlertDialog(')
 b=s.index('\n}\n',a)
 s=s[:a]+r'''    if (showEditor) {
