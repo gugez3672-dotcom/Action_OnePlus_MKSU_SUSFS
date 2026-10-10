@@ -120,17 +120,11 @@ rep('''    if (batchMenu) {
     }
     if (batchMenu) {
 ''')
-rep('''                        option("属性") {
-                            properties = "读取中…"
-''',
-'''                        option("属性") {
-                            properties = "读取中…"
-''')
 rep('''                    Row(Modifier.fillMaxWidth()) {
-                        option("终端") { openTerminal(if (c.entry.folder) file else c.directory) }
+                        option("终端", Modifier.weight(1f)) { openTerminal(if (c.entry.folder) file else c.directory) }
 ''',
 '''                    Row(Modifier.fillMaxWidth()) {
-                        option("十六进制预览") {
+                        option("十六进制预览", Modifier.weight(1f)) {
                             properties = "读取中…"
                             scope.launch {
                                 properties = cmd(cli,
