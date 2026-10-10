@@ -177,10 +177,16 @@ extern int ksu_security_context_to_sid_with_policy_ex(
     u32 *sid, u32 def_sid, gfp_t gfp_flags, u32 *orig_sid_p, int *orig_rc_p);"""
     hooks = exactly_once(hooks, symbol, symbol + extended_decl, "External SID helper")
     if "#include <linux/rcupdate.h>" not in hooks:
-        hooks = exactly_once(
-            hooks, "#include <linux/cred.h>",
-            "#include <linux/cred.h>\n#include <linux/rcupdate.h>",
-            "SELinux RCU header",
+        # The stock OnePlus SELinux hooks.c does not necessarily include
+        # linux/cred.h directly. Use its first real include as a stable
+        # insertion point rather than expecting a specific header layout.
+        include_match = re.search(r"^#include[ \\t]+[<\"]", hooks, re.M)
+        if include_match is None:
+            raise RuntimeError("SELinux hooks.c has no C include anchor")
+        hooks = (
+            hooks[:include_match.start()]
+            + "#include <linux/rcupdate.h>\\n"
+            + hooks[include_match.start():]
         )
 
     assert "ksu_security_context_to_sid_with_policy_ex" in old
