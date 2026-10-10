@@ -32,6 +32,7 @@ on:
       - '.github/dn47_root_listing_cache.py'
       - '.github/dn48_file_tasks.py'
       - '.github/dn49_sort_open.py'
+      - '.github/dn50_final_safety.py'
 
 permissions:
   contents: write
@@ -391,7 +392,8 @@ jobs:
             .github/dn46_safe_editor.py \
             .github/dn47_root_listing_cache.py \
             .github/dn48_file_tasks.py \
-            .github/dn49_sort_open.py
+            .github/dn49_sort_open.py \
+            .github/dn50_final_safety.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -421,6 +423,7 @@ jobs:
           python3 .github/dn47_root_listing_cache.py
           python3 .github/dn48_file_tasks.py
           python3 .github/dn49_sort_open.py
+          python3 .github/dn50_final_safety.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
