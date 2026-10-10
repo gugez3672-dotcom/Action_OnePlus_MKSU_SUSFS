@@ -13,6 +13,7 @@ on:
       - resukisu-mt-dual-pane-preview-20261010
       - resukisu-mt-compact-header-20261010
       - resukisu-mt-file-ux-performance-20261010
+      - resukisu-mt-file-robust-6364-20261010
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -27,6 +28,10 @@ on:
       - '.github/dn43_file_fast_ui.py'
       - '.github/dn44_multiselect_sh.py'
       - '.github/dn45_terminal_canvas.py'
+      - '.github/dn46_safe_editor.py'
+      - '.github/dn47_root_listing_cache.py'
+      - '.github/dn48_file_tasks.py'
+      - '.github/dn49_sort_open.py'
 
 permissions:
   contents: write
@@ -382,7 +387,11 @@ jobs:
             .github/dn42_mt_compact_header.py \
             .github/dn43_file_fast_ui.py \
             .github/dn44_multiselect_sh.py \
-            .github/dn45_terminal_canvas.py
+            .github/dn45_terminal_canvas.py \
+            .github/dn46_safe_editor.py \
+            .github/dn47_root_listing_cache.py \
+            .github/dn48_file_tasks.py \
+            .github/dn49_sort_open.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -408,6 +417,10 @@ jobs:
           python3 .github/dn43_file_fast_ui.py
           python3 .github/dn44_multiselect_sh.py
           python3 .github/dn45_terminal_canvas.py
+          python3 .github/dn46_safe_editor.py
+          python3 .github/dn47_root_listing_cache.py
+          python3 .github/dn48_file_tasks.py
+          python3 .github/dn49_sort_open.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
