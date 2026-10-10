@@ -131,7 +131,7 @@ rep('''                    Row(Modifier.fillMaxWidth()) {
                                     "/data/adb/ksu/bin/busybox hexdump -C -n 512 -- " + qs(file)).value
                             }
                         }
-                        option("终端") { openTerminal(if (c.entry.folder) file else c.directory) }
+                        option("终端", Modifier.weight(1f)) { openTerminal(if (c.entry.folder) file else c.directory) }
 ''')
 rep('''    val shown = if (pane.filter.isBlank()) pane.files else pane.files.filter { it.name.contains(pane.filter, true) }''',
 '''    val shown = pane.visible()''')
