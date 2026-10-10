@@ -34,6 +34,15 @@ new = '''        if (o.kind == "delete" && source in setOf(
 '''
 if s.count(old) != 1: raise SystemExit("DN41 delete guard drift")
 s = s.replace(old,new)
+# Kotlin visibility: internal pane exposes an internal anchor type.
+old = "private data class DualAnchor("
+if s.count(old) != 1: raise SystemExit("DN41 DualAnchor anchor drift")
+s = s.replace(old, "internal data class DualAnchor(", 1)
+# Sequence.sortedWith returns Sequence; dnParse requires a concrete List.
+old = '}.distinctBy { it.name }.sortedWith(compareBy<DualEntry>({ !it.folder }, { it.name.lowercase(Locale.ROOT) }))'
+new = old + '.toList()'
+if s.count(old) != 1: raise SystemExit("DN41 parseEntries return anchor drift")
+s = s.replace(old, new, 1)
 p.write_text(s)
 assert '@Composable fun option(title: String, modifier: Modifier, action: () -> Unit)' in s
 assert 'Box(modifier.height(48.dp).clickable {' in s
