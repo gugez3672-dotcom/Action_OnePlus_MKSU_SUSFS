@@ -180,12 +180,12 @@ extern int ksu_security_context_to_sid_with_policy_ex(
         # The stock OnePlus SELinux hooks.c does not necessarily include
         # linux/cred.h directly. Use its first real include as a stable
         # insertion point rather than expecting a specific header layout.
-        include_match = re.search(r"^#include[ \\t]+[<\"]", hooks, re.M)
+        include_match = re.search(r"^#include ", hooks, re.M)
         if include_match is None:
             raise RuntimeError("SELinux hooks.c has no C include anchor")
         hooks = (
             hooks[:include_match.start()]
-            + "#include <linux/rcupdate.h>\\n"
+            + "#include <linux/rcupdate.h>\n"
             + hooks[include_match.start():]
         )
 
