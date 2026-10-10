@@ -9,6 +9,7 @@ on:
       - resukisu-usb-debug-toggle-20261010
       - resukisu-module-hidden-20261010
       - resukisu-module-webui-fix-20261010
+      - resukisu-module-tap-session-20261010
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -16,6 +17,7 @@ on:
       - '.github/dn36_usb_debug_toggle.py'
       - '.github/dn37_modules_hidden_two_second.py'
       - '.github/dn38_webui_actual_module_lookup.py'
+      - '.github/dn39_module_tap_session.py'
 
 permissions:
   contents: write
@@ -364,7 +366,8 @@ jobs:
             .github/dn35_superuser_user0_view.py \
             .github/dn36_usb_debug_toggle.py \
             .github/dn37_modules_hidden_two_second.py \
-            .github/dn38_webui_actual_module_lookup.py
+            .github/dn38_webui_actual_module_lookup.py \
+            .github/dn39_module_tap_session.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -383,6 +386,7 @@ jobs:
           python3 .github/dn36_usb_debug_toggle.py
           python3 .github/dn37_modules_hidden_two_second.py
           python3 .github/dn38_webui_actual_module_lookup.py
+          python3 .github/dn39_module_tap_session.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
