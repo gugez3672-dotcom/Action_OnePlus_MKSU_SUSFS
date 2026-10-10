@@ -31,7 +31,7 @@ replace_once(
  */
 object ModuleVisibilitySession {
     private val state = MutableStateFlow(false)
-    val visible: StateFlow<Boolean> = state.asStateFlow()
+    val visible: StateFlow<Boolean> = state
 
     fun toggle() {
         state.value = !state.value
