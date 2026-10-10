@@ -10,3 +10,6 @@ kernelSu_sync=excluded-acaa5475
 kbuild_migration=excluded-8b6cd18a
 public_ikconfig=exact-A67-stock-e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
 pguard=unchanged-v2
+
+# KSU 3877 experimental SELinux timing-side-channel port
+# Do not flash without source review and boot/device validation.
