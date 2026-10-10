@@ -454,6 +454,8 @@ jobs:
           # ReSukiSU/ReSukiSU was renamed to Baka-SU/BakaSU.
           # Verify the historical successful upstream run is for our pin.
           curl --fail --location --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/Baka-SU/BakaSU/actions/runs/${UPSTREAM_MANAGER_RUN}" \
             | jq -e --arg commit "${RESUKISU_COMMIT}" \
               '.conclusion == "success" and .head_sha == $commit'
