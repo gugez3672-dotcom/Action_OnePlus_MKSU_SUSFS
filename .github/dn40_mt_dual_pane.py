@@ -544,5 +544,5 @@ assert 'LazyColumn(state = pane.scroll' in t
 assert 'heightIn(min = 40.dp)' in t and 'size(32.dp)' in t
 assert 'RootInteractiveSession(' in s
 assert 'fun runScriptInTerminal(path: String)' in s
-assert 'onTerminal = { openTerminalAt(it) }' in s
+assert 'openTerminal = { openTerminalAt(it) }' in s
 print("DN40: MT-style compact dual-pane UI and actual opposite-pane copy/move applied.")
