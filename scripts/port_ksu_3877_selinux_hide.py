@@ -24,8 +24,12 @@ REPORT = Path("artifacts/KSUPR3877_EXPERIMENTAL.txt")
 def function(src: str, declaration: str) -> str:
     pat = re.compile(r"^" + declaration + r"\([^;{}]*\)\s*\{", re.M)
     matches = list(pat.finditer(src))
-    if len(matches) != 1:
-        raise RuntimeError(f"Expected exactly one function: {declaration}: {len(matches)}")
+    if not matches:
+        raise RuntimeError(f"Function not found: {declaration}")
+    # ReSukiSU retains a second parser for legacy Linux kernels; for
+    # PLK110 6.12 we intentionally select the first (6.6+) definition.
+    if len(matches) != 1 and declaration != "static int string_to_context_struct":
+        raise RuntimeError(f"Ambiguous function: {declaration}: {len(matches)}")
     start = matches[0].start()
     opening = src.rfind("{", matches[0].start(), matches[0].end())
     depth = 0
