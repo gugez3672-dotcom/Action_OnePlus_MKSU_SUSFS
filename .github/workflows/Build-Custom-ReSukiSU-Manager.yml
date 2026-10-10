@@ -15,6 +15,7 @@ on:
       - resukisu-mt-file-ux-performance-20261010
       - resukisu-mt-file-robust-6364-20261010
       - resukisu-mt-pane-focus-ui-20261011
+      - resukisu-mt-batch-menu-focus-20261011
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -35,6 +36,7 @@ on:
       - '.github/dn49_sort_open.py'
       - '.github/dn50_final_safety.py'
       - '.github/dn51_pane_focus_secondary_ui.py'
+      - '.github/dn52_batch_menu_focus.py'
 
 permissions:
   contents: write
@@ -396,7 +398,8 @@ jobs:
             .github/dn48_file_tasks.py \
             .github/dn49_sort_open.py \
             .github/dn50_final_safety.py \
-            .github/dn51_pane_focus_secondary_ui.py
+            .github/dn51_pane_focus_secondary_ui.py \
+            .github/dn52_batch_menu_focus.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -428,6 +431,7 @@ jobs:
           python3 .github/dn49_sort_open.py
           python3 .github/dn50_final_safety.py
           python3 .github/dn51_pane_focus_secondary_ui.py
+          python3 .github/dn52_batch_menu_focus.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
