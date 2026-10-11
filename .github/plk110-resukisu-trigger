@@ -22,3 +22,5 @@ pguard=unchanged-v2
 # Preflight correction: coverage check excludes intentionally writable boot targets
 
 # Retry #28 after AVTAB two-branch exact pattern gate correction
+
+# #29 critical fix: assert KernelSU PR #3877 is included with SELinux RCU/AVTAB fixes
