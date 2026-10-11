@@ -144,6 +144,8 @@ internal class DnPtyTerminalController(private val daemon: String) {
                 3000, sessionClient,
             )
             status = "Root PTY"
+            // Reattach on session restart if the view already exists.
+            display?.let { view -> session?.let { view.attachSession(it) } }
         } catch (t: Throwable) {
             status = "终端启动失败"
             failure = t.message ?: t.javaClass.simpleName
@@ -297,6 +299,11 @@ s=s[:begin]+'''    val pty = remember(ksuCli) { DnPtyTerminalController(ksuCli.g
 '''+s[end:]
 begin=s.index('''    fun ensureTerminalStarted() {''')
 end=s.index('''    fun loadEditor(path: String) {''',begin)
+# Preserve the separate background/detached execution function injected by
+# DN31 and updated by DN34. It is called by the existing file-action menu.
+detached_begin=s.index('    fun runScriptDetached(path: String) {',begin,end)
+detached_end=s.index('    fun sendTerminalLine()',detached_begin,end)
+detached_function=s[detached_begin:detached_end]
 s=s[:begin]+'''    fun ensureTerminalStarted() { pty.ensure() }
     fun openTerminalAt(path: String) {
         pty.changeDirectory(path)
@@ -317,6 +324,10 @@ s=s[:begin]+'''    fun ensureTerminalStarted() { pty.ensure() }
     }
 
 '''+s[end:]
+# Put detached runner back between interactive functions and sendTerminalLine.
+send_anchor='    fun sendTerminalLine() {'
+if s.count(send_anchor)!=1: raise SystemExit("D70b send function drift")
+s=s.replace(send_anchor, detached_function + send_anchor, 1)
 
 start=s.index('''            } else {
                 Row(''',s.index('''                DnDualFiles('''))
