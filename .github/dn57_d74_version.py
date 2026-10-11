@@ -33,7 +33,14 @@ for before, after in patches.items():
 app_root.write_text(content, encoding="utf-8")
 
 apk = Path("source/manager/app/build.gradle.kts").read_text(encoding="utf-8")
-assert 'versionName = managerVersionName' in apk
+# DN23 intentionally pins the previous public version. Upgrade the actual
+# Android versionName after its patch; keep the manager versionCode monotonic.
+old_name = 'versionName = "V4.2.0"'
+if apk.count(old_name) != 1:
+    raise SystemExit("Unexpected DN23 application versionName override")
+apk = apk.replace(old_name, f'versionName = "{version}"', 1)
+Path("source/manager/app/build.gradle.kts").write_text(apk, encoding="utf-8")
+assert f'versionName = "{version}"' in apk
 assert 'versionCode = managerVersionCode' in apk
 assert 'applicationId = "com.daily.notes"' in apk
 
