@@ -107,7 +107,7 @@ new=r'''    fun runScriptInTerminal(path: String) {
 '''
 # NOTE: Kotlin string interpolation in the generated code requires escaping
 # the '$' before dn_exit_status, as it is a shell variable not Kotlin.
-new=new.replace('"$dn_exit_status"', '"\\$dn_exit_status"')
+new=new.replace('$dn_exit_status', r'\$dn_exit_status')
 s=s.replace(old,new,1)
 p.write_text(s,encoding="utf-8")
 assert 'hex.startsWith("7f454c46")' in s
