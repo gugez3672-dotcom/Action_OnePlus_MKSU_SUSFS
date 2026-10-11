@@ -47,6 +47,7 @@ on:
       - '.github/dn56_d73_termux_font_pixels.py'
       - '.github/dn57_d74_version.py'
       - '.github/dn58_d74_elf_pty_runner.py'
+      - '.github/dn59_d81_terminal_ime_viewport.py'
 
 permissions:
   contents: write
@@ -427,7 +428,8 @@ jobs:
             .github/dn55_d72_ime_font.py \
             .github/dn56_d73_termux_font_pixels.py \
             .github/dn57_d74_version.py \
-            .github/dn58_d74_elf_pty_runner.py
+            .github/dn58_d74_elf_pty_runner.py \
+            .github/dn59_d81_terminal_ime_viewport.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -466,6 +468,7 @@ jobs:
           python3 .github/dn56_d73_termux_font_pixels.py
           python3 .github/dn57_d74_version.py
           python3 .github/dn58_d74_elf_pty_runner.py
+          python3 .github/dn59_d81_terminal_ime_viewport.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
