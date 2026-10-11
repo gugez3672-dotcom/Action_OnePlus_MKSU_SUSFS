@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""D81: keep the live PTY prompt visible when Android IME appears.
+"""D81/D82: keep live PTY prompt visible, without double-reserving IME height.
 
-The terminal view must receive IME-safe space, recalculate its PTY size,
-and return to the live screen after keyboard resize. No synthetic keystrokes.
+The activity already adjusts its viewport for IME; avoid Compose imePadding().
+Refresh the PTY size and follow the live cursor on keyboard resize.
 """
 from pathlib import Path
 
@@ -40,8 +40,8 @@ rep(
 rep(
     "    var fontPixels by rememberSaveable { mutableIntStateOf(28) }\n",
     """    var fontPixels by rememberSaveable { mutableIntStateOf(28) }
-    // When ColorOS keyboard opens, the Compose viewport must exclude its insets.
-    // The IME bottom is read reactively so terminal output follows animation.
+    // Watch IME animation only to refresh the live cursor. The activity already
+    // resizes the available viewport; do not subtract IME insets twice.
     val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(imeBottomPx) {
         if (imeBottomPx > 0) {
@@ -51,16 +51,17 @@ rep(
     }
 """,
 )
-rep(
-    "    Column(Modifier.fillMaxSize()) {\n",
-    "    Column(Modifier.fillMaxSize().imePadding()) {\n",
-)
+# D82: the host activity already resizes its Compose viewport for the IME.
+# The D81 imePadding() shrinks it a second time and leaves a large empty strip
+# between the extra-key row and the on-screen keyboard. Use the resized bounds
+# directly; TerminalView.onSizeChanged updates PTY dimensions automatically.
 assert "setTopRow(0)" in s
 assert "WindowInsets.ime.getBottom(LocalDensity.current)" in s
-assert "Column(Modifier.fillMaxSize().imePadding())" in s
+assert "Column(Modifier.fillMaxSize())" in s
+assert "Column(Modifier.fillMaxSize().imePadding())" not in s
 assert "view.updateSize()" in s
 assert "controller.followImeViewport()" in s
 assert 'shouldEnforceCharBasedInput(): Boolean = true' in s
 assert 'setFontPixels(fontPixels)' in s
 p.write_text(s, encoding="utf-8")
-print("D81: IME-aware PTY viewport resize and scroll-to-live-output, preserving terminal inputs")
+print("D82: remove double IME padding, retain PTY resize and live cursor follow")
