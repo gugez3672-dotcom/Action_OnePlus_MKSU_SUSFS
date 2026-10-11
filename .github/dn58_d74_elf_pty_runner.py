@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """D74: restore format-aware terminal file execution after replacing fake shell
-with PTY. Keep original files unchanged and never feed ELF bytes to sh."""
+with PTY. Keep original files unchanged, run ELF directly, and accept
+self-extracting Shell scripts containing an embedded binary payload."""
 from pathlib import Path
 p=Path("source/manager/app/src/main/java/com/resukisu/resukisu/ui/screen/main/ToolsPage.kt")
 s=p.read_text(encoding="utf-8")
@@ -80,14 +81,26 @@ new=r'''    fun runScriptInTerminal(path: String) {
                 terminalHint = "Root PTY · ELF 执行"
                 return@launch
             }
-            if (isBinary) {
-                showStatus("[拒绝执行：文件不是标准 ELF，且包含二进制控制字节。请检查实际文件格式。]")
-                terminalHint = "文件格式不支持"
-                return@launch
-            }
+            // A self-extracting Shell script may contain compressed/binary payload
+            // after a valid interpreter header. Validate the leading shebang
+            // *before* treating control bytes in the payload as a bad format.
             val firstLine = execRoot("$bb head -n 1 -- " + q).out
                 .lineSequence().firstOrNull().orEmpty().trimStart('\uFEFF').trimEnd('\r')
             val shebang = if (firstLine.startsWith("#!")) firstLine.drop(2).trim() else ""
+            val shellPrograms = setOf("sh", "bash", "ash", "dash", "ksh", "zsh")
+            val interpreter = shebang.substringBefore(' ').substringBefore('\t')
+            val envArg = if (interpreter == "/usr/bin/env") {
+                shebang.removePrefix("/usr/bin/env").trimStart()
+                    .substringBefore(' ').substringBefore('\t')
+            } else ""
+            val isShellShebang = shebang.isNotEmpty() &&
+                (interpreter.substringAfterLast('/') in shellPrograms ||
+                    envArg in shellPrograms)
+            if (isBinary && !isShellShebang) {
+                showStatus("[拒绝执行：非 ELF、无可识别 Shell 文件头，且包含二进制控制字节。]")
+                terminalHint = "文件格式不支持"
+                return@launch
+            }
             var runner = "/system/bin/sh"
             if (shebang.contains("bash")) {
                 val bash = execRoot("command -v bash 2>/dev/null").out.trim()
@@ -111,8 +124,11 @@ new=new.replace('$dn_exit_status', r'\$dn_exit_status')
 s=s.replace(old,new,1)
 p.write_text(s,encoding="utf-8")
 assert 'hex.startsWith("7f454c46")' in s
+assert 'if (isBinary && !isShellShebang)' in s
+assert s.index('val isShellShebang') < s.index('if (isBinary && !isShellShebang)')
+assert s.count('val firstLine = execRoot(') == 1
 assert 'pty.sendLine(shellQuote(runPath) + after)' in s
 assert 'pty.sendLine(runner + " " + q)' in s
 assert 'DN30' in s
 assert 'val destinationDir = opposite.path' not in s  # different source file
-print("DN58 D74: native ELF direct PTY execution, text shell routing, binary format checks")
+print("DN58 D80: native ELF direct PTY execution; allow self-extracting Shell scripts with valid shebang; reject unknown binary")
