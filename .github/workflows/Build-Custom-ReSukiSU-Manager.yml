@@ -19,6 +19,7 @@ on:
       - resukisu-d70-pty-swipe-fix-20261011
       - resukisu-d72-ime-font-20261011
       - resukisu-d73-pty-font-density-20261011
+      - resukisu-d74-brand-version-20261011
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -44,6 +45,8 @@ on:
       - '.github/dn54_d70_true_pty.py'
       - '.github/dn55_d72_ime_font.py'
       - '.github/dn56_d73_termux_font_pixels.py'
+      - '.github/dn57_d74_version.py'
+      - '.github/daily-notes-version.txt'
 
 permissions:
   contents: write
@@ -61,6 +64,18 @@ jobs:
     steps:
       - name: Checkout build trigger
         uses: actions/checkout@v7
+
+      - name: Resolve Daily Notes release version
+        run: |
+          set -euo pipefail
+          NAME=$(tr -d '\r\n' < .github/daily-notes-version.txt)
+          [[ "$NAME" =~ ^D1\.0\.([0-9]{1,3})$ ]]
+          REVISION=${BASH_REMATCH[1]}
+          CODE=$(( 35100 + 10#$REVISION ))
+          test "$CODE" -gt 35154
+          echo "MANAGER_DISPLAY_VERSION=$NAME" >> "$GITHUB_ENV"
+          echo "MANAGER_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "D series manager release: $NAME ($CODE)"
 
       - name: Setup Java 21
         uses: actions/setup-java@v6
@@ -410,7 +425,8 @@ jobs:
             .github/dn53_d70_swipe_selection_anchor.py \
             .github/dn54_d70_true_pty.py \
             .github/dn55_d72_ime_font.py \
-            .github/dn56_d73_termux_font_pixels.py
+            .github/dn56_d73_termux_font_pixels.py \
+            .github/dn57_d74_version.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -447,6 +463,7 @@ jobs:
           python3 .github/dn54_d70_true_pty.py
           python3 .github/dn55_d72_ime_font.py
           python3 .github/dn56_d73_termux_font_pixels.py
+          python3 .github/dn57_d74_version.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
@@ -537,7 +554,7 @@ jobs:
         run: |
           set -euo pipefail
           KEYSTORE_PASS="$(printf '%s' "${MANAGER_KEYSTORE_PASSWORD}" | tr -d '\r\n')"
-          python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${KEYSTORE_PASS}"             -S "${KEYSTORE_PASS}"             -n ReSukiSU_v4.2.0-rc2_35154-custom             --no-strip
+          python3 repack_apk.py repack             -b release             -t release             -a arm64-v8a             -K manager/key.jks             -A "${KEY_ALIAS}"             -P "${KEYSTORE_PASS}"             -S "${KEYSTORE_PASS}"             -n "DailyNotes_${MANAGER_DISPLAY_VERSION}_${MANAGER_VERSION_CODE}-custom"             --no-strip
 
       - name: Verify package signature and identity
         env:
@@ -563,7 +580,10 @@ jobs:
 
           VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" | head -n 1)
           echo "versionName=$VERSION_NAME"
-          test "$VERSION_NAME" = "V4.2.0"
+          test "$VERSION_NAME" = "$MANAGER_DISPLAY_VERSION"
+          VERSION_CODE=$(printf '%s\n' "$BADGING" | sed -n "s/^package: .*versionCode='\([^']*\)'.*/\1/p" | head -n 1)
+          echo "versionCode=$VERSION_CODE"
+          test "$VERSION_CODE" = "$MANAGER_VERSION_CODE"
 
           # Custom manager must have a normal desktop launcher entry.
           printf '%s\n' "$BADGING" | grep -q "^launchable-activity:"
@@ -589,11 +609,13 @@ jobs:
           APK_SIZE=$(stat -c%s "$APK")
 
           mkdir -p custom-manager
-          cp "$APK" custom-manager/ReSukiSU_v4.2.0-rc2_35154_com.daily.notes.apk
+          cp "$APK" "custom-manager/DailyNotes_${MANAGER_DISPLAY_VERSION}_${MANAGER_VERSION_CODE}_com.daily.notes.apk"
           cp apksigner-verify.txt custom-manager/
           cat > custom-manager/manager_identity.txt <<EOF
           source_commit=${RESUKISU_COMMIT}
           package=${CUSTOM_PACKAGE}
+          version_name=${MANAGER_DISPLAY_VERSION}
+          version_code=${MANAGER_VERSION_CODE}
           apk_sha256=$APK_SHA256
           apk_size=$APK_SIZE
           cert_sha256=$CERT_SHA256
@@ -606,7 +628,7 @@ jobs:
       - name: Upload custom manager
         uses: actions/upload-artifact@v7
         with:
-          name: ReSukiSU-35154-com.daily.notes
+          name: DailyNotes-${{ env.MANAGER_DISPLAY_VERSION }}-com.daily.notes
           path: custom-manager/
           retention-days: 30
 
@@ -617,7 +639,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cp custom-manager/ReSukiSU_v4.2.0-rc2_35154_com.daily.notes.apk custom-manager/DailyNotes.apk
+          cp "custom-manager/DailyNotes_${MANAGER_DISPLAY_VERSION}_${MANAGER_VERSION_CODE}_com.daily.notes.apk" custom-manager/DailyNotes.apk
 
           if gh release view manager-latest --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release upload manager-latest custom-manager/DailyNotes.apk \
