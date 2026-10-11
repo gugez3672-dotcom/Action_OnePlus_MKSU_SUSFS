@@ -47,7 +47,6 @@ on:
       - '.github/dn56_d73_termux_font_pixels.py'
       - '.github/dn57_d74_version.py'
       - '.github/dn58_d74_elf_pty_runner.py'
-      - '.github/daily-notes-version.txt'
 
 permissions:
   contents: write
@@ -69,14 +68,14 @@ jobs:
       - name: Resolve Daily Notes release version
         run: |
           set -euo pipefail
-          NAME=$(tr -d '\r\n' < .github/daily-notes-version.txt)
-          [[ "$NAME" =~ ^D1\.0\.([0-9]{1,3})$ ]]
-          REVISION=${BASH_REMATCH[1]}
+          REVISION="${GITHUB_RUN_NUMBER:?Missing GitHub run number}"
+          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]]
+          NAME="D1.0.${REVISION}"
           CODE=$(( 35100 + 10#$REVISION ))
           test "$CODE" -gt 35154
           echo "MANAGER_DISPLAY_VERSION=$NAME" >> "$GITHUB_ENV"
           echo "MANAGER_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
-          echo "D series manager release: $NAME ($CODE)"
+          echo "Daily Notes = GitHub Actions build #$REVISION: $NAME ($CODE)"
 
       - name: Setup Java 21
         uses: actions/setup-java@v6
