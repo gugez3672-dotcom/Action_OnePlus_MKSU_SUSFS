@@ -18,3 +18,5 @@ pguard=unchanged-v2
 
 # #26 PLK110 SELinux correctness + boot-only PGuard write release
 # Built-in A67; keep boot25 as recovery baseline; do not flash automatically.
+
+# Preflight correction: coverage check excludes intentionally writable boot targets
