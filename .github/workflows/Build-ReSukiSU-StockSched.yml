@@ -344,7 +344,7 @@ jobs:
           EOF
 
       - name: EXPERIMENTAL port of KernelSU PR 3877 SELinux side-channel fix
-        if: github.ref_name == 'resukisu-pguard-v2-ksu3877-experimental'
+        if: github.ref_name == 'resukisu-pguard-v2-ksu3877-experimental' || github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open'
         run: |
           set -euo pipefail
           mkdir -p kernel_workspace/ksu3877
@@ -371,6 +371,10 @@ jobs:
           grep -Fq 'old_pol = rcu_dereference_protected(selinux_state.policy' kernel_workspace/kernel_platform/KernelSU/kernel/selinux/rules.c
           grep -Fq 'datum->u.xperms->perms.p[i] |= xperms.perms.p[i]' kernel_workspace/kernel_platform/KernelSU/kernel/selinux/sepolicy.c
           ! grep -Fq 'ksu_selinux_hide_drop_backup_if_unused();' kernel_workspace/kernel_platform/KernelSU/kernel/runtime/boot_event.c
+          # Fail closed if the #25 detection fix was inadvertently skipped.
+          grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/KernelSU/kernel/feature/selinux_hide.c
+          grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/common/security/selinux/hooks.c
+          test -s artifacts/KSUPR3877_EXPERIMENTAL.txt
 
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
