@@ -67,6 +67,11 @@ static const char plk110_pguard_version[] __used = PLK110_PGUARD_VERSION;
  * MARKER: identifies an internal PLK110 UFS LUN so its primary/backup GPT can
  * be protected without blocking normal I/O to the marker partition itself.
  */
+/* #26: Raw boot/boot_a/boot_b writes are intentionally unguarded for
+ * local AnyKernel3 upgrades. GPT, init_boot, vendor_boot and all other
+ * security-critical partitions retain the #25 protection policy.
+ * Read operations were never denied by PGuard.
+ */
 static const struct plk110_pguard_rule plk110_pguard_rules[] = {
 	{ "xbl_a", PLK110_PG_HARD },
 	{ "xbl_b", PLK110_PG_HARD },
@@ -222,7 +227,6 @@ static const struct plk110_pguard_rule plk110_pguard_rules[] = {
 	{ "featenabler_a", PLK110_PG_HARD },
 	{ "featenabler_b", PLK110_PG_HARD },
 
-	{ "boot", PLK110_PG_HARD },
 	{ "init_boot", PLK110_PG_HARD },
 	{ "vendor_boot", PLK110_PG_HARD },
 	{ "dtbo", PLK110_PG_HARD },
@@ -232,8 +236,6 @@ static const struct plk110_pguard_rule plk110_pguard_rules[] = {
 	{ "recovery", PLK110_PG_HARD },
 	{ "modem", PLK110_PG_HARD },
 
-	{ "boot_a", PLK110_PG_HARD },
-	{ "boot_b", PLK110_PG_HARD },
 	{ "init_boot_a", PLK110_PG_HARD },
 	{ "init_boot_b", PLK110_PG_HARD },
 	{ "vendor_boot_a", PLK110_PG_HARD },
@@ -550,6 +552,17 @@ int plk110_pguard_check_bytes(struct block_device *bdev, u64 start, u64 len,
 	return plk110_pguard_check_sectors(bdev, first, last - first + 1, op);
 }
 """
+# #26 release is intentionally exact-name-only. No prefixes or wildcards.
+for boot_name in ("boot", "boot_a", "boot_b"):
+    assert f'{{ "{boot_name}", PLK110_PG_HARD }}' not in pguard_c
+for still_guarded in ("init_boot", "init_boot_a", "init_boot_b",
+                      "vendor_boot", "vendor_boot_a", "vendor_boot_b",
+                      "vbmeta", "vbmeta_a", "vbmeta_b",
+                      "abl", "abl_a", "abl_b", "xbl", "xbl_a", "xbl_b"):
+    assert f'{{ "{still_guarded}", PLK110_PG_HARD }}' in pguard_c, still_guarded
+assert "PLK110_PGUARD_GPT_SECTORS" in pguard_c
+assert "plk110_pguard_lookup_overlap" in pguard_c
+
 (common / "block/plk110_partition_guard.c").write_text(pguard_c.lstrip())
 
 (common / "include/linux/plk110_pguard.h").write_text(r"""
