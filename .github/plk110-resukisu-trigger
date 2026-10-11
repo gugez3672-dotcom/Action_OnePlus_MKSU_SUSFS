@@ -15,3 +15,6 @@ pguard=unchanged-v2
 # Do not flash without source review and boot/device validation.
 
 # Retry experimental #25: adapt stock A67 SELinux RCU header insertion
+
+# #26 PLK110 SELinux correctness + boot-only PGuard write release
+# Built-in A67; keep boot25 as recovery baseline; do not flash automatically.
