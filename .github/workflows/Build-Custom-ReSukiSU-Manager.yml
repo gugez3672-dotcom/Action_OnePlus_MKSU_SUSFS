@@ -18,6 +18,7 @@ on:
       - resukisu-mt-batch-menu-focus-20261011
       - resukisu-d70-pty-swipe-fix-20261011
       - resukisu-d72-ime-font-20261011
+      - resukisu-d73-pty-font-density-20261011
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -42,6 +43,7 @@ on:
       - '.github/dn53_d70_swipe_selection_anchor.py'
       - '.github/dn54_d70_true_pty.py'
       - '.github/dn55_d72_ime_font.py'
+      - '.github/dn56_d73_termux_font_pixels.py'
 
 permissions:
   contents: write
@@ -407,7 +409,8 @@ jobs:
             .github/dn52_batch_menu_focus.py \
             .github/dn53_d70_swipe_selection_anchor.py \
             .github/dn54_d70_true_pty.py \
-            .github/dn55_d72_ime_font.py
+            .github/dn55_d72_ime_font.py \
+            .github/dn56_d73_termux_font_pixels.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -443,6 +446,7 @@ jobs:
           python3 .github/dn53_d70_swipe_selection_anchor.py
           python3 .github/dn54_d70_true_pty.py
           python3 .github/dn55_d72_ime_font.py
+          python3 .github/dn56_d73_termux_font_pixels.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
