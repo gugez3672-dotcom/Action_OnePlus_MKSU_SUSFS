@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""Apply Daily Notes independent manager version from one version manifest.
+"""Map GitHub Actions run_number to Daily Notes manager APK version.
 
-Only Android application versionName/versionCode are changed. Do not patch KSU
-UAPI constants, kernel root protocol, ksud binaries, package name or signing.
-To release the next version change .github/daily-notes-version.txt to D1.0.75.
+Every workflow invocation has its own number, even when the build fails:
+  run #74 -> Android versionName D1.0.74, versionCode 35174.
+A rerun of the same GitHub Actions run retains its run_number (and version).
+Do not modify KernelSU UAPI, kernel, ksud, package name or signing.
 """
 from pathlib import Path
+import os
 import re
 
-version_file = Path(".github/daily-notes-version.txt")
-version = version_file.read_text(encoding="utf-8").strip()
-match = re.fullmatch(r"D1\.0\.(\d{1,3})", version)
-if not match:
-    raise SystemExit(f"Daily Notes version format invalid: {version!r}")
-revision = int(match.group(1))
+run_number = os.environ.get("GITHUB_RUN_NUMBER", "").strip()
+if not re.fullmatch(r"[1-9][0-9]*", run_number):
+    raise SystemExit(f"Missing/invalid GITHUB_RUN_NUMBER: {run_number!r}")
+revision = int(run_number)
+version = f"D1.0.{revision}"
 version_code = 35100 + revision
 if version_code <= 35154:
     raise SystemExit("Android versionCode must exceed existing signed APK 35154")
+if os.environ.get("MANAGER_DISPLAY_VERSION") != version:
+    raise SystemExit("Version drift between GitHub workflow and manager patch")
+if os.environ.get("MANAGER_VERSION_CODE") != str(version_code):
+    raise SystemExit("VersionCode drift between GitHub workflow and manager patch")
 
 app_root = Path("source/manager/build.gradle.kts")
 content = app_root.read_text(encoding="utf-8")
