@@ -6,6 +6,7 @@ on:
     branches:
       - resukisu-pguard-v2-susfs-post230
       - resukisu-pguard-v2-ksu3877-experimental
+      - resukisu-pguard-v2-selinux-hardening-boot-open
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -360,12 +361,30 @@ jobs:
           grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/KernelSU/kernel/feature/selinux_hide.c
           echo 'EXPERIMENTAL BUILD: do not flash without SELinux runtime review' >> artifacts/KSUPR3877_EXPERIMENTAL.txt
 
+      - name: Backport SELinux policy RCU and XPERMS correctness from #25
+        if: github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open'
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/apply_plk110_selinux_correctness.py
+          python3 scripts/apply_plk110_selinux_correctness.py
+          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+          grep -Fq 'old_pol = rcu_dereference_protected(selinux_state.policy' kernel_workspace/kernel_platform/KernelSU/kernel/selinux/rules.c
+          grep -Fq 'datum->u.xperms->perms.p[i] |= xperms.perms.p[i]' kernel_workspace/kernel_platform/KernelSU/kernel/selinux/sepolicy.c
+          ! grep -Fq 'ksu_selinux_hide_drop_backup_if_unused();' kernel_workspace/kernel_platform/KernelSU/kernel/runtime/boot_event.c
+
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/apply_plk110_pguard.py
           python3 scripts/prepare_resukisu_config.py
           python3 scripts/apply_plk110_pguard.py
+          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ]; then
+            ! grep -Eq '\{ "boot(_a|_b)?", PLK110_PG_HARD \}' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
+            grep -Fq '{ "init_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
+            grep -Fq '{ "vendor_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
+            grep -Fq '{ "xbl_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
+            grep -Fq 'PLK110_PGUARD_GPT_SECTORS' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
+          fi
           python3 - <<'PY'
           from pathlib import Path
           src = Path("kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c").read_text()
@@ -464,6 +483,12 @@ jobs:
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
           cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v2_source.c
           cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v2_patcher.py
+          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ]; then
+            cp scripts/apply_plk110_selinux_correctness.py artifacts/SELINUX_CORRECTNESS_26_PATCHER.py
+            cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/rules.c artifacts/KSUSelinuxRules26.c
+            cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/sepolicy.c artifacts/KSUSelinuxPolicy26.c
+            cp kernel_workspace/kernel_platform/KernelSU/kernel/runtime/boot_event.c artifacts/KSU_BootEvent26.c
+          fi
           cp scripts/apply_susfs_post230_fixes.py artifacts/
           cp scripts/prepare_stock_ikconfig.py artifacts/
           cp "$common/arch/arm64/configs/plk110_a67_stock_ikconfig" artifacts/
