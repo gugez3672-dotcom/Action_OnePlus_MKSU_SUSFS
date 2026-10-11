@@ -20,3 +20,5 @@ pguard=unchanged-v2
 # Built-in A67; keep boot25 as recovery baseline; do not flash automatically.
 
 # Preflight correction: coverage check excludes intentionally writable boot targets
+
+# Retry #28 after AVTAB two-branch exact pattern gate correction
