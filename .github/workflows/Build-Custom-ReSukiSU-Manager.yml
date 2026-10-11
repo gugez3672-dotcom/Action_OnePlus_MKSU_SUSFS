@@ -46,6 +46,7 @@ on:
       - '.github/dn55_d72_ime_font.py'
       - '.github/dn56_d73_termux_font_pixels.py'
       - '.github/dn57_d74_version.py'
+      - '.github/dn58_d74_elf_pty_runner.py'
       - '.github/daily-notes-version.txt'
 
 permissions:
@@ -426,7 +427,8 @@ jobs:
             .github/dn54_d70_true_pty.py \
             .github/dn55_d72_ime_font.py \
             .github/dn56_d73_termux_font_pixels.py \
-            .github/dn57_d74_version.py
+            .github/dn57_d74_version.py \
+            .github/dn58_d74_elf_pty_runner.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -464,6 +466,7 @@ jobs:
           python3 .github/dn55_d72_ime_font.py
           python3 .github/dn56_d73_termux_font_pixels.py
           python3 .github/dn57_d74_version.py
+          python3 .github/dn58_d74_elf_pty_runner.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
