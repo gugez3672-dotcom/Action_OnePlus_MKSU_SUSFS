@@ -98,6 +98,9 @@ def main() -> None:
             else
                 shrink_size += sizeof(n->datum.u.data);""",
         "AVTAB exact serialized datum size",
+        # ReSukiSU carries this removal logic in both modern and legacy
+        # avtab hash-table branches; both must preserve serialized sizing.
+        n=2,
     )
     sepol = replace_exact(
         sepol,
