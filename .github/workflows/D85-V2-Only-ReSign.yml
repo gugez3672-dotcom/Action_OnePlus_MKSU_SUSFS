@@ -38,12 +38,18 @@ jobs:
           KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$KEYSTORE_B64"
-          test -n "$KS_PASS"
+          if [ -z "${KEYSTORE_B64:-}" ]; then echo "::error::Missing MANAGER_KEYSTORE_B64"; exit 1; fi
+          if [ -z "${KS_PASS:-}" ]; then echo "::error::Missing MANAGER_KEYSTORE_PASSWORD"; exit 1; fi
+          echo "Signing Secrets present; restoring keystore"
           umask 077
           printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > manager-original.jks
-          keytool -exportcert -keystore manager-original.jks \
-            -storepass "$KS_PASS" -alias notes -file manager-cert.der >/dev/null
+          echo "Keystore decoded"
+          test -s manager-original.jks
+          if ! keytool -exportcert -keystore manager-original.jks \
+            -storepass "$KS_PASS" -alias notes -file manager-cert.der >/dev/null; then
+            echo "::error::Failed to export cert from key alias notes"; exit 1
+          fi
+          echo "Keystore alias opened successfully"
           echo "$EXPECTED_CERT_SHA256  manager-cert.der" | sha256sum -c -
           rm -f manager-cert.der
 
