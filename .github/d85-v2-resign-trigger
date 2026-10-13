@@ -1,3 +1,5 @@
 D85 V2-only re-sign recovery
 Input SHA256: 206f0cb6ec96376d37ec3aa3f68d8f0826b4b87ca8de2f9a73308155e43c6e95
 Original signing Secrets kept in GitHub Actions only.
+
+Retry with masked-secret diagnostics.
