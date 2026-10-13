@@ -40,6 +40,8 @@ jobs:
           set -euo pipefail
           if [ -z "${KEYSTORE_B64:-}" ]; then echo "::error::Missing MANAGER_KEYSTORE_B64"; exit 1; fi
           if [ -z "${KS_PASS:-}" ]; then echo "::error::Missing MANAGER_KEYSTORE_PASSWORD"; exit 1; fi
+          KS_PASS="$(printf '%s' "$KS_PASS" | tr -d '\r\n')"
+          test -n "$KS_PASS"
           echo "Signing Secrets present; restoring keystore"
           umask 077
           printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > manager-original.jks
@@ -58,6 +60,8 @@ jobs:
           KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
+          KS_PASS="$(printf '%s' "$KS_PASS" | tr -d '\r\n')"
+          test -n "$KS_PASS"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
           test -x "$APKSIGNER"
