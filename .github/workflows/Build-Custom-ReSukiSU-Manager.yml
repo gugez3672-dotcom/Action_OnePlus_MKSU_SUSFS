@@ -20,6 +20,7 @@ on:
       - resukisu-d72-ime-font-20261011
       - resukisu-d73-pty-font-density-20261011
       - resukisu-d74-brand-version-20261011
+      - codex/d87-duck-identity-source-test-20261014
     paths:
       - '.github/workflows/Build-Custom-ReSukiSU-Manager.yml'
       - '.github/custom-manager-trigger'
@@ -48,6 +49,7 @@ on:
       - '.github/dn57_d74_version.py'
       - '.github/dn58_d74_elf_pty_runner.py'
       - '.github/dn59_d81_terminal_ime_viewport.py'
+      - '.github/dn87_duck_metadata_source_test.py'
 
 permissions:
   contents: write
@@ -69,7 +71,7 @@ jobs:
       - name: Resolve Daily Notes release version
         run: |
           set -euo pipefail
-          REVISION="${GITHUB_RUN_NUMBER:?Missing GitHub run number}"
+          REVISION="87"  # isolated historical-D82 rollback test, not the Actions run number
           [[ "$REVISION" =~ ^[1-9][0-9]*$ ]]
           NAME="D1.0.${REVISION}"
           CODE=$(( 35100 + 10#$REVISION ))
@@ -429,7 +431,8 @@ jobs:
             .github/dn56_d73_termux_font_pixels.py \
             .github/dn57_d74_version.py \
             .github/dn58_d74_elf_pty_runner.py \
-            .github/dn59_d81_terminal_ime_viewport.py
+            .github/dn59_d81_terminal_ime_viewport.py \
+            .github/dn87_duck_metadata_source_test.py
 
       - name: Apply launcher and tools patches
         run: |
@@ -466,9 +469,14 @@ jobs:
           python3 .github/dn54_d70_true_pty.py
           python3 .github/dn55_d72_ime_font.py
           python3 .github/dn56_d73_termux_font_pixels.py
-          python3 .github/dn57_d74_version.py
+          GITHUB_RUN_NUMBER=87 python3 .github/dn57_d74_version.py
           python3 .github/dn58_d74_elf_pty_runner.py
           python3 .github/dn59_d81_terminal_ime_viewport.py
+
+      - name: Apply isolated D87 application identity entrypoints
+        run: |
+          set -euo pipefail
+          python3 .github/dn87_duck_metadata_source_test.py
 
       - name: Restore permanent manager signing key
         working-directory: source/manager
@@ -601,9 +609,30 @@ jobs:
           ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND'
           ! printf '%s\n' "$MANIFEST_DUMP" | grep -q 'android.intent.action.SEND_MULTIPLE'
           echo "launcher_visibility=enabled"
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'com.daily.notes.entry.NoteApp'
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'com.daily.notes.entry.NotePreload'
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'com.daily.notes.entry.NoteHome'
+          printf '%s\n' "$MANIFEST_DUMP" | grep -q 'com.daily.notes.entry.NoteHomeAlias'
+          if printf '%s\n' "$MANIFEST_DUMP" | grep -Eq 'KernelSUApplication|AppZygotePreload|com.resukisu.resukisu.ui.MainActivity'; then
+            echo '::error::Old manager component metadata detected'; exit 1
+          fi
+          python3 - "$APK" <<'PY'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as apk:
+              dex = b''.join(apk.read(n) for n in apk.namelist() if n.startswith('classes') and n.endswith('.dex'))
+              for cls in ('NoteApp','NotePreload','NoteHome'):
+                  assert cls.encode() in dex, f'D87 Android class missing in DEX: {cls}'
+              so = next((n for n in apk.namelist() if n.endswith('libkernelsu.so')), None)
+              assert so, 'libkernelsu.so missing'
+              assert b'Java_com_resukisu_resukisu_magica_AppZygotePreload_forkDontCareAndExecKsud' in apk.read(so), 'Native JNI export changed; source bridge invalid'
+          print('Verified source-compiled manifest classes, DEX and original JNI export')
+          PY
 
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apksigner-verify.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
+          grep -q 'Verified using v1 scheme (JAR signing): false' apksigner-verify.txt
+          grep -q 'Verified using v3 scheme (APK Signature Scheme v3): false' apksigner-verify.txt
+          grep -q 'Verified using v4 scheme (APK Signature Scheme v4): false' apksigner-verify.txt
 
           keytool -exportcert             -alias "${KEY_ALIAS}"             -keystore source/manager/key.jks             -storepass "${KEYSTORE_PASS}"             -file manager-cert.der >/dev/null
 
