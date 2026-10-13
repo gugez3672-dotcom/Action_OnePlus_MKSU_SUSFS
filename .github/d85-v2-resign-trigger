@@ -5,3 +5,5 @@ Original signing Secrets kept in GitHub Actions only.
 Retry with masked-secret diagnostics.
 
 Retry with D82 password normalization.
+
+Retry with signing metadata-aware payload integrity comparison.
