@@ -1,0 +1,104 @@
+
+name: D86 Terminal Preview Build and V2-only Sign
+on:
+  push:
+    branches:
+      - codex/d86-terminal-session-preview-20261013
+    paths:
+      - .github/d86-preview-trigger
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      INPUT: DailyNotes_D1.0.85_35185_com.daily.notes.apk
+      UNSIGNED: D86-preview-unsigned.apk
+      ALIGNED: D86-preview-aligned.apk
+      OUTPUT: DailyNotes_D1.0.86_35186_V2only_PREVIEW.apk
+      CERT_SHA256: 7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e
+    steps:
+      - name: Checkout auditable preview patch
+        uses: actions/checkout@v4
+      - name: Fetch proven D85 input
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download manager-latest --repo "$GITHUB_REPOSITORY" --pattern "$INPUT" --dir .
+          echo '206f0cb6ec96376d37ec3aa3f68d8f0826b4b87ca8de2f9a73308155e43c6e95  DailyNotes_D1.0.85_35185_com.daily.notes.apk' | sha256sum -c -
+      - name: Patch D85 bytecode, startup shell and version to D86 preview
+        run: |
+          set -euo pipefail
+          python3 .github/d86_patch_apk.py "$INPUT" "$UNSIGNED"
+      - name: Restore original signing key
+        env:
+          B64: ${{ secrets.MANAGER_KEYSTORE_B64 }}
+          PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$B64" && test -n "$PASS"
+          umask 077
+          printf '%s' "$B64" | tr -d '\r\n ' | base64 -d > original.jks
+          P="$(printf '%s' "$PASS" | tr -d '\r\n')"
+          keytool -exportcert -keystore original.jks -alias notes -storepass "$P" -file cert.der >/dev/null
+          echo "$CERT_SHA256  cert.der" | sha256sum -c -
+          rm cert.der
+      - name: Zipalign and V2-only sign
+        env:
+          PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          P="$(printf '%s' "$PASS" | tr -d '\r\n')"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n1)"
+          "$ZIPALIGN" -P 16 -f 4 "$UNSIGNED" "$ALIGNED"
+          "$APKSIGNER" sign --v1-signing-enabled false --v2-signing-enabled true             --v3-signing-enabled false --v4-signing-enabled false             --ks original.jks --ks-key-alias notes             --ks-pass "pass:$P" --key-pass "pass:$P"             --out "$OUTPUT" "$ALIGNED"
+          rm -f original.jks
+          "$APKSIGNER" verify --min-sdk-version 36 --verbose --print-certs "$OUTPUT" | tee verify.txt
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' verify.txt
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): false' verify.txt
+          grep -Fq "$CERT_SHA256" verify.txt
+          "$AAPT" dump badging "$OUTPUT" | tee badging.txt
+          grep -E "^package: name='com.daily.notes' versionCode='35186' versionName='D1.0.86'" badging.txt
+          sha256sum "$OUTPUT" | tee SHA256SUMS.txt
+      - name: Confirm original runtime payload unchanged except exact patch targets
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,zipfile,hashlib,struct
+          exceptions={"classes.dex","classes2.dex","AndroidManifest.xml","assets/dn-terminal/start-shell","assets/dn-terminal/bashrc"}
+          with zipfile.ZipFile(os.environ["INPUT"]) as a,zipfile.ZipFile(os.environ["OUTPUT"]) as b:
+              am={n for n in a.namelist() if n not in ("META-INF/NOTES.SF","META-INF/NOTES.RSA","META-INF/MANIFEST.MF")}
+              assert am==set(b.namelist()),"Unexpected APK ZIP entries"
+              for name in am-exceptions:
+                  assert hashlib.sha256(a.read(name)).digest()==hashlib.sha256(b.read(name)).digest(),name
+              dex=b.read("classes2.dex"); assert b"-p\x00" in dex
+              startup=b.read("assets/dn-terminal/start-shell"); assert b"trap '' HUP" not in startup
+              bashrc=b.read("assets/dn-terminal/bashrc"); assert b'exit "$dn_result"' in bashrc
+          data=open(os.environ["OUTPUT"],"rb").read();i=data.rfind(b"APK Sig Block 42"); assert i>0
+          size=struct.unpack_from("<Q",data,i-8)[0];start=i+8-size; p=start+8;end=i-8;ids=[]
+          while p<end:
+              n=struct.unpack_from("<Q",data,p)[0]
+              assert 4<=n<=end-p-8
+              ids.append(struct.unpack_from("<I",data,p+8)[0]);p+=8+n
+          assert p==end and ids.count(0x7109871a)==1
+          assert set(ids)<={0x7109871a,0x42726577},[hex(v) for v in ids]
+          print("Runtime payload and V2-only signing block checked")
+          PY
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DailyNotes-D86-terminal-preview-v2-only
+          path: |
+            DailyNotes_D1.0.86_35186_V2only_PREVIEW.apk
+            SHA256SUMS.txt
+            verify.txt
+          retention-days: 14
+      - name: Publish separate preview download (do not replace stable APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload manager-latest "$OUTPUT" --repo "$GITHUB_REPOSITORY" --clobber
