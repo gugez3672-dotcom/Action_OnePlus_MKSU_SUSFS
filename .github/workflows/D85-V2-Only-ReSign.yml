@@ -90,12 +90,19 @@ jobs:
           original = os.environ["INPUT_NAME"]
           output = os.environ["OUTPUT_NAME"]
           with zipfile.ZipFile(original) as a, zipfile.ZipFile(output) as b:
-              af, bf = sorted(a.namelist()), sorted(b.namelist())
-              if af != bf:
-                  raise SystemExit("APK ZIP entry name set changed")
-              for name in af:
+              an, bn = set(a.namelist()), set(b.namelist())
+              removed, added = sorted(an-bn), sorted(bn-an)
+              print("Removed entries:", removed)
+              print("Added entries:", added)
+              allowed_signature_entry = lambda n: n.startswith("META-INF/") and (
+                  n.upper().endswith((".SF", ".RSA", ".DSA", ".EC")) or n.upper() == "META-INF/MANIFEST.MF"
+              )
+              if any(not allowed_signature_entry(n) for n in removed+added):
+                  raise SystemExit("Non-signing APK ZIP entry set changed")
+              for name in sorted(an & bn):
                   if hashlib.sha256(a.read(name)).digest() != hashlib.sha256(b.read(name)).digest():
-                      raise SystemExit("APK payload modified: "+name)
+                      if not allowed_signature_entry(name):
+                          raise SystemExit("Runtime APK payload modified: "+name)
           data = open(output,"rb").read()
           magic = data.rfind(b"APK Sig Block 42")
           if magic == -1: raise SystemExit("Missing APK Signing Block")
