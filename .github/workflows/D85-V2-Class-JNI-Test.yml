@@ -1,0 +1,112 @@
+name: D85 V2 class and JNI compatibility test
+on:
+  push:
+    branches:
+      - codex/d85v2-static-class-jni-audit-20261014
+    paths:
+      - .github/d85v2_class_jni_patch.py
+      - .github/workflows/D85-V2-Class-JNI-Test.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  patch-and-sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      INPUT_NAME: DailyNotes_D1.0.85_35185_V2-only.apk
+      EXPECTED_INPUT_SHA256: 2cc40e6bdee92b81ea3be8947be3342bae7f24c3e74c6e89eef2cb1ba4404ef6
+      EXPECTED_CERT_SHA256: 7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e
+      OUTPUT_NAME: DailyNotes_D85V2_ClassJNI_TEST_35185.apk
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact D85 V2 baseline and verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download manager-latest --repo "$GITHUB_REPOSITORY" --pattern "$INPUT_NAME" --dir . --clobber
+          printf '%s  %s\n' "$EXPECTED_INPUT_SHA256" "$INPUT_NAME" | sha256sum -c -
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --min-sdk-version 36 --print-certs "$INPUT_NAME" > original-cert.txt
+          grep -Fi "$EXPECTED_CERT_SHA256" original-cert.txt
+      - name: Rewrite classes with strict JNI and payload checks
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/d85v2_class_jni_patch.py
+          python3 .github/d85v2_class_jni_patch.py --input "$INPUT_NAME" --output unsigned-test.apk --report d85v2-class-diff.json
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("unsigned-test.apk") as z:
+              so = next(n for n in z.namelist() if n.endswith("/libkernelsu.so"))
+              raw = z.read(so)
+              assert b"Java_com_notepads_notepads_magica_AppThreadPreload_forkDontCareAndExecKsud" in raw
+              assert b"Java_com_resukisu_resukisu_magica_AppZygotePreload_forkDontCareAndExecKsud" not in raw
+          print("JNI export verified")
+          PY
+      - name: Restore original ephemeral signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.MANAGER_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" || { echo "::error::Missing keystore"; exit 1; }
+          test -n "$KS_PASS" || { echo "::error::Missing key password"; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > manager-original.jks
+          KS_PASS="$(printf '%s' "$KS_PASS" | tr -d '\r\n')"
+          keytool -exportcert -keystore manager-original.jks -storepass "$KS_PASS" -alias notes -file local-cert.der >/dev/null
+          echo "$EXPECTED_CERT_SHA256  local-cert.der" | sha256sum -c -
+          rm -f local-cert.der
+      - name: Align and sign with APK V2 only
+        env:
+          KS_PASS: ${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KS_PASS="$(printf '%s' "$KS_PASS" | tr -d '\r\n')"
+          BIN_DIR=$(dirname "$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)")
+          "$BIN_DIR/zipalign" -P 16 -f 4 unsigned-test.apk aligned-test.apk
+          "$BIN_DIR/zipalign" -c -P 16 -v 4 aligned-test.apk
+          "$BIN_DIR/apksigner" sign --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled false --v4-signing-enabled false --ks manager-original.jks --ks-key-alias notes --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$OUTPUT_NAME" aligned-test.apk
+          rm -f manager-original.jks
+          "$BIN_DIR/apksigner" verify --min-sdk-version 36 --verbose --print-certs "$OUTPUT_NAME" | tee signature-check.txt
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' signature-check.txt
+          grep -Fqx 'Verified using v1 scheme (JAR signing): false' signature-check.txt
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): false' signature-check.txt
+          grep -Fi "$EXPECTED_CERT_SHA256" signature-check.txt
+      - name: Verify package components and all untouched bytes
+        run: |
+          set -euo pipefail
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$AAPT" dump badging "$OUTPUT_NAME" | grep -E "^package: name='com.daily.notes' versionCode='35185'"
+          "$AAPT" dump xmltree "$OUTPUT_NAME" AndroidManifest.xml > manifest-check.txt
+          grep -q 'com.notepads.notepads.NotebookApplication' manifest-check.txt
+          grep -q 'com.notepads.notepads.magica.AppThreadPreload' manifest-check.txt
+          grep -q 'com.notepads.notepads.ui.HomeActivity' manifest-check.txt
+          grep -q 'com.notepads.notepads.ui.HomeActivityAlias' manifest-check.txt
+          ! grep -Eq 'KernelSUApplication|AppZygotePreload|com.resukisu.resukisu.ui.MainActivity' manifest-check.txt
+          python3 - <<'PY'
+          import zipfile, hashlib
+          with zipfile.ZipFile("DailyNotes_D1.0.85_35185_V2-only.apk") as a, zipfile.ZipFile("DailyNotes_D85V2_ClassJNI_TEST_35185.apk") as b:
+              assert set(a.namelist()) == set(b.namelist())
+              targets = {"AndroidManifest.xml"}
+              targets.update(n for n in a.namelist() if n.startswith("classes") and n.endswith(".dex"))
+              targets.update(n for n in a.namelist() if n.endswith("/libkernelsu.so"))
+              for n in a.namelist():
+                  if n not in targets:
+                      assert hashlib.sha256(a.read(n)).digest() == hashlib.sha256(b.read(n)).digest(), n
+          print("Other files including libksud.so unchanged")
+          PY
+          sha256sum "$OUTPUT_NAME" > SHA256SUMS.txt
+      - name: Upload test APK without touching release
+        uses: actions/upload-artifact@v4
+        with:
+          name: D85V2-ClassJNI-Compatibility-TEST
+          path: |
+            DailyNotes_D85V2_ClassJNI_TEST_35185.apk
+            SHA256SUMS.txt
+            d85v2-class-diff.json
+            signature-check.txt
+            manifest-check.txt
+          if-no-files-found: error
+          retention-days: 14
