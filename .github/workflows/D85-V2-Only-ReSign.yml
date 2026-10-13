@@ -1,0 +1,118 @@
+name: D85 V2-only Recovery Re-sign
+
+on:
+  push:
+    branches:
+      - codex/d85-v2only-resign-20261013
+    paths:
+      - .github/d85-v2-resign-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  resign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EXPECTED_APK_SHA256: 206f0cb6ec96376d37ec3aa3f68d8f0826b4b87ca8de2f9a73308155e43c6e95
+      EXPECTED_CERT_SHA256: 7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e
+      INPUT_NAME: DailyNotes_D1.0.85_35185_com.daily.notes.apk
+      OUTPUT_NAME: DailyNotes_D1.0.85_35185_V2-only.apk
+
+    steps:
+      - name: Download exactly audited D85 APK from existing release
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download manager-latest \
+            --repo "$GITHUB_REPOSITORY" --pattern "$INPUT_NAME" \
+            --dir . --clobber
+          test -s "$INPUT_NAME"
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$INPUT_NAME" | sha256sum -c -
+
+      - name: Restore original manager signing key (ephemeral only)
+        env:
+          KEYSTORE_B64: \${{ secrets.MANAGER_KEYSTORE_B64 }}
+          KS_PASS: \${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64"
+          test -n "$KS_PASS"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > manager-original.jks
+          keytool -exportcert -keystore manager-original.jks \
+            -storepass "$KS_PASS" -alias notes -file manager-cert.der >/dev/null
+          echo "$EXPECTED_CERT_SHA256  manager-cert.der" | sha256sum -c -
+          rm -f manager-cert.der
+
+      - name: Re-sign the same APK with V2 only
+        env:
+          KS_PASS: \${{ secrets.MANAGER_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" sign \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --v4-signing-enabled false \
+            --ks manager-original.jks --ks-key-alias notes \
+            --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" \
+            --out "$OUTPUT_NAME" "$INPUT_NAME"
+          rm -f manager-original.jks
+          "$APKSIGNER" verify --min-sdk-version 36 --verbose --print-certs "$OUTPUT_NAME" | tee apksigner-verify.txt
+          grep -Fqx 'Verified using v1 scheme (JAR signing): false' apksigner-verify.txt
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' apksigner-verify.txt
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): false' apksigner-verify.txt
+          grep -Fq "$EXPECTED_CERT_SHA256" apksigner-verify.txt
+          "$AAPT" dump badging "$OUTPUT_NAME" | grep -E "^package: name='com.daily.notes' versionCode='35185'"
+
+      - name: Check V2-only sign block and unchanged payload
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, struct, zipfile, hashlib
+          original = os.environ["INPUT_NAME"]
+          output = os.environ["OUTPUT_NAME"]
+          with zipfile.ZipFile(original) as a, zipfile.ZipFile(output) as b:
+              af, bf = sorted(a.namelist()), sorted(b.namelist())
+              if af != bf:
+                  raise SystemExit("APK ZIP entry name set changed")
+              for name in af:
+                  if hashlib.sha256(a.read(name)).digest() != hashlib.sha256(b.read(name)).digest():
+                      raise SystemExit("APK payload modified: "+name)
+          data = open(output,"rb").read()
+          magic = data.rfind(b"APK Sig Block 42")
+          if magic == -1: raise SystemExit("Missing APK Signing Block")
+          size = struct.unpack_from("<Q",data,magic-8)[0]
+          start = magic+8-size
+          if start<0 or struct.unpack_from("<Q",data,start)[0]!=size:
+              raise SystemExit("Malformed APK Signing Block")
+          pos, ending, ids = start+8, magic-8, []
+          while pos<ending:
+              pairsize = struct.unpack_from("<Q",data,pos)[0]
+              if pairsize<4 or pos+8+pairsize>ending:
+                  raise SystemExit("Malformed signing block pair")
+              ids.append(struct.unpack_from("<I",data,pos+8)[0])
+              pos += 8+pairsize
+          if pos!=ending or ids.count(0x7109871a)!=1 or set(ids)-{0x7109871a,0x42726577}:
+              raise SystemExit("Not KSU-compatible V2-only signing block: "+str([hex(x) for x in ids]))
+          print("Verified D85 APK payload unchanged, signing block IDs:", [hex(x) for x in ids])
+          PY
+          sha256sum "$OUTPUT_NAME" > SHA256SUMS.txt
+
+      - name: Upload signed test APK without publishing release
+        uses: actions/upload-artifact@v4
+        with:
+          name: DailyNotes-D85-V2-only-reboot-test
+          path: |
+            DailyNotes_D1.0.85_35185_V2-only.apk
+            SHA256SUMS.txt
+            apksigner-verify.txt
+          if-no-files-found: error
+          retention-days: 14
