@@ -8,7 +8,7 @@ on:
       - .github/d85-v2-resign-trigger
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   resign:
@@ -133,3 +133,11 @@ jobs:
             apksigner-verify.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish separate V2-only APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload manager-latest "$OUTPUT_NAME" --repo "$GITHUB_REPOSITORY" --clobber
+          echo "Standalone V2-only APK: https://github.com/$GITHUB_REPOSITORY/releases/download/manager-latest/$OUTPUT_NAME"
