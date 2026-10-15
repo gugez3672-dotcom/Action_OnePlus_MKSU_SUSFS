@@ -7,6 +7,7 @@ on:
       - resukisu-pguard-v2-susfs-post230
       - resukisu-pguard-v2-ksu3877-experimental
       - resukisu-pguard-v2-selinux-hardening-boot-open
+      - k30-20261015-ksu-susfs-audit
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -344,7 +345,7 @@ jobs:
           EOF
 
       - name: EXPERIMENTAL port of KernelSU PR 3877 SELinux side-channel fix
-        if: github.ref_name == 'resukisu-pguard-v2-ksu3877-experimental' || github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open'
+        if: github.ref_name == 'resukisu-pguard-v2-ksu3877-experimental' || github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open' || github.ref_name == 'k30-20261015-ksu-susfs-audit'
         run: |
           set -euo pipefail
           mkdir -p kernel_workspace/ksu3877
@@ -362,7 +363,7 @@ jobs:
           echo 'EXPERIMENTAL BUILD: do not flash without SELinux runtime review' >> artifacts/KSUPR3877_EXPERIMENTAL.txt
 
       - name: Backport SELinux policy RCU and XPERMS correctness from #25
-        if: github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open'
+        if: github.ref_name == 'resukisu-pguard-v2-selinux-hardening-boot-open' || github.ref_name == 'k30-20261015-ksu-susfs-audit'
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/apply_plk110_selinux_correctness.py
@@ -376,13 +377,30 @@ jobs:
           grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/common/security/selinux/hooks.c
           test -s artifacts/KSUPR3877_EXPERIMENTAL.txt
 
+      - name: K30 targeted KernelSU and SUSFS compatibility backports
+        if: github.ref_name == 'k30-20261015-ksu-susfs-audit'
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/apply_k30_upstream_fixes.py
+          python3 scripts/apply_k30_upstream_fixes.py
+          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+          git -C kernel_workspace/kernel_platform/common diff --check
+          pkg=kernel_workspace/kernel_platform/KernelSU/kernel/manager/pkg_observer.c
+          sel=kernel_workspace/kernel_platform/common/security/selinux/selinuxfs.c
+          grep -Fq 'task_work_add(current, cb, TWA_RESUME)' "$pkg"
+          grep -Fq 'ksu_defer_track_throne();' "$pkg"
+          grep -Fq 'current_uid().val >= 10000 && ksu_selinux_hide_running' "$sel"
+          grep -Fq 'ksu_security_context_to_sid_with_policy_ex' kernel_workspace/kernel_platform/common/security/selinux/hooks.c
+          cp scripts/apply_k30_upstream_fixes.py artifacts/K30_upstream_fixes_patcher.py
+          test -s artifacts/K30_UPSTREAM_FIXSET.txt
+
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/apply_plk110_pguard.py
           python3 scripts/prepare_resukisu_config.py
           python3 scripts/apply_plk110_pguard.py
-          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ]; then
+          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ] || [ "$GITHUB_REF_NAME" = "k30-20261015-ksu-susfs-audit" ]; then
             ! grep -Eq '\{ "boot(_a|_b)?", PLK110_PG_HARD \}' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
             grep -Fq '{ "init_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
             grep -Fq '{ "vendor_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
@@ -406,7 +424,7 @@ jobs:
               "vendor_boot", "dtbo", "vbmeta", "vbmeta_system",
               "vbmeta_vendor", "recovery", "modem", "efisp",
           )
-          if __import__('os').environ.get('GITHUB_REF_NAME') == 'resukisu-pguard-v2-selinux-hardening-boot-open':
+          if __import__('os').environ.get('GITHUB_REF_NAME') in ('resukisu-pguard-v2-selinux-hardening-boot-open', 'k30-20261015-ksu-susfs-audit'):
               # Exact boot targets are intentionally no longer guarded.
               required = tuple(n for n in required if n != 'boot')
           missing = [name for name in required if f'"{name}"' not in src]
@@ -490,7 +508,7 @@ jobs:
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
           cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v2_source.c
           cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v2_patcher.py
-          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ]; then
+          if [ "$GITHUB_REF_NAME" = "resukisu-pguard-v2-selinux-hardening-boot-open" ] || [ "$GITHUB_REF_NAME" = "k30-20261015-ksu-susfs-audit" ]; then
             cp scripts/apply_plk110_selinux_correctness.py artifacts/SELINUX_CORRECTNESS_26_PATCHER.py
             cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/rules.c artifacts/KSUSelinuxRules26.c
             cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/sepolicy.c artifacts/KSUSelinuxPolicy26.c
