@@ -24,3 +24,8 @@ pguard=unchanged-v2
 # Retry #28 after AVTAB two-branch exact pattern gate correction
 
 # #29 critical fix: assert KernelSU PR #3877 is included with SELinux RCU/AVTAB fixes
+
+# K30 candidate: preserve exact #29 baseline + #3871 task_work observer and SELinux status running gate
+# KSU official release reference: v3.3.1 (0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d)
+# cctv18 current compared: 5f236a7b573c5a21ad0e5871ee96b63b89486596 (NOT wholesale synced)
+# K30 first compile: do not flash before verified ABI and on-device regression
