@@ -37,8 +37,8 @@
 **A（推荐优先）：K29 最小改动兼容路径**
 - K29 固定 ReSukiSU + 固定 cctv 基础不变；已移植的 #3877 / RCU / AVTAB / SUS_MOUNT / SUS_KSTAT 不再重复。
 - 独立移植并验证 SELinux status 根据 running 而不是 enabled 判定的行为；连同 fake_status 初始化/内存/锁顺序审计，不能仅修改布尔量。
-- 检查官方 v3.3.1 的 #3873（sidtab）、#3871（Package Observer 延迟处理）、#3865（iterate_dir 防死锁）在 ReSukiSU 固定源码中是否缺失；仅 cherry-pick 确实缺失、可验证的修复。
-- BakaSU #623 `context_add_hash` 和 #597 `execve`/ksud 存在性修复仅在能确认 K29 存在同样缺陷时移植。
+- 已确认 #3871（Package Observer 延迟处理）在 K29 固定源码中缺失，列为第一项实质 backport 候选；#3865 的核心规避方式（iterate_dir() 后再打开文件）K29 已具有，不重复引入；#3873 的 SIDTAB 全局同步语义需与 K29 从 #3877 移植的双策略 SID 同步实现等价性确认，防止二次同步。
+- OnePlus A67 固定 common `b2a876903b49` 的 `security/selinux/ss/services.c` 未定义 `context_add_hash`；BakaSU #623 以该函数存在为条件，当前不移植。BakaSU #597 `execve`/ksud 存在性修复只用于异常缺失 ksud 的路径，首轮不改变 D 系列管理器 SU 行为。
 - 不加入实验性内核模块黑名单、不默认启用 shell SU 限制、不合并管理器/ksud 全量更新。
 - 编译前用脚本断言每一项修复最终只存在一个实现。
 
@@ -71,3 +71,13 @@
 ## 6. 当前状态与下一步
 
 本分支只包含此审计清单（尚无 K30 代码修改）。先实施 A 路线的逐提交语义对照与最小 backport；B 路线只作为独立验证。完成静态审核后才能触发新构建，切勿把此审计分支视作编译产物。
+
+## 7. 直接读取 A67 和 K29 上游源码后的精确补充
+
+- A67 原厂 `security/selinux/hooks.c` 同时具有 `selinux_lsm_setattr(u64 attr,...)`（约 6390 行）和委托给它的 `selinux_setprocattr`（约 6588 行）。所以最新版 cctv18 的新入口本身存在；还须做实际补丁适配、完整语义审查，不能假设新旧接口可混用。
+- A67 `security/selinux/ss/services.c` 存在 `sidtab_context_to_sid`，但没有 `context_add_hash` 的函数定义。BakaSU #623 有版本/能力判断，不应为本机移入不存在的哈希辅助调用。
+- 固定 ReSukiSU `6ec8d9a8` 的 `kernel/manager/throne_tracker.c` 已注明在 `iterate_dir` 后延迟 file opens，和 KSU #3865 的核心策略重叠，**不应再叠加 #3865**。
+- 固定 ReSukiSU `6ec8d9a8` 的 `kernel/manager/pkg_observer.c` 在 fsnotify 路径直接 `track_throne(0)`；官方 [#3871](https://github.com/tiann/KernelSU/commit/ab23091edfeddc774e1e880b0919b211808a193e) 改为 `task_work_add(..., TWA_RESUME)` 延迟扫描，可避免持有锁期间对 /data/app 扫描；K30 优先以此为单独可回退补丁，但需适配 ReSukiSU 的 `track_throne` API 和任务退出分支。
+- 官方 [#3873](https://github.com/tiann/KernelSU/commit/a810677b847ba564c5f9d3fa0fbabe54794b8eef) 在备份策略解析成功后同步真实 sidtab；K29 #3877 双策略辅助函数已有 real/orig sid 同步路径，必须审查覆盖关系，**不能直接补一次额外的 sync**。
+- 最新 cctv18 SELinux status 从 `enabled` 改为 `running`，且在原始 `sel_open_handle_status` 中写入；A 路线只移植具实证收益的状态同步修复，并审计 `fake_status` 生命周期；B 路线则须独立验证新的属性设置流、原始权限与错误返回。
+- K30 优先级结论：**#3871 进第一轮补丁候选；status running 一致性进第一轮审计/候选；已包含的 KSTAT/MOUNT/#3865 不再移植；#623/#597 暂不加入；其余官方功能不改变默认运行行为**。
