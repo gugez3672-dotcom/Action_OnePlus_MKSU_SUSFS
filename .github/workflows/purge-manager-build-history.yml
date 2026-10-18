@@ -1,0 +1,78 @@
+name: Purge public SU manager build history
+
+on:
+  push:
+    paths:
+      - .github/workflows/purge-manager-build-history.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: one-time-manager-history-cleanup
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Remove only SU manager runs, their artifacts, and manager release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          headers=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          get() { curl --fail-with-body -fsSL --retry 3 "${headers[@]}" "${api}/$1"; }
+          del() { curl --fail-with-body -fsSL --retry 3 -X DELETE "${headers[@]}" "${api}/$1" -o /dev/null; }
+
+          targets="$(mktemp)"
+          for page in $(seq 1 20); do
+            payload="$(get "actions/runs?per_page=100&page=${page}")"
+            count="$(jq '.workflow_runs | length' <<<"${payload}")"
+            jq -r '.workflow_runs[] |
+              select(.path == ".github/workflows/Build-Custom-ReSukiSU-Manager.yml" or
+                     .path == ".github/workflows/D85-V2-Class-JNI-Test.yml" or
+                     .path == ".github/workflows/D86-Terminal-Preview.yml" or
+                     .path == ".github/workflows/D85-V2-Only-ReSign.yml" or
+                     .path == ".github/workflows/Resign-DN29-Manager.yml") |
+              .id' <<<"${payload}" >> "${targets}"
+            [[ "${count}" -lt 100 ]] && break
+          done
+          sort -u -o "${targets}" "${targets}"
+          n="$(wc -l < "${targets}" | tr -d ' ')"
+          if [[ "${n}" -lt 92 ]]; then
+            echo "::error::Expected at least 92 manager build runs; selected only ${n}. No deletions made."
+            exit 1
+          fi
+
+          release="$(get "releases/tags/manager-latest")"
+          if ! jq -e '.name == "Daily Notes Manager" and (.assets | all(.name | startswith("DailyNotes")))' <<<"${release}" >/dev/null; then
+            echo "::error::Release does not match the verified manager-only assets; no deletions made."
+            exit 1
+          fi
+          release_id="$(jq -r '.id' <<<"${release}")"
+          echo "Manager workflow runs selected: ${n}; manager release ID: ${release_id}"
+
+          # Deleting a workflow run also deletes its Actions logs and artifacts.
+          while IFS= read -r id; do
+            [[ -n "${id}" ]] && del "actions/runs/${id}"
+          done < "${targets}"
+
+          # Delete the Daily Notes release, its attached APK assets, and its tag.
+          del "releases/${release_id}"
+          if get "git/ref/tags/manager-latest" >/dev/null 2>&1; then
+            del "git/refs/tags/manager-latest"
+          fi
+
+          remaining="$(get "actions/runs?per_page=100")"
+          leftover="$(jq '[.workflow_runs[] | select(.path == ".github/workflows/Build-Custom-ReSukiSU-Manager.yml" or .path == ".github/workflows/D85-V2-Class-JNI-Test.yml" or .path == ".github/workflows/D86-Terminal-Preview.yml" or .path == ".github/workflows/D85-V2-Only-ReSign.yml" or .path == ".github/workflows/Resign-DN29-Manager.yml")] | length' <<<"${remaining}")"
+          [[ "${leftover}" -eq 0 ]] || { echo "::error::${leftover} manager runs remain"; exit 1; }
+          echo "Verified: SU manager workflow runs and their artifacts removed; Daily Notes release removed."
+
+          # The cleanup run is not a manager build, but remove its public log as well.
+          del "actions/runs/${GITHUB_RUN_ID}" || true
