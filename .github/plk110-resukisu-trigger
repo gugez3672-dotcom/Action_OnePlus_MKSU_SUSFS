@@ -33,3 +33,5 @@ pguard=unchanged-v2
 # K31 route A (2026-10-24): exact K30 2fdd663b + #3871 synchronous scan, #3733 (ksu_cred, no fsnotify/atime),
 # get_managers RCU fix (BakaSU 3d1185d8), #3924 init.rc mounted path. SUSFS stays cctv18 8dce4337 + post-2.3.0 fixset.
 # Branch-name gating replaced by PLK110_PROFILE=k31. Do not flash before ABI gates and on-device review.
+
+# Retry #31: pin repo launcher bytes to official git-repo tag v2.68.1 (googleapis now serves v2.69; SHA unchanged).

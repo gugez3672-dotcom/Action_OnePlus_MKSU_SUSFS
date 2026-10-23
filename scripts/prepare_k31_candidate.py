@@ -87,6 +87,19 @@ def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
               "if __import__('os').environ['PLK110_PROFILE'] == 'k31':",
               "python profile condition")
 
+    # Environment drift (2026-10-24): storage.googleapis.com now serves repo
+    # launcher v2.69, so the pinned SHA (unchanged) fails. Fetch the identical
+    # pinned launcher from the official git-repo tag v2.68.1 (same bytes as
+    # tags v2.65..v2.68.1 = 1211b57b...); the SHA256 check below is kept.
+    wf = once(wf,
+              "          curl --fail --location --retry 3             "
+              "https://storage.googleapis.com/git-repo-downloads/repo             --output /tmp/repo\n",
+              "          # Pinned launcher bytes from the official git-repo tag (googleapis now serves v2.69).\n"
+              "          curl --fail --location --retry 3 \\\n"
+              "            'https://gerrit.googlesource.com/git-repo/+/refs/tags/v2.68.1/repo?format=TEXT' \\\n"
+              "            | base64 -d > /tmp/repo\n",
+              "repo launcher source")
+
     # K31 kernel fixes after the K30 fixes, before the strict-manager/PGuard config.
     anchor = "      - name: Configure frozen kernel 11 baseline + Partition Guard v2\n"
     wf = once(wf, anchor,

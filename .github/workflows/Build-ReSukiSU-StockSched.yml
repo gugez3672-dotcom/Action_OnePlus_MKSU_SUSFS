@@ -101,7 +101,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y binutils git curl jq python3 zip patch
 
-          curl --fail --location --retry 3             https://storage.googleapis.com/git-repo-downloads/repo             --output /tmp/repo
+          # Pinned launcher bytes from the official git-repo tag (googleapis now serves v2.69).
+          curl --fail --location --retry 3 \
+            'https://gerrit.googlesource.com/git-repo/+/refs/tags/v2.68.1/repo?format=TEXT' \
+            | base64 -d > /tmp/repo
           echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
           sudo install -m 0755 /tmp/repo /usr/local/bin/repo
 
