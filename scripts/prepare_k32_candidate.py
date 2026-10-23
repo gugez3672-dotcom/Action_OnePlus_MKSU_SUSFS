@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""K31 review-only derivative of the exact K30 build definition (route A).
+"""K32 review-only derivative of the exact K30 build definition (route A).
 
 Never builds, commits, flashes or starts a workflow. Writes review/ only.
 
@@ -9,8 +9,8 @@ backport (proven by a tree diff). Its SELinux part replaces the
 K30/upstream-#3877 dual-policy path and drops the #3873 global sidtab sync,
 so it is not taken.
 
-Every K30 branch-name condition becomes an explicit profile (PLK110_PROFILE=k31).
-A K31 step never depends on the branch name and never skips silently.
+Every K30 branch-name condition becomes an explicit profile (PLK110_PROFILE=k32).
+A K32 step never depends on the branch name and never skips silently.
 """
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from pathlib import Path
 
 K30_BASE = "2fdd663bdae89179c1aad42dda72cb865f5bb92c"
 K30_BRANCH = "k30-20261015-ksu-susfs-audit"
-K31_BRANCH = "k31-review-only"
+K32_BRANCH = "k32-review-only"
 K30_WORKFLOW = ".github/workflows/Build-ReSukiSU-StockSched.yml"
-REVIEW_TARGET = "review/Build-ReSukiSU-K31-CANDIDATE.yml"
+REVIEW_TARGET = "review/Build-ReSukiSU-K32-CANDIDATE.yml"
 
 
 def once(src: str, old: str, new: str, title: str) -> str:
@@ -44,10 +44,10 @@ def verify_k30_checkout(root: Path) -> None:
 def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
     if "Build PLK110 ReSukiSU + SUSFS" not in wf:
         raise RuntimeError("wrong workflow")
-    title = "REVIEW-ONLY K31" if build_branch is None else "Build PLK110 K31"
+    title = "REVIEW-ONLY K32" if build_branch is None else "Build PLK110 K32"
     wf = once(wf, "name: Build PLK110 ReSukiSU + SUSFS (Stock Scheduler ABI)",
               f"name: {title} PLK110 ReSukiSU + SUSFS (Stock Scheduler ABI)".replace(
-                  "Build PLK110 K31 PLK110", "Build PLK110 K31"), "workflow name")
+                  "Build PLK110 K32 PLK110", "Build PLK110 K32"), "workflow name")
     # Locate the trigger block only after the rename (offsets shift).
     if wf.count("\n  push:\n") != 1:
         raise RuntimeError("unexpected trigger layout")
@@ -57,12 +57,12 @@ def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
         # Review-only: no push trigger at all.
         wf = wf[:start] + "\n" + wf[end:]
     else:
-        # Build mode: only this K31 branch, only when the trigger file changes.
+        # Build mode: only this K32 branch, only when the trigger file changes.
         wf = (wf[:start] + "  push:\n    branches:\n      - " + build_branch + "\n"
               "    paths:\n      - .github/plk110-resukisu-trigger\n\n" + wf[end:])
     wf = once(wf, "env:\n  DEVICE: PLK110\n",
               "env:\n  # Explicit build profile; never derived from the branch name.\n"
-              "  PLK110_PROFILE: k31\n  DEVICE: PLK110\n", "profile env")
+              "  PLK110_PROFILE: k32\n  DEVICE: PLK110\n", "profile env")
 
     # 1) step-level if: conditions -> unconditional (the profile is the workflow itself)
     for cond in (
@@ -79,12 +79,12 @@ def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
                  f'[ "$GITHUB_REF_NAME" = "{K30_BRANCH}" ]; then')
     if wf.count(shell_old) != 2:
         raise RuntimeError(f"expected 2 shell branch conditions, found {wf.count(shell_old)}")
-    wf = wf.replace(shell_old, 'if [ "$PLK110_PROFILE" = "k31" ]; then')
+    wf = wf.replace(shell_old, 'if [ "$PLK110_PROFILE" = "k32" ]; then')
     # 3) Python condition inside the Configure step
     wf = once(wf,
               "if __import__('os').environ.get('GITHUB_REF_NAME') in "
               f"('resukisu-pguard-v2-selinux-hardening-boot-open', '{K30_BRANCH}'):",
-              "if __import__('os').environ['PLK110_PROFILE'] == 'k31':",
+              "if __import__('os').environ['PLK110_PROFILE'] == 'k32':",
               "python profile condition")
 
     # Environment drift (2026-10-24): storage.googleapis.com now serves repo
@@ -100,28 +100,28 @@ def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
               "            | base64 -d > /tmp/repo\n",
               "repo launcher source")
 
-    # K31 kernel fixes after the K30 fixes, before the strict-manager/PGuard config.
+    # K32 kernel fixes after the K30 fixes, before the strict-manager/PGuard config.
     anchor = "      - name: Configure frozen kernel 11 baseline + Partition Guard v2\n"
     wf = once(wf, anchor,
-              "      - name: K31 kernel fixes (#3871 sync scan, #3733, get_managers RCU, #3924)\n"
+              "      - name: K32 kernel fixes (#3871 sync scan, #3733, get_managers RCU, #3924)\n"
               "        run: |\n"
               "          set -euo pipefail\n"
-              "          python3 -m py_compile scripts/apply_k31_kernel_fixes.py\n"
-              "          python3 scripts/apply_k31_kernel_fixes.py\n"
+              "          python3 -m py_compile scripts/apply_k32_kernel_fixes.py\n"
+              "          python3 scripts/apply_k32_kernel_fixes.py\n"
               "          git -C kernel_workspace/kernel_platform/KernelSU diff --check\n"
-              "          test -s artifacts/K31_KERNEL_FIXSET.txt\n\n" + anchor, "K31 fix step")
+              "          test -s artifacts/K32_KERNEL_FIXSET.txt\n\n" + anchor, "K32 fix step")
     # Static invariants only after strict manager + PGuard sources exist.
     anchor2 = "      - name: Publish exact A67 stock IKCONFIG\n"
     wf = once(wf, anchor2,
-              "      - name: K31 static invariants (after strict manager + PGuard)\n"
+              "      - name: K32 static invariants (after strict manager + PGuard)\n"
               "        run: |\n"
               "          set -euo pipefail\n"
-              "          python3 scripts/k31_verify_susfs.py\n"
-              "          python3 scripts/k31_verify_kernel.py\n\n" + anchor2, "K31 verify step")
+              "          python3 scripts/k32_verify_susfs.py\n"
+              "          python3 scripts/k32_verify_kernel.py\n\n" + anchor2, "K32 verify step")
     wf = once(wf, "          cp scripts/apply_susfs_post230_fixes.py artifacts/\n",
               "          cp scripts/apply_susfs_post230_fixes.py artifacts/\n"
-              "          cp scripts/apply_k31_kernel_fixes.py scripts/k31_verify_susfs.py "
-              "scripts/k31_verify_kernel.py artifacts/\n", "record K31 scripts")
+              "          cp scripts/apply_k32_kernel_fixes.py scripts/k32_verify_susfs.py "
+              "scripts/k32_verify_kernel.py artifacts/\n", "record K32 scripts")
 
     # Fail-closed audit of the result.
     head = wf[:wf.index("permissions:")]
@@ -141,13 +141,13 @@ def rewrite_workflow(wf: str, build_branch: str | None = None) -> str:
                  "python3 scripts/port_ksu_3877_selinux_hide.py",
                  "python3 scripts/apply_plk110_selinux_correctness.py",
                  "python3 scripts/apply_k30_upstream_fixes.py",
-                 "python3 scripts/apply_k31_kernel_fixes.py"):
+                 "python3 scripts/apply_k32_kernel_fixes.py"):
         if wf.count(must) != 1:
             raise RuntimeError(f"required patch step missing or duplicated: {must}")
-    order = [wf.index(s) for s in ("apply_k30_upstream_fixes.py\n", "apply_k31_kernel_fixes.py\n",
-                                   "prepare_resukisu_config.py\n", "k31_verify_kernel.py\n")]
+    order = [wf.index(s) for s in ("apply_k30_upstream_fixes.py\n", "apply_k32_kernel_fixes.py\n",
+                                   "prepare_resukisu_config.py\n", "k32_verify_kernel.py\n")]
     if order != sorted(order):
-        raise RuntimeError("K31 step order wrong")
+        raise RuntimeError("K32 step order wrong")
     return wf
 
 

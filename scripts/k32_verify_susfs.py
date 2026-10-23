@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only SUSFS ABI/correctness assertions for K31 Android16-6.12.
+"""Read-only SUSFS ABI/correctness assertions for K32 Android16-6.12.
 
 Run after the 5f236a7b SUSFS patch and before any compilation. Missing
 critical security/correctness markers cause a hard failure, never a fallback.

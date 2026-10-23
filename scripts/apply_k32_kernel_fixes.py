@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""K31 kernel-only fixes on top of the exact K30 tree (ReSukiSU 6ec8d9a8 after
+"""K32 kernel-only fixes on top of the exact K30 tree (ReSukiSU 6ec8d9a8 after
 apply_k30_upstream_fixes.py). Exact pre-images only; any drift fails closed.
 Writes nothing unless every fix and every postcondition succeeds.
 
@@ -28,7 +28,7 @@ RC = KSU / "runtime/ksud_integration.c"
 COMPAT = KSU / "compat/kernel_compat.h"
 APK = KSU / "manager/apk_sign.c"
 THRONE = KSU / "manager/throne_tracker.c"
-REPORT = Path("artifacts/K31_KERNEL_FIXSET.txt")
+REPORT = Path("artifacts/K32_KERNEL_FIXSET.txt")
 
 
 def replace_exact(text: str, old: str, new: str, title: str) -> str:
@@ -46,7 +46,7 @@ TW_OLD = """    if (current->flags & PF_EXITING)
 """
 TW_NEW = """    if (current->flags & PF_EXITING)
         return;
-    /* K31: scan before the rename returns (upstream #3871 / BakaSU 8450dd28).
+    /* K32: scan before the rename returns (upstream #3871 / BakaSU 8450dd28).
        track_throne(0) would re-queue the scan to init and run it later. */
     track_throne(TRACK_THRONE_FORCE_SYNCHRONOUS);
 }
@@ -82,7 +82,7 @@ MGR_NEW = """    struct ksu_manager_node *pos;
     int count = 0;
     int copy_count;
 
-    /* K31 (BakaSU 3d1185d8): never copy_to_user() inside rcu_read_lock(). */
+    /* K32 (BakaSU 3d1185d8): never copy_to_user() inside rcu_read_lock(). */
     entries = kcalloc(max_allowed, sizeof(*entries), GFP_KERNEL);
     if (!entries && max_allowed)
         return -ENOMEM;
@@ -115,7 +115,7 @@ RC_OLD = """    const char *short_name = fp->f_path.dentry->d_name.name;
         return false;
     }
 """
-RC_NEW = "    /* K31 (KernelSU #3924): bind mounts keep the source dentry name; match the mounted path. */\n"
+RC_NEW = "    /* K32 (KernelSU #3924): bind mounts keep the source dentry name; match the mounted path. */\n"
 
 # KernelSU #3733 (upstream 6ebd714c, BakaSU a855ec67), kernel part for GKI 6.12 only.
 # The synchronous #3871 scan runs in the renamer's task (system_server), so the
@@ -124,7 +124,7 @@ RC_NEW = "    /* K31 (KernelSU #3924): bind mounts keep the source dentry name; 
 COMPAT_INC_OLD = "#include <linux/fs.h>\n"
 COMPAT_INC_NEW = "#include <linux/namei.h>\n#include <linux/cred.h>\n#include <linux/fs.h>\n#include <linux/err.h>\n"
 COMPAT_HELPER = """
-/* K31 (KernelSU #3733): open without fsnotify events (GKI 6.12: dentry_open + __FMODE_NONOTIFY). */
+/* K32 (KernelSU #3733): open without fsnotify events (GKI 6.12: dentry_open + __FMODE_NONOTIFY). */
 static inline struct file *ksu_filp_open_nonotify(const char *path, int flags)
 {
     struct path p;
@@ -159,7 +159,7 @@ INC_OLD = '#include "compat/kernel_compat.h"\n'
 INC_NEW = '#include "compat/kernel_compat.h"\n#include "ksu.h"\n'
 CRED_OLD = "    INIT_LIST_HEAD(&uid_list);\n"
 CRED_NEW = ("    INIT_LIST_HEAD(&uid_list);\n\n"
-            "    /* K31 (#3733): scan with KernelSU credentials, not the caller's (system_server). */\n"
+            "    /* K32 (#3733): scan with KernelSU credentials, not the caller's (system_server). */\n"
             "    const struct cred *old_cred = override_creds(ksu_cred);\n")
 REVERT_OLD = """    if (diff_map)
         bitmap_free(diff_map);
@@ -226,8 +226,9 @@ def main() -> None:
         "fix=#3871 task_work scans synchronously (upstream ab23091, BakaSU 8450dd28)\n"
         "fix=get_managers_cmd copy_to_user outside RCU (BakaSU 3d1185d8)\n"
         "fix=#3924 init.rc mounted path (KernelSU 469c4282)\n"
+        "fix=#3733 scan with ksu_cred, no fsnotify/atime (KernelSU 6ebd714c, BakaSU a855ec67)\n"
         "verification=source pre/post-image assertions only; compile and device PENDING\n")
-    print("Applied K31 kernel fixes: #3871 sync scan, #3733, get_managers RCU, #3924")
+    print("Applied K32 kernel fixes: #3871 sync scan, #3733, get_managers RCU, #3924")
 
 
 if __name__ == "__main__":

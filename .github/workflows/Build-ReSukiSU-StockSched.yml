@@ -1,10 +1,10 @@
-name: Build PLK110 K31 ReSukiSU + SUSFS (Stock Scheduler ABI)
+name: Build PLK110 K32 ReSukiSU + SUSFS (Stock Scheduler ABI)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - k31-20261024-route-a
+      - k32-20261024-route-a
     paths:
       - .github/plk110-resukisu-trigger
 
@@ -18,7 +18,7 @@ concurrency:
 
 env:
   # Explicit build profile; never derived from the branch name.
-  PLK110_PROFILE: k31
+  PLK110_PROFILE: k32
   DEVICE: PLK110
   SOC: sm8850
   CODENAME: canoe
@@ -393,13 +393,13 @@ jobs:
           cp scripts/apply_k30_upstream_fixes.py artifacts/K30_upstream_fixes_patcher.py
           test -s artifacts/K30_UPSTREAM_FIXSET.txt
 
-      - name: K31 kernel fixes (#3871 sync scan, #3733, get_managers RCU, #3924)
+      - name: K32 kernel fixes (#3871 sync scan, #3733, get_managers RCU, #3924)
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/apply_k31_kernel_fixes.py
-          python3 scripts/apply_k31_kernel_fixes.py
+          python3 -m py_compile scripts/apply_k32_kernel_fixes.py
+          python3 scripts/apply_k32_kernel_fixes.py
           git -C kernel_workspace/kernel_platform/KernelSU diff --check
-          test -s artifacts/K31_KERNEL_FIXSET.txt
+          test -s artifacts/K32_KERNEL_FIXSET.txt
 
       - name: Configure frozen kernel 11 baseline + Partition Guard v2
         run: |
@@ -407,7 +407,7 @@ jobs:
           python3 -m py_compile scripts/apply_plk110_pguard.py
           python3 scripts/prepare_resukisu_config.py
           python3 scripts/apply_plk110_pguard.py
-          if [ "$PLK110_PROFILE" = "k31" ]; then
+          if [ "$PLK110_PROFILE" = "k32" ]; then
             ! grep -Eq '\{ "boot(_a|_b)?", PLK110_PG_HARD \}' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
             grep -Fq '{ "init_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
             grep -Fq '{ "vendor_boot_a", PLK110_PG_HARD }' kernel_workspace/kernel_platform/common/block/plk110_partition_guard.c
@@ -431,7 +431,7 @@ jobs:
               "vendor_boot", "dtbo", "vbmeta", "vbmeta_system",
               "vbmeta_vendor", "recovery", "modem", "efisp",
           )
-          if __import__('os').environ['PLK110_PROFILE'] == 'k31':
+          if __import__('os').environ['PLK110_PROFILE'] == 'k32':
               # Exact boot targets are intentionally no longer guarded.
               required = tuple(n for n in required if n != 'boot')
           missing = [name for name in required if f'"{name}"' not in src]
@@ -487,11 +487,11 @@ jobs:
               assert '.perm_check = always_allow' not in block, marker
           PY
 
-      - name: K31 static invariants (after strict manager + PGuard)
+      - name: K32 static invariants (after strict manager + PGuard)
         run: |
           set -euo pipefail
-          python3 scripts/k31_verify_susfs.py
-          python3 scripts/k31_verify_kernel.py
+          python3 scripts/k32_verify_susfs.py
+          python3 scripts/k32_verify_kernel.py
 
       - name: Publish exact A67 stock IKCONFIG
         run: |
@@ -521,14 +521,14 @@ jobs:
           cp "$common/arch/arm64/configs/plk110_resukisu.fragment" artifacts/
           cp "$common/block/plk110_partition_guard.c" artifacts/PLK110_PGuard_v2_source.c
           cp scripts/apply_plk110_pguard.py artifacts/PLK110_PGuard_v2_patcher.py
-          if [ "$PLK110_PROFILE" = "k31" ]; then
+          if [ "$PLK110_PROFILE" = "k32" ]; then
             cp scripts/apply_plk110_selinux_correctness.py artifacts/SELINUX_CORRECTNESS_26_PATCHER.py
             cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/rules.c artifacts/KSUSelinuxRules26.c
             cp kernel_workspace/kernel_platform/KernelSU/kernel/selinux/sepolicy.c artifacts/KSUSelinuxPolicy26.c
             cp kernel_workspace/kernel_platform/KernelSU/kernel/runtime/boot_event.c artifacts/KSU_BootEvent26.c
           fi
           cp scripts/apply_susfs_post230_fixes.py artifacts/
-          cp scripts/apply_k31_kernel_fixes.py scripts/k31_verify_susfs.py scripts/k31_verify_kernel.py artifacts/
+          cp scripts/apply_k32_kernel_fixes.py scripts/k32_verify_susfs.py scripts/k32_verify_kernel.py artifacts/
           cp scripts/prepare_stock_ikconfig.py artifacts/
           cp "$common/arch/arm64/configs/plk110_a67_stock_ikconfig" artifacts/
           cp "$common/certs/plk110_stock.pem" artifacts/

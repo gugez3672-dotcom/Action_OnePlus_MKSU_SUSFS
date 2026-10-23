@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""K31 static invariants: do not confuse source checks with a compiled build."""
+"""K32 static invariants: do not confuse source checks with a compiled build."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,7 +43,7 @@ def verify(kp: Path) -> list[str]:
     need(not re.search(r'\{ "boot(?:_a|_b)?", PLK110_PG_HARD \}', pguard),
          'PGuard boot exempt as K30')
     if errors:
-        raise RuntimeError('K31 preflight contract failed: '+ '; '.join(errors))
+        raise RuntimeError('K32 preflight contract failed: '+ '; '.join(errors))
     return ['fixed manager and signer', 'reboot supercall gate',
             'restricted info ioctls', '#3877 live/backup policy bridge',
             '#3871 deferred observer', 'PGuard partition and boot contract']
