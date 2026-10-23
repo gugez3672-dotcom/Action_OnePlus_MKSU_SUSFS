@@ -29,3 +29,7 @@ pguard=unchanged-v2
 # KSU official release reference: v3.3.1 (0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d)
 # cctv18 current compared: 5f236a7b573c5a21ad0e5871ee96b63b89486596 (NOT wholesale synced)
 # K30 first compile: do not flash before verified ABI and on-device regression
+
+# K31 route A (2026-10-24): exact K30 2fdd663b + #3871 synchronous scan, #3733 (ksu_cred, no fsnotify/atime),
+# get_managers RCU fix (BakaSU 3d1185d8), #3924 init.rc mounted path. SUSFS stays cctv18 8dce4337 + post-2.3.0 fixset.
+# Branch-name gating replaced by PLK110_PROFILE=k31. Do not flash before ABI gates and on-device review.
