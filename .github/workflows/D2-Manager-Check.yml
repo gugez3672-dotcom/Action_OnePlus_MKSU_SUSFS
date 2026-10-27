@@ -1,0 +1,36 @@
+name: Daily Notes 2 integration check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Select Java 21 and install fixed Android platform
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;29.0.14206865'
+      - name: Compile Kotlin Java AIDL protobuf and JNI
+        working-directory: manager
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileReleaseKotlin :app:compileReleaseJavaWithJavac \
+            :app:externalNativeBuildRelease --no-daemon --console=plain > ../manager-check.log 2>&1 || {
+              tail -160 ../manager-check.log
+              exit 1
+            }
+          tail -25 ../manager-check.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: D2-integration-check-${{ github.run_number }}
+          path: manager-check.log
+          retention-days: 14

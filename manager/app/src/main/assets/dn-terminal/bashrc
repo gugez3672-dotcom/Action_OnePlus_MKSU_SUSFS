@@ -1,0 +1,80 @@
+# The interactive environment belongs to Daily Notes, independently of MT.
+HISTFILE="$HOME/.bash_history"
+HISTSIZE=3000
+HISTFILESIZE=5000
+HISTCONTROL=ignoredups
+shopt -s histappend checkwinsize
+bind 'set enable-bracketed-paste on'
+# MT-style prompt: the arrow is green after a successful command and red after
+# a failing one, then a cyan name and one space before the block cursor.
+__dn_prompt() {
+    local status=$?
+    history -a
+    local arrow='\[\e[38;5;120m\]'
+    (( status )) && arrow='\[\e[38;5;209m\]'
+    PS1="${arrow}➜ \[\e[38;5;123m\]root\[\e[0m\] "
+}
+PROMPT_COMMAND=__dn_prompt
+
+dn_run_file() {
+    local file="$1" first magic interpreter
+    local -a arguments
+    [[ -f "$file" && -r "$file" ]] || return 66
+    magic=$(/data/adb/ksu/bin/busybox od -An -tx1 -N4 -- "$file")
+    if [[ "$magic" == *'7f 45 4c 46'* ]]; then
+        # Randomize the private directory, retaining argv[0]'s basename for
+        # multicall executables. Traps belong only to this isolated invocation.
+        (
+            local directory executable
+            directory=$(/data/adb/ksu/bin/busybox mktemp -d "$TMPDIR/native.XXXXXXXX") || exit
+            trap '/data/adb/ksu/bin/busybox rm -rf -- "$directory"' EXIT
+            trap 'exit 129' HUP
+            trap 'exit 130' INT
+            trap 'exit 143' TERM
+            executable="$directory/${file##*/}"
+            if ! /data/adb/ksu/bin/busybox cp -- "$file" "$executable" ||
+               ! /data/adb/ksu/bin/busybox chmod 700 -- "$executable"; then
+                exit 126
+            fi
+            "$executable"
+            exit "$?"
+        )
+        return "$?"
+    fi
+    IFS= read -r -n 4096 first < "$file"
+    first=${first%$'\r'}
+    first=${first#$'\xef\xbb\xbf'}
+    if [[ "$first" == '#!'* ]]; then
+        read -r -a arguments <<< "${first:2}"
+        interpreter=${arguments[0]##*/}
+        arguments=("${arguments[@]:1}")
+        if [[ "$interpreter" == env ]]; then
+            [[ "${arguments[0]}" == -S ]] && arguments=("${arguments[@]:1}")
+            interpreter=${arguments[0]##*/}
+            arguments=("${arguments[@]:1}")
+        fi
+        case "$interpreter" in
+            bash) "$DN_BASH" "${arguments[@]}" "$file" ;;
+            sh|ksh|mksh) /system/bin/sh "${arguments[@]}" "$file" ;;
+            ash) /data/adb/ksu/bin/busybox ash "${arguments[@]}" "$file" ;;
+            *) printf '%s: %s\n' "$DN_INTERPRETER_ERROR" "$interpreter" >&2; return 126 ;;
+        esac
+    else
+        # Ordinary text .sh files retain Android sh semantics. Self-extracting
+        # scripts take the shebang path above, including embedded binary bytes.
+        /system/bin/sh "$file"
+    fi
+}
+
+if [[ -n "$DN_SCRIPT" ]]; then
+    # A file started from the file manager runs in its own session with no
+    # controlling terminal, so swiping the manager away (which hangs up this
+    # PTY) does not take it down. -w keeps its output and exit code here.
+    export -f dn_run_file
+    setsid -w "$DN_BASH" --noprofile --norc -c 'dn_run_file "$1"' dn_run "$DN_SCRIPT"
+    dn_result=$?
+    # Leave the output and exit code on screen; Enter then closes the session.
+    printf '\n[%s %s]\n' "$DN_EXIT_LABEL" "$dn_result"
+    exit "$dn_result"
+fi
+# Only a deliberately opened blank terminal remains interactive.

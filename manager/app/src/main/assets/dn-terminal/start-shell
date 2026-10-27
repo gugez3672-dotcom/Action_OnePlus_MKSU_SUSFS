@@ -1,0 +1,11 @@
+#!/system/bin/sh
+# The normal su wrapper supplies terminal descriptors and session isolation.
+# Lifetime and child cleanup are owned by this session's native supervisor.
+PATH="$DN_TOOLS:/system/bin:/system/xbin:/vendor/bin:/product/bin:/data/adb/ksu/bin"
+export PATH
+cd "$DN_CWD" || exit 1
+unset ENV BASH_ENV
+if [ "$DN_MODE" = attach ]; then
+    exec "$DN_SUPERVISOR" --attach
+fi
+exec "$DN_SUPERVISOR" "$DN_BASH" --noprofile --rcfile "$DN_RC" -i

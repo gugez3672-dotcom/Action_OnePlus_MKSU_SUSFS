@@ -1,0 +1,22 @@
+<resources>
+<string name="cancel">Cancel</string>
+    
+<string name="settings_usb_debug">USB debugging</string>
+    
+<string name="settings_usb_debug_error">Failed to change USB debugging. Check root access.</string>
+    
+<string name="dn_traffic_clear_success">Traffic history cleared (%1$d records)</string>
+    
+<string name="dn_traffic_clear_failed">Could not clear traffic history</string>
+    
+<string name="dn_switch_user_failed">Failed to switch user</string>
+    
+<string name="settings_adb_tcp">Network ADB</string>
+    
+<string name="settings_adb_tcp_error">Failed to sync network ADB or remote keepalive. Check root access.</string>
+    
+<string name="settings_adb_heartbeat_error">Remote channel keepalive sync failed (code %1$d); switch state is unaffected.</string>
+
+<string name="dn_connection_settings">Connections and tools</string>
+<string name="dn_alternate_icon">Alternate icon</string>
+</resources>
