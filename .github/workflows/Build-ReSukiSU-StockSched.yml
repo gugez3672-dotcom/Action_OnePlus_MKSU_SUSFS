@@ -1,0 +1,298 @@
+name: Build PLK110 Official KernelSU + SUSFS (Stock Scheduler ABI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      review_ack:
+        description: 'Only after Claude review is clear: enter reviewed'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: plk110-official-${{ github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DEVICE: PLK110
+  SOC: sm8850
+  CODENAME: canoe
+  ANDROID_VERSION: android16
+  KERNEL_VERSION: "6.12"
+  BUILD_VARIANT: perf
+  BUILD_NUMBER: "14541642"
+
+jobs:
+  official-stock-sched:
+    if: inputs.review_ack == 'reviewed'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          swap-size-mb: 8192
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+
+      - name: Checkout build definition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Load fixed official source inputs
+        run: python3 scripts/export_inputs.py
+
+      - name: Verify A67 baseline and scheduler invariants
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+          stock=baselines/PLK110_16.0.8.302_stock.config
+          grep -qx 'CONFIG_SCHED_CLASS_EXT=y' "$stock"
+          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+
+      - name: Confirm previously verified stock reproduction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3             -H "Authorization: Bearer $GH_TOKEN"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN"             --output artifacts/VERIFIED_STOCK_RUN.json
+          jq -e --arg sha "$VERIFIED_STOCK_COMMIT"             '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"'             artifacts/VERIFIED_STOCK_RUN.json
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y binutils git curl jq python3 python3-yaml zip patch
+
+          # Pinned launcher bytes from the official git-repo tag (googleapis now serves v2.69).
+          curl --fail --location --retry 3 \
+            'https://gerrit.googlesource.com/git-repo/+/refs/tags/v2.68.1/repo?format=TEXT' \
+            | base64 -d > /tmp/repo
+          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
+          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
+
+      - name: Sync and pin exact OnePlus A67 source
+        run: |
+          set -euo pipefail
+          mkdir kernel_workspace
+          cd kernel_workspace
+
+          repo init             -u https://github.com/OnePlusOSS/kernel_manifest.git             -b "$MANIFEST_COMMIT"             -m oneplus_15.xml             --depth=1
+
+          mkdir -p .repo/local_manifests
+          printf '%s\n'             '<?xml version="1.0" encoding="UTF-8"?>'             '<manifest>'             '  <remove-project name="kernel_platform/prebuilts/asuite" />'             '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />'             '</manifest>'             > .repo/local_manifests/prune-unused-test-prebuilts.xml
+
+          # GitHub/CodeLinaro occasionally stalls a fresh runner mid-sync.
+          # Bound each attempt and reuse the partial checkout on retry; source pins
+          # below still guarantee that a successful run lands on the exact A67 baseline.
+          sync_ok=0
+          for attempt in 1 2 3; do
+            echo "repo sync attempt $attempt/3"
+            if timeout --signal=TERM --kill-after=60s 1800s \
+              repo sync -c --no-tags --no-clone-bundle --fail-fast -j2; then
+              sync_ok=1
+              break
+            fi
+            echo "repo sync attempt $attempt failed or timed out; retrying from partial checkout"
+            sleep 10
+          done
+          test "$sync_ok" -eq 1
+
+          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
+          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
+          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
+          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
+          git fetch --depth=1 origin "$MODULES_COMMIT"
+          git checkout --detach "$MODULES_COMMIT"
+
+          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
+          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
+          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+
+          {
+            echo "manifest=$MANIFEST_COMMIT"
+            echo "common=$COMMON_COMMIT"
+            echo "soc=$SOC_COMMIT"
+            echo "modules=$MODULES_COMMIT"
+          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+
+      - name: Restore exact A67 stock clang 14043575
+        run: |
+          set -euo pipefail
+          dst="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86"
+          tarball="$GITHUB_WORKSPACE/aosp-clang-r536225.tar.gz"
+          url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/$AOSP_CLANG_PREBUILT_COMMIT/clang-r536225.tar.gz"
+
+          test -d "$dst/clang-r536225"
+          test -x "$dst/clang-r536225/bin/clang"
+          "$dst/clang-r536225/bin/clang" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION_BEFORE.txt"
+
+          # AOSP archive is >500 MiB and transient HTTP/2 stream resets have
+          # killed otherwise valid builds. Force HTTP/1.1 and retry all transport
+          # failures; the compiler payload itself is still verified below.
+          curl --http1.1 --fail --location \
+            --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 30 \
+            "$url" --output "$tarball"
+          rm -rf "$dst/clang-r536225"
+          mkdir -p "$dst/clang-r536225"
+          tar -xzf "$tarball" -C "$dst/clang-r536225"
+
+          CLANG="$dst/clang-r536225/bin/clang"
+          LLD="$dst/clang-r536225/bin/ld.lld"
+          test -x "$CLANG"
+          test -x "$LLD"
+
+          "$CLANG" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION.txt"
+          "$LLD" --version | tee "$GITHUB_WORKSPACE/artifacts/LLD_VERSION.txt"
+
+          stock_cc=$(sed -n 's/^CONFIG_CC_VERSION_TEXT="\(.*\)"$/\1/p'             "$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config")
+          actual_cc=$("$CLANG" --version | head -n 1)
+          test -n "$stock_cc"
+          test "$actual_cc" = "$stock_cc"
+          printf '%s\n' "$actual_cc" | grep -Fq "Android ($EXPECTED_CLANG_BUILD"
+          printf '%s\n' "$actual_cc" | grep -Fq "based on r536225"
+          printf '%s\n' "$actual_cc" | grep -Fq "clang version 19.0.1"
+          printf '%s\n' "$actual_cc" | grep -Fq "$EXPECTED_LLVM_COMMIT"
+          "$LLD" --version | grep -Fq "LLD 19.0.1"
+
+          # The synced OnePlus prebuilt project itself stays in place; only the
+          # clang-r536225 payload is replaced.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          repo = Path("kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86")
+          raw = subprocess.check_output(
+              ["git", "-C", str(repo), "status", "--porcelain=v1", "-z"]
+          ).decode(errors="replace")
+          entries = [x for x in raw.split("\0") if x]
+          bad = []
+          for entry in entries:
+              path = entry[3:] if len(entry) >= 4 else ""
+              if " -> " in path:
+                  path = path.split(" -> ", 1)[-1]
+              if not path.startswith("clang-r536225/"):
+                  bad.append(entry)
+          if bad:
+              raise SystemExit("unexpected prebuilt paths changed: " + repr(bad[:20]))
+          PY
+
+          {
+            echo "aosp_clang_prebuilt_commit=$AOSP_CLANG_PREBUILT_COMMIT"
+            echo "expected_android_build=$EXPECTED_CLANG_BUILD"
+            echo "expected_llvm_commit=$EXPECTED_LLVM_COMMIT"
+            echo "stock_cc=$stock_cc"
+            sha256sum "$tarball" "$CLANG" "$LLD"
+          } > "$GITHUB_WORKSPACE/artifacts/TOOLCHAIN_PROVENANCE.txt"
+
+      - name: Apply only proven A67 stock build-system adaptations
+        run: python3 scripts/prepare_stock_build.py
+
+      - name: Preserve original GKI module signer trust
+        run: |
+          set -euo pipefail
+          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+          python3 scripts/prepare_stock_trust.py
+
+      - name: Check build definition and configuration policy
+        run: |
+          set -euo pipefail
+          python3 scripts/check_definition.py
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+      - name: Checkout exact official KernelSU and SUSFS
+        run: |
+          set -euo pipefail
+          ksu=kernel_workspace/kernel_platform/KernelSU
+          susfs=kernel_workspace/susfs4ksu
+          git clone --filter=blob:none --no-checkout https://github.com/tiann/KernelSU.git "$ksu"
+          git -C "$ksu" fetch origin "$KERNELSU_COMMIT"
+          git -C "$ksu" checkout --detach "$KERNELSU_COMMIT"
+          git clone --depth=1 --no-checkout --branch gki-android16-6.12 https://gitlab.com/simonpunk/susfs4ksu.git "$susfs"
+          git -C "$susfs" fetch --depth=1 origin "$SUSFS_COMMIT"
+          git -C "$susfs" checkout --detach "$SUSFS_COMMIT"
+          test "$(git -C "$ksu" rev-parse HEAD)" = "$KERNELSU_COMMIT"
+          test "$(git -C "$susfs" rev-parse HEAD)" = "$SUSFS_COMMIT"
+          python3 scripts/link_official_driver.py
+
+      - name: Apply official SUSFS with explicit A67 compatibility contexts
+        run: python3 scripts/integrate_official_susfs.py
+
+      - name: Prepare official manager parameters and K32 access gates
+        run: python3 scripts/prepare_official_kernel.py
+
+      - name: Publish exact A67 stock IKCONFIG
+        run: python3 scripts/prepare_stock_ikconfig.py
+
+      - name: Verify source invariants before compilation
+        run: python3 scripts/verify_official_sources.py
+
+      - name: Exercise source gate regressions and restore original bytes
+        run: python3 scripts/check_source_guards.py --fixture .
+
+      - name: Record adapted sources and preserve stock SCM stamping
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp inputs.lock.json artifacts/
+          python3 scripts/source_state.py record
+          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
+          tar -czf artifacts/OFFICIAL_SUSFS_ADDED_SOURCES.tar.gz -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
+          cp kernel_workspace/kernel_platform/common/arch/arm64/configs/plk110_official.fragment artifacts/
+          cp kernel_workspace/kernel_platform/common/arch/arm64/configs/plk110_a67_stock_ikconfig artifacts/
+
+      - name: Preflight exact stock config plus declared official root delta
+        run: |
+          set -euo pipefail
+          bash scripts/build_gki.sh preflight
+          python3 scripts/verify_gki.py --preflight --additions baselines/PLK110_A67_official.config.additions
+
+      - name: Build exact A67 GKI
+        run: bash scripts/build_gki.sh build
+
+      - name: Verify unchanged inputs and stock ABI banner config and signer
+        run: |
+          set -euo pipefail
+          python3 scripts/source_state.py verify
+          python3 scripts/verify_gki.py --additions baselines/PLK110_A67_official.config.additions
+          common=kernel_workspace/kernel_platform/common
+          "$common/scripts/extract-ikconfig" artifacts/Image > artifacts/image.public.extract-ikconfig.config
+          cmp -s baselines/PLK110_16.0.8.302_stock.config artifacts/image.public.extract-ikconfig.config
+          python3 scripts/verify_official_image.py
+
+      - name: Package verified Image only
+        run: bash scripts/package_official_gki.sh
+
+      - name: Generate checksums
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          (cd artifacts && find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt)
+
+      - name: Upload diagnostics and verified package
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: PLK110-A67-K${{ github.run_number }}-official
+          path: artifacts/
+          if-no-files-found: warn
+          compression-level: 6
+          retention-days: 14

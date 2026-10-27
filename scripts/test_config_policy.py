@@ -32,7 +32,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('CONFIG_KSU', bad)
 
     def test_feature_phase_requires_exact_additions(self):
-        additions = config(Path('baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions').read_text())
+        additions = config(Path('baselines/PLK110_A67_official.config.additions').read_text())
         actual = self.actual | additions
         _, bad, unmet = compare(self.stock, actual, additions)
         self.assertFalse(bad or unmet)

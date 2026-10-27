@@ -1,2 +1,14 @@
+/kernel_workspace/
+/.inputs/
+/artifacts/
+/bazel-cache/
+/AnyKernelSource/
+/AnyKernel3/
+/*.tar.gz
 __pycache__/
 *.pyc
+/manager-workspace/
+/manager-artifacts/
+*.jks
+*.keystore
+*.pass

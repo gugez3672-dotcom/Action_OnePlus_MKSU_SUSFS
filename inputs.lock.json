@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "device": "PLK110",
+  "firmware": "PLK110_16.0.8.302(CN01)",
+  "kernel_release": "6.12.23-android16-5-gb2a876903b49-ab14541642-4k",
+  "oneplus_manifest": "ecdd4809cbd01fa5f509a4708347026f63498303",
+  "oneplus_common": "b2a876903b495c444a94b16f50d1463ffe953957",
+  "oneplus_soc": "c88c1b3f75f7e88cd651608362ac7b95f11eb400",
+  "oneplus_modules": "f45a4a587a0ba9107a5421a2dd978404f545164b",
+  "kernelsu": {
+    "repository": "https://github.com/tiann/KernelSU.git",
+    "commit": "75e179d378d7aaa0de8946358a3384444c3e36b0",
+    "git_count": 2705,
+    "version": 32705
+  },
+  "susfs": {
+    "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
+    "branch": "gki-android16-6.12",
+    "commit": "519c86c5d8ad3832ff4a2e1a81dc1b81076f1693",
+    "version": "v2.3.0"
+  },
+  "manager": {
+    "package": "com.daily.notes",
+    "certificate_size": 890,
+    "certificate_sha256": "7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e",
+    "version_name": "D2.0.0",
+    "version_code": 36200
+  },
+  "clang_prebuilt": "9a98ca4072ec000f301bd3ece481ea2baca76ca5",
+  "clang_android_build": "14043575",
+  "llvm_commit": "b3a530ec6537146650e42be89f1089e9a3588460",
+  "anykernel": "0fc7569866bb5d5fe51752cc410dca3e92ab332f",
+  "stock_config_sha256": "e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0",
+  "stock_reference_run": "34980659033",
+  "stock_reference_commit": "34e24abcfaac6fc9db1279ad073c15af216fd664",
+  "k32_reference_commit": "ba4ff939d8825906289424a7079e91925c8a4c90",
+  "repo_launcher_sha256": "1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f",
+  "pguard": false,
+  "kernel_embedded_k_number": false
+}

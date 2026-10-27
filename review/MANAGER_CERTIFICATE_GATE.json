@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "certificate_size": 890,
+  "certificate_sha256": "7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e",
+  "apk_sha256": "06b764651d8c14af8f79fe2fd00327023faa6d51119b2742241e6d2ba0083eb3",
+  "scope": "Public certificate extraction; this does not replace apksigner signature verification."
+}

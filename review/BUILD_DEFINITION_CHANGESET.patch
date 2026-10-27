@@ -1,0 +1,3093 @@
+diff --git a/.gitattributes b/.gitattributes
+--- a/.gitattributes
++++ b/.gitattributes
+@@ -1,4 +1,3 @@
+-*.py text eol=lf
+-*.sh text eol=lf
+-*.yml text eol=lf
+-*.json text eol=lf
++* text=auto eol=lf
++*.config text eol=lf
++*.pem text eol=lf
+diff --git a/.github/plk110-build-trigger b/.github/plk110-build-trigger
+--- a/.github/plk110-build-trigger
++++ /dev/null
+@@ -1 +0,0 @@
+-Build SukiSU 4.2 + SUSFS 2.3 after verified stock run 34980659033 passed, 2026-09-16
+diff --git a/.github/plk110-stock-trigger b/.github/plk110-stock-trigger
+--- a/.github/plk110-stock-trigger
++++ /dev/null
+@@ -1 +0,0 @@
+-A67 stock: restore ZSTD, retain original module signer trust, verify full module set 2026-09-15
+diff --git a/.github/workflows/Build-ReSukiSU-StockSched.yml b/.github/workflows/Build-ReSukiSU-StockSched.yml
+--- /dev/null
++++ b/.github/workflows/Build-ReSukiSU-StockSched.yml
+@@ -0,0 +1,298 @@
++name: Build PLK110 Official KernelSU + SUSFS (Stock Scheduler ABI)
++
++on:
++  workflow_dispatch:
++    inputs:
++      review_ack:
++        description: 'Only after Claude review is clear: enter reviewed'
++        type: string
++        required: true
++
++permissions:
++  contents: read
++  actions: read
++
++concurrency:
++  group: plk110-official-${{ github.ref_name }}
++  cancel-in-progress: false
++
++defaults:
++  run:
++    shell: bash
++
++env:
++  DEVICE: PLK110
++  SOC: sm8850
++  CODENAME: canoe
++  ANDROID_VERSION: android16
++  KERNEL_VERSION: "6.12"
++  BUILD_VARIANT: perf
++  BUILD_NUMBER: "14541642"
++
++jobs:
++  official-stock-sched:
++    if: inputs.review_ack == 'reviewed'
++    runs-on: ubuntu-24.04
++    timeout-minutes: 180
++    steps:
++      - name: Maximize build space
++        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
++        with:
++          root-reserve-mb: 8192
++          temp-reserve-mb: 2048
++          swap-size-mb: 8192
++          remove-dotnet: "true"
++          remove-android: "true"
++          remove-haskell: "true"
++          remove-codeql: "true"
++
++      - name: Checkout build definition
++        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
++        with:
++          persist-credentials: false
++
++      - name: Load fixed official source inputs
++        run: python3 scripts/export_inputs.py
++
++      - name: Verify A67 baseline and scheduler invariants
++        run: |
++          set -euo pipefail
++          mkdir -p artifacts
++          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
++          stock=baselines/PLK110_16.0.8.302_stock.config
++          grep -qx 'CONFIG_SCHED_CLASS_EXT=y' "$stock"
++          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
++          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
++          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
++          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
++          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
++          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
++
++      - name: Confirm previously verified stock reproduction
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: |
++          set -euo pipefail
++          curl --fail --location --retry 3             -H "Authorization: Bearer $GH_TOKEN"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN"             --output artifacts/VERIFIED_STOCK_RUN.json
++          jq -e --arg sha "$VERIFIED_STOCK_COMMIT"             '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"'             artifacts/VERIFIED_STOCK_RUN.json
++
++      - name: Install dependencies
++        run: |
++          set -euo pipefail
++          sudo apt-get update
++          sudo apt-get install -y binutils git curl jq python3 python3-yaml zip patch
++
++          # Pinned launcher bytes from the official git-repo tag (googleapis now serves v2.69).
++          curl --fail --location --retry 3 \
++            'https://gerrit.googlesource.com/git-repo/+/refs/tags/v2.68.1/repo?format=TEXT' \
++            | base64 -d > /tmp/repo
++          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
++          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
++
++      - name: Sync and pin exact OnePlus A67 source
++        run: |
++          set -euo pipefail
++          mkdir kernel_workspace
++          cd kernel_workspace
++
++          repo init             -u https://github.com/OnePlusOSS/kernel_manifest.git             -b "$MANIFEST_COMMIT"             -m oneplus_15.xml             --depth=1
++
++          mkdir -p .repo/local_manifests
++          printf '%s\n'             '<?xml version="1.0" encoding="UTF-8"?>'             '<manifest>'             '  <remove-project name="kernel_platform/prebuilts/asuite" />'             '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />'             '</manifest>'             > .repo/local_manifests/prune-unused-test-prebuilts.xml
++
++          # GitHub/CodeLinaro occasionally stalls a fresh runner mid-sync.
++          # Bound each attempt and reuse the partial checkout on retry; source pins
++          # below still guarantee that a successful run lands on the exact A67 baseline.
++          sync_ok=0
++          for attempt in 1 2 3; do
++            echo "repo sync attempt $attempt/3"
++            if timeout --signal=TERM --kill-after=60s 1800s \
++              repo sync -c --no-tags --no-clone-bundle --fail-fast -j2; then
++              sync_ok=1
++              break
++            fi
++            echo "repo sync attempt $attempt failed or timed out; retrying from partial checkout"
++            sleep 10
++          done
++          test "$sync_ok" -eq 1
++
++          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
++          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
++          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
++          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
++          git fetch --depth=1 origin "$MODULES_COMMIT"
++          git checkout --detach "$MODULES_COMMIT"
++
++          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
++          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
++          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
++
++          {
++            echo "manifest=$MANIFEST_COMMIT"
++            echo "common=$COMMON_COMMIT"
++            echo "soc=$SOC_COMMIT"
++            echo "modules=$MODULES_COMMIT"
++          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
++
++      - name: Restore exact A67 stock clang 14043575
++        run: |
++          set -euo pipefail
++          dst="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86"
++          tarball="$GITHUB_WORKSPACE/aosp-clang-r536225.tar.gz"
++          url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/$AOSP_CLANG_PREBUILT_COMMIT/clang-r536225.tar.gz"
++
++          test -d "$dst/clang-r536225"
++          test -x "$dst/clang-r536225/bin/clang"
++          "$dst/clang-r536225/bin/clang" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION_BEFORE.txt"
++
++          # AOSP archive is >500 MiB and transient HTTP/2 stream resets have
++          # killed otherwise valid builds. Force HTTP/1.1 and retry all transport
++          # failures; the compiler payload itself is still verified below.
++          curl --http1.1 --fail --location \
++            --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 30 \
++            "$url" --output "$tarball"
++          rm -rf "$dst/clang-r536225"
++          mkdir -p "$dst/clang-r536225"
++          tar -xzf "$tarball" -C "$dst/clang-r536225"
++
++          CLANG="$dst/clang-r536225/bin/clang"
++          LLD="$dst/clang-r536225/bin/ld.lld"
++          test -x "$CLANG"
++          test -x "$LLD"
++
++          "$CLANG" --version | tee "$GITHUB_WORKSPACE/artifacts/CLANG_VERSION.txt"
++          "$LLD" --version | tee "$GITHUB_WORKSPACE/artifacts/LLD_VERSION.txt"
++
++          stock_cc=$(sed -n 's/^CONFIG_CC_VERSION_TEXT="\(.*\)"$/\1/p'             "$GITHUB_WORKSPACE/baselines/PLK110_16.0.8.302_stock.config")
++          actual_cc=$("$CLANG" --version | head -n 1)
++          test -n "$stock_cc"
++          test "$actual_cc" = "$stock_cc"
++          printf '%s\n' "$actual_cc" | grep -Fq "Android ($EXPECTED_CLANG_BUILD"
++          printf '%s\n' "$actual_cc" | grep -Fq "based on r536225"
++          printf '%s\n' "$actual_cc" | grep -Fq "clang version 19.0.1"
++          printf '%s\n' "$actual_cc" | grep -Fq "$EXPECTED_LLVM_COMMIT"
++          "$LLD" --version | grep -Fq "LLD 19.0.1"
++
++          # The synced OnePlus prebuilt project itself stays in place; only the
++          # clang-r536225 payload is replaced.
++          python3 - <<'PY'
++          import subprocess
++          from pathlib import Path
++          repo = Path("kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86")
++          raw = subprocess.check_output(
++              ["git", "-C", str(repo), "status", "--porcelain=v1", "-z"]
++          ).decode(errors="replace")
++          entries = [x for x in raw.split("\0") if x]
++          bad = []
++          for entry in entries:
++              path = entry[3:] if len(entry) >= 4 else ""
++              if " -> " in path:
++                  path = path.split(" -> ", 1)[-1]
++              if not path.startswith("clang-r536225/"):
++                  bad.append(entry)
++          if bad:
++              raise SystemExit("unexpected prebuilt paths changed: " + repr(bad[:20]))
++          PY
++
++          {
++            echo "aosp_clang_prebuilt_commit=$AOSP_CLANG_PREBUILT_COMMIT"
++            echo "expected_android_build=$EXPECTED_CLANG_BUILD"
++            echo "expected_llvm_commit=$EXPECTED_LLVM_COMMIT"
++            echo "stock_cc=$stock_cc"
++            sha256sum "$tarball" "$CLANG" "$LLD"
++          } > "$GITHUB_WORKSPACE/artifacts/TOOLCHAIN_PROVENANCE.txt"
++
++      - name: Apply only proven A67 stock build-system adaptations
++        run: python3 scripts/prepare_stock_build.py
++
++      - name: Preserve original GKI module signer trust
++        run: |
++          set -euo pipefail
++          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
++          python3 scripts/prepare_stock_trust.py
++
++      - name: Check build definition and configuration policy
++        run: |
++          set -euo pipefail
++          python3 scripts/check_definition.py
++          python3 -m unittest discover -s scripts -p 'test_*.py' -v
++
++      - name: Checkout exact official KernelSU and SUSFS
++        run: |
++          set -euo pipefail
++          ksu=kernel_workspace/kernel_platform/KernelSU
++          susfs=kernel_workspace/susfs4ksu
++          git clone --filter=blob:none --no-checkout https://github.com/tiann/KernelSU.git "$ksu"
++          git -C "$ksu" fetch origin "$KERNELSU_COMMIT"
++          git -C "$ksu" checkout --detach "$KERNELSU_COMMIT"
++          git clone --depth=1 --no-checkout --branch gki-android16-6.12 https://gitlab.com/simonpunk/susfs4ksu.git "$susfs"
++          git -C "$susfs" fetch --depth=1 origin "$SUSFS_COMMIT"
++          git -C "$susfs" checkout --detach "$SUSFS_COMMIT"
++          test "$(git -C "$ksu" rev-parse HEAD)" = "$KERNELSU_COMMIT"
++          test "$(git -C "$susfs" rev-parse HEAD)" = "$SUSFS_COMMIT"
++          python3 scripts/link_official_driver.py
++
++      - name: Apply official SUSFS with explicit A67 compatibility contexts
++        run: python3 scripts/integrate_official_susfs.py
++
++      - name: Prepare official manager parameters and K32 access gates
++        run: python3 scripts/prepare_official_kernel.py
++
++      - name: Publish exact A67 stock IKCONFIG
++        run: python3 scripts/prepare_stock_ikconfig.py
++
++      - name: Verify source invariants before compilation
++        run: python3 scripts/verify_official_sources.py
++
++      - name: Exercise source gate regressions and restore original bytes
++        run: python3 scripts/check_source_guards.py --fixture .
++
++      - name: Record adapted sources and preserve stock SCM stamping
++        run: |
++          set -euo pipefail
++          mkdir -p artifacts
++          cp inputs.lock.json artifacts/
++          python3 scripts/source_state.py record
++          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
++          tar -czf artifacts/OFFICIAL_SUSFS_ADDED_SOURCES.tar.gz -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
++          cp kernel_workspace/kernel_platform/common/arch/arm64/configs/plk110_official.fragment artifacts/
++          cp kernel_workspace/kernel_platform/common/arch/arm64/configs/plk110_a67_stock_ikconfig artifacts/
++
++      - name: Preflight exact stock config plus declared official root delta
++        run: |
++          set -euo pipefail
++          bash scripts/build_gki.sh preflight
++          python3 scripts/verify_gki.py --preflight --additions baselines/PLK110_A67_official.config.additions
++
++      - name: Build exact A67 GKI
++        run: bash scripts/build_gki.sh build
++
++      - name: Verify unchanged inputs and stock ABI banner config and signer
++        run: |
++          set -euo pipefail
++          python3 scripts/source_state.py verify
++          python3 scripts/verify_gki.py --additions baselines/PLK110_A67_official.config.additions
++          common=kernel_workspace/kernel_platform/common
++          "$common/scripts/extract-ikconfig" artifacts/Image > artifacts/image.public.extract-ikconfig.config
++          cmp -s baselines/PLK110_16.0.8.302_stock.config artifacts/image.public.extract-ikconfig.config
++          python3 scripts/verify_official_image.py
++
++      - name: Package verified Image only
++        run: bash scripts/package_official_gki.sh
++
++      - name: Generate checksums
++        if: always()
++        run: |
++          set -euo pipefail
++          mkdir -p artifacts
++          (cd artifacts && find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt)
++
++      - name: Upload diagnostics and verified package
++        if: always()
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
++        with:
++          name: PLK110-A67-K${{ github.run_number }}-official
++          path: artifacts/
++          if-no-files-found: warn
++          compression-level: 6
++          retention-days: 14
+diff --git a/.github/workflows/Build-Stock-A67.yml b/.github/workflows/Build-Stock-A67.yml
+--- a/.github/workflows/Build-Stock-A67.yml
++++ /dev/null
+@@ -1,230 +0,0 @@
+-name: Build PLK110 A67 Stock GKI
+-
+-on:
+-  workflow_dispatch:
+-  push:
+-    branches:
+-      - main
+-    paths:
+-      - .github/plk110-stock-trigger
+-
+-permissions:
+-  contents: read
+-
+-concurrency:
+-  group: plk110-a67-stock-reproduction
+-  cancel-in-progress: false
+-
+-env:
+-  DEVICE: PLK110
+-  SOC: sm8850
+-  CODENAME: canoe
+-  ANDROID_VERSION: android16
+-  KERNEL_VERSION: "6.12"
+-  BUILD_VARIANT: perf
+-  BUILD_NUMBER: "14541642"
+-  FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
+-  EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
+-  STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+-
+-  # Exact commits previously identified from the running A.67 kernel/source set.
+-  MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
+-  COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
+-  SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
+-  MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
+-
+-  REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
+-
+-jobs:
+-  stock-gki:
+-    runs-on: ubuntu-24.04
+-    timeout-minutes: 180
+-
+-    steps:
+-      - name: Maximize build space
+-        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
+-        with:
+-          root-reserve-mb: 8192
+-          temp-reserve-mb: 2048
+-          swap-size-mb: 8192
+-          remove-dotnet: "true"
+-          remove-android: "true"
+-          remove-haskell: "true"
+-          remove-codeql: "true"
+-
+-      - name: Checkout audited reproduction definition
+-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+-        with:
+-          persist-credentials: false
+-
+-      - name: Verify stock baseline
+-        run: |
+-          set -euo pipefail
+-          mkdir -p artifacts
+-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+-          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+-
+-          stock=baselines/PLK110_16.0.8.302_stock.config
+-          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+-          grep -qx 'CONFIG_LTO_NONE=y' "$stock"
+-          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+-          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+-
+-      - name: Install dependencies
+-        run: |
+-          set -euo pipefail
+-          sudo apt-get update
+-          sudo apt-get install -y binutils git curl jq python3 zip
+-
+-          curl --fail --location --retry 3 \
+-            https://storage.googleapis.com/git-repo-downloads/repo \
+-            --output /tmp/repo
+-          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
+-          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
+-
+-      - name: Sync and pin OnePlus A.67 source
+-        run: |
+-          set -euo pipefail
+-          mkdir kernel_workspace
+-          cd kernel_workspace
+-
+-          repo init \
+-            -u https://github.com/OnePlusOSS/kernel_manifest.git \
+-            -b "$MANIFEST_COMMIT" \
+-            -m oneplus_15.xml \
+-            --depth=1
+-
+-          # Removed upstream test prebuilts are not kernel build inputs.
+-          mkdir -p .repo/local_manifests
+-          printf '%s\n' \
+-            '<?xml version="1.0" encoding="UTF-8"?>' \
+-            '<manifest>' \
+-            '  <remove-project name="kernel_platform/prebuilts/asuite" />' \
+-            '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />' \
+-            '</manifest>' \
+-            > .repo/local_manifests/prune-unused-test-prebuilts.xml
+-
+-          repo sync -c --no-tags --no-clone-bundle -j2
+-
+-          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
+-          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
+-          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
+-          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
+-          git fetch --depth=1 origin "$MODULES_COMMIT"
+-          git checkout --detach "$MODULES_COMMIT"
+-
+-          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
+-          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
+-          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+-
+-          {
+-            echo "manifest=$MANIFEST_COMMIT"
+-            echo "common=$COMMON_COMMIT"
+-            echo "soc=$SOC_COMMIT"
+-            echo "modules=$MODULES_COMMIT"
+-          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+-
+-      - name: Apply only required stock build-system adaptations
+-        run: |
+-          set -euo pipefail
+-          common=kernel_workspace/kernel_platform/common
+-          kp=kernel_workspace/kernel_platform
+-
+-          # The pinned A.67 common commit predates the later official one-line
+-          # vmlinux_oki copy while this pinned Kleaf snapshot already requires
+-          # vmlinux_oki as a GKI output. This changes only the copied build
+-          # artifact, not the linked vmlinux contents.
+-          grep -Fq '"vmlinux_oki",' "$kp/build/kernel/kleaf/constants.bzl"
+-          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' "$common/scripts/Makefile.vmlinux"
+-
+-          python3 - <<'PY'
+-          from pathlib import Path
+-          path = Path("kernel_workspace/kernel_platform/common/scripts/Makefile.vmlinux")
+-          text = path.read_text()
+-          anchor = (
+-              "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
+-              "\t+$(call if_changed_dep,link_vmlinux)\n"
+-          )
+-          replacement = anchor + "\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n"
+-          if text.count(anchor) != 1:
+-              raise SystemExit("unexpected A.67 Makefile.vmlinux link rule")
+-          path.write_text(text.replace(anchor, replacement, 1))
+-          PY
+-
+-          # The running PLK110 A.67 release has no Kleaf OKI '-o-' component.
+-          python3 - <<'PY'
+-          from pathlib import Path
+-          path = Path("kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl")
+-          text = path.read_text()
+-          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
+-          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
+-          if text.count(old) != 1:
+-              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
+-          path.write_text(text.replace(old, new, 1))
+-          PY
+-
+-      - name: Preserve original GKI module signer trust
+-        run: |
+-          set -euo pipefail
+-          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+-          python3 scripts/prepare_stock_trust.py
+-
+-      - name: Preserve upstream defconfig and record build adaptations
+-        run: |
+-          set -euo pipefail
+-          common=kernel_workspace/kernel_platform/common
+-          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
+-          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
+-          git -C "$common" diff -- scripts/Makefile.vmlinux BUILD.bazel > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+-          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
+-          cp "$common/certs/plk110_stock.pem" artifacts/
+-          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
+-          git -C "$common" update-index --assume-unchanged scripts/Makefile.vmlinux BUILD.bazel
+-          test -z "$(git -C "$common" status -uno --porcelain)"
+-          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
+-
+-      - name: Prove no root or concealment integration exists
+-        run: |
+-          set -euo pipefail
+-          kp=kernel_workspace/kernel_platform
+-          test ! -e "$kp/KernelSU"
+-          test ! -e kernel_workspace/susfs4ksu
+-          ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Makefile"
+-          ! grep -Eq 'kernelsu|KernelSU|SukiSU|SUSFS|KPM' "$kp/common/drivers/Kconfig"
+-
+-      - name: Preflight upstream GKI configuration
+-        run: |
+-          bash scripts/build_gki.sh preflight
+-          python3 scripts/verify_gki.py --preflight
+-
+-      - name: Build the GKI used by official canoe perf
+-        run: bash scripts/build_gki.sh build
+-
+-      - name: Verify actual Image config and stock module symbol CRCs
+-        run: python3 scripts/verify_gki.py
+-
+-      - name: Generate checksums
+-        if: always()
+-        run: |
+-          set -euo pipefail
+-          mkdir -p artifacts
+-          (
+-            cd artifacts
+-            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+-              | sort -z \
+-              | xargs -0 -r sha256sum \
+-              > SHA256SUMS.txt
+-          )
+-
+-      - name: Upload reproduction diagnostics and image
+-        if: always()
+-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+-        with:
+-          name: PLK110-A67-Stock-GKI-${{ github.run_number }}
+-          path: artifacts/
+-          if-no-files-found: warn
+-          compression-level: 6
+-          retention-days: 14
+diff --git a/.github/workflows/Build-SukiSU.yml b/.github/workflows/Build-SukiSU.yml
+--- a/.github/workflows/Build-SukiSU.yml
++++ /dev/null
+@@ -1,339 +0,0 @@
+-name: Build PLK110 SukiSU 4.2 + SUSFS 2.3
+-
+-on:
+-  workflow_dispatch:
+-  push:
+-    branches:
+-      - main
+-    paths:
+-      - .github/plk110-build-trigger
+-
+-permissions:
+-  contents: read
+-
+-concurrency:
+-  group: plk110-a67-sukisu-susfs
+-  cancel-in-progress: false
+-
+-env:
+-  DEVICE: PLK110
+-  SOC: sm8850
+-  CODENAME: canoe
+-  ANDROID_VERSION: android16
+-  KERNEL_VERSION: "6.12"
+-  BUILD_VARIANT: perf
+-  BUILD_NUMBER: "14541642"
+-  FIRMWARE_BASELINE: PLK110_16.0.8.302(CN01)
+-  EXPECTED_KERNEL_RELEASE: 6.12.23-android16-5-gb2a876903b49-ab14541642-4k
+-  STOCK_CONFIG_SHA256: e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0
+-
+-  # Exact commits previously identified from the running A.67 kernel/source set.
+-  MANIFEST_COMMIT: ecdd4809cbd01fa5f509a4708347026f63498303
+-  COMMON_COMMIT: b2a876903b495c444a94b16f50d1463ffe953957
+-  SOC_COMMIT: c88c1b3f75f7e88cd651608362ac7b95f11eb400
+-  MODULES_COMMIT: f45a4a587a0ba9107a5421a2dd978404f545164b
+-
+-  SUKISU_COMMIT: e2912817f4e1b194e582a06e0b5eacf6a3fb7083
+-  SUSFS_COMMIT: c7db8cb367ef3ed4126ed7e222d77757ccb5c05b
+-  ANYKERNEL_COMMIT: 0fc7569866bb5d5fe51752cc410dca3e92ab332f
+-  EXPECTED_CONFIG_ADDITIONS_SHA256: d3235c8aa6e95b7b56c24a4619f01d930ffbac48a050d593fdcf896f770a997e
+-  A67_SELINUX_PATCH_SHA256: 101d7bce48d848495ae4d972347bfd60cd78f45dcc9bb4f6780162612c51f97c
+-  SUKISU_COMPAT_PATCH_SHA256: ea2be02443d0d5aed8da7866071af33bfc89a3f394d905b2db49798e6c574444
+-  VERIFIED_STOCK_RUN: "34980659033"
+-  VERIFIED_STOCK_COMMIT: 34e24abcfaac6fc9db1279ad073c15af216fd664
+-
+-  REPO_LAUNCHER_SHA256: 1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f
+-
+-jobs:
+-  sukisu-gki:
+-    runs-on: ubuntu-24.04
+-    timeout-minutes: 180
+-
+-    steps:
+-      - name: Maximize build space
+-        uses: easimon/maximize-build-space@c28619d8999a147d5e09c1199f84ff6af6ad5794
+-        with:
+-          root-reserve-mb: 8192
+-          temp-reserve-mb: 2048
+-          swap-size-mb: 8192
+-          remove-dotnet: "true"
+-          remove-android: "true"
+-          remove-haskell: "true"
+-          remove-codeql: "true"
+-
+-      - name: Checkout audited reproduction definition
+-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+-        with:
+-          persist-credentials: false
+-
+-      - name: Verify stock baseline
+-        run: |
+-          set -euo pipefail
+-          mkdir -p artifacts
+-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+-          echo "$STOCK_CONFIG_SHA256  baselines/PLK110_16.0.8.302_stock.config" | sha256sum --check
+-
+-          stock=baselines/PLK110_16.0.8.302_stock.config
+-          ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
+-          grep -qx 'CONFIG_LTO_NONE=y' "$stock"
+-          grep -qx 'CONFIG_MODVERSIONS=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG_ALL=y' "$stock"
+-          grep -qx 'CONFIG_MODULE_SIG_PROTECT=y' "$stock"
+-          grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
+-
+-      - name: Require completed stock verification
+-        env:
+-          GH_TOKEN: ${{ github.token }}
+-        run: |
+-          set -euo pipefail
+-          curl --fail --location --retry 3 \
+-            -H "Authorization: Bearer $GH_TOKEN" \
+-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN" \
+-            --output artifacts/VERIFIED_STOCK_RUN.json
+-          jq -e --arg sha "$VERIFIED_STOCK_COMMIT" \
+-            '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"' \
+-            artifacts/VERIFIED_STOCK_RUN.json
+-          echo "$EXPECTED_CONFIG_ADDITIONS_SHA256  baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions" | sha256sum --check
+-          echo "$A67_SELINUX_PATCH_SHA256  patches/PLK110_A67_susfs_selinux_hooks.patch" | sha256sum --check
+-          echo "$SUKISU_COMPAT_PATCH_SHA256  patches/PLK110_SukiSU_4.2_6.12_compat.patch" | sha256sum --check
+-
+-      - name: Install dependencies
+-        run: |
+-          set -euo pipefail
+-          sudo apt-get update
+-          sudo apt-get install -y binutils git curl jq python3 zip
+-
+-          curl --fail --location --retry 3 \
+-            https://storage.googleapis.com/git-repo-downloads/repo \
+-            --output /tmp/repo
+-          echo "$REPO_LAUNCHER_SHA256  /tmp/repo" | sha256sum --check
+-          sudo install -m 0755 /tmp/repo /usr/local/bin/repo
+-
+-      - name: Sync and pin OnePlus A.67 source
+-        run: |
+-          set -euo pipefail
+-          mkdir kernel_workspace
+-          cd kernel_workspace
+-
+-          repo init \
+-            -u https://github.com/OnePlusOSS/kernel_manifest.git \
+-            -b "$MANIFEST_COMMIT" \
+-            -m oneplus_15.xml \
+-            --depth=1
+-
+-          # Removed upstream test prebuilts are not kernel build inputs.
+-          mkdir -p .repo/local_manifests
+-          printf '%s\n' \
+-            '<?xml version="1.0" encoding="UTF-8"?>' \
+-            '<manifest>' \
+-            '  <remove-project name="kernel_platform/prebuilts/asuite" />' \
+-            '  <remove-project name="kernel_platform/tools/tradefederation/prebuilts" />' \
+-            '</manifest>' \
+-            > .repo/local_manifests/prune-unused-test-prebuilts.xml
+-
+-          repo sync -c --no-tags --no-clone-bundle -j2
+-
+-          git -C kernel_platform/common fetch --depth=1 origin "$COMMON_COMMIT"
+-          git -C kernel_platform/common checkout --detach "$COMMON_COMMIT"
+-          git -C kernel_platform/soc-repo fetch --depth=1 origin "$SOC_COMMIT"
+-          git -C kernel_platform/soc-repo checkout --detach "$SOC_COMMIT"
+-          git fetch --depth=1 origin "$MODULES_COMMIT"
+-          git checkout --detach "$MODULES_COMMIT"
+-
+-          test "$(git -C kernel_platform/common rev-parse HEAD)" = "$COMMON_COMMIT"
+-          test "$(git -C kernel_platform/soc-repo rev-parse HEAD)" = "$SOC_COMMIT"
+-          test "$(git rev-parse HEAD)" = "$MODULES_COMMIT"
+-
+-          {
+-            echo "manifest=$MANIFEST_COMMIT"
+-            echo "common=$COMMON_COMMIT"
+-            echo "soc=$SOC_COMMIT"
+-            echo "modules=$MODULES_COMMIT"
+-          } > "$GITHUB_WORKSPACE/artifacts/SOURCE_PINS.txt"
+-
+-      - name: Apply only required stock build-system adaptations
+-        run: |
+-          set -euo pipefail
+-          common=kernel_workspace/kernel_platform/common
+-          kp=kernel_workspace/kernel_platform
+-
+-          # The pinned A.67 common commit predates the later official one-line
+-          # vmlinux_oki copy while this pinned Kleaf snapshot already requires
+-          # vmlinux_oki as a GKI output. This changes only the copied build
+-          # artifact, not the linked vmlinux contents.
+-          grep -Fq '"vmlinux_oki",' "$kp/build/kernel/kleaf/constants.bzl"
+-          ! grep -Fq '$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki' "$common/scripts/Makefile.vmlinux"
+-
+-          python3 - <<'PY'
+-          from pathlib import Path
+-          path = Path("kernel_workspace/kernel_platform/common/scripts/Makefile.vmlinux")
+-          text = path.read_text()
+-          anchor = (
+-              "vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n"
+-              "\t+$(call if_changed_dep,link_vmlinux)\n"
+-          )
+-          replacement = anchor + "\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n"
+-          if text.count(anchor) != 1:
+-              raise SystemExit("unexpected A.67 Makefile.vmlinux link rule")
+-          path.write_text(text.replace(anchor, replacement, 1))
+-          PY
+-
+-          # The running PLK110 A.67 release has no Kleaf OKI '-o-' component.
+-          python3 - <<'PY'
+-          from pathlib import Path
+-          path = Path("kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl")
+-          text = path.read_text()
+-          old = 'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"'
+-          new = 'scmversion_prefix="-$android_release-$KMI_GENERATION"'
+-          if text.count(old) != 1:
+-              raise SystemExit("unexpected Kleaf scmversion_prefix composition")
+-          path.write_text(text.replace(old, new, 1))
+-          PY
+-
+-      - name: Preserve original GKI module signer trust
+-        run: |
+-          set -euo pipefail
+-          git -C kernel_workspace/kernel_platform/common diff --exit-code -- BUILD.bazel
+-          python3 scripts/prepare_stock_trust.py
+-
+-      - name: Integrate pinned SukiSU builtin
+-        run: |
+-          set -euo pipefail
+-          cd kernel_workspace/kernel_platform
+-
+-          git clone --filter=blob:none --no-checkout --depth=1 --branch builtin \
+-            https://github.com/SukiSU-Ultra/SukiSU-Ultra.git KernelSU
+-          git -C KernelSU fetch --depth=1 origin "$SUKISU_COMMIT"
+-          git -C KernelSU checkout --detach "$SUKISU_COMMIT"
+-          test "$(git -C KernelSU rev-parse HEAD)" = "$SUKISU_COMMIT"
+-
+-          ln -sfn ../../KernelSU/kernel common/drivers/kernelsu
+-          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' common/drivers/Makefile || \
+-            printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> common/drivers/Makefile
+-          grep -q 'source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig || \
+-            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' common/drivers/Kconfig
+-
+-          grep -q 'config KSU_SUSFS' KernelSU/kernel/Kconfig
+-          grep -q 'susfs_init();' KernelSU/kernel/ksu.c
+-
+-      - name: Apply SukiSU 4.2 Android 6.12 compatibility patch
+-        run: |
+-          set -euo pipefail
+-          patch="$GITHUB_WORKSPACE/patches/PLK110_SukiSU_4.2_6.12_compat.patch"
+-          echo "$SUKISU_COMPAT_PATCH_SHA256  $patch" | sha256sum --check
+-
+-          cd kernel_workspace/kernel_platform/KernelSU
+-          git apply --check "$patch"
+-          git apply "$patch"
+-          git diff --check
+-
+-          grep -Fq 'static int kernel_umount_feature_set(u64 value)' kernel/feature/kernel_umount.c
+-          grep -Fq '.id = LSM_ID_UNDEF,' kernel/hook/lsm_hook.c
+-          grep -Fq 'security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), &ksu_lsmid);' kernel/hook/lsm_hook.c
+-          grep -Fq '#define LSM_ID_UNDEF' ../common/include/uapi/linux/lsm.h
+-          grep -Fq 'const struct lsm_id *lsmid' ../common/include/linux/lsm_hooks.h
+-
+-      - name: Apply pinned SUSFS kernel patch
+-        run: |
+-          set -euo pipefail
+-          cd kernel_workspace
+-
+-          git clone --filter=blob:none --no-checkout --depth=1 --branch gki-android16-6.12 \
+-            https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu
+-          git -C susfs4ksu fetch --depth=1 origin "$SUSFS_COMMIT"
+-          git -C susfs4ksu checkout --detach "$SUSFS_COMMIT"
+-          test "$(git -C susfs4ksu rev-parse HEAD)" = "$SUSFS_COMMIT"
+-
+-          cp susfs4ksu/kernel_patches/fs/* kernel_platform/common/fs/
+-          cp susfs4ksu/kernel_patches/include/linux/* kernel_platform/common/include/linux/
+-          cp \
+-            susfs4ksu/kernel_patches/50_add_susfs_in_gki-android16-6.12.patch \
+-            kernel_platform/common/50_add_susfs.patch
+-
+-          cd kernel_platform/common
+-          # OnePlus A.67 has a different comment block immediately after
+-          # selinux_state. Apply the upstream SUSFS patch everywhere else,
+-          # then use the audited A.67-only hooks.c context adaptation.
+-          git apply --check --exclude=security/selinux/hooks.c 50_add_susfs.patch
+-          # The upstream patch has one whitespace-only line in mm/memory.c.
+-          git apply --whitespace=fix --exclude=security/selinux/hooks.c 50_add_susfs.patch
+-          git apply --check "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
+-          git apply "$GITHUB_WORKSPACE/patches/PLK110_A67_susfs_selinux_hooks.patch"
+-
+-          grep -q '#define SUSFS_VERSION "v2.3.0"' include/linux/susfs.h
+-          grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+-
+-      - name: Configure pinned SukiSU and SUSFS features
+-        run: |
+-          set -euo pipefail
+-          python3 scripts/prepare_sukisu_config.py
+-          git -C kernel_workspace/kernel_platform/KernelSU diff --check
+-          git -C kernel_workspace/kernel_platform/common diff --check
+-          git -C kernel_workspace/kernel_platform/KernelSU diff > artifacts/SUKISU_ADAPTATIONS.patch
+-          printf 'sukisu=%s\nsusfs=%s\n' "$SUKISU_COMMIT" "$SUSFS_COMMIT" >> artifacts/SOURCE_PINS.txt
+-
+-      - name: Preserve upstream defconfig and record build adaptations
+-        run: |
+-          set -euo pipefail
+-          common=kernel_workspace/kernel_platform/common
+-          git -C "$common" diff --exit-code -- arch/arm64/configs/gki_defconfig build.config.gki
+-          cp "$common/arch/arm64/configs/gki_defconfig" artifacts/upstream_gki_defconfig
+-          git -C "$common" diff > artifacts/COMMON_BUILD_ADAPTATIONS.patch
+-          cp "$common/arch/arm64/configs/plk110_sukisu.fragment" artifacts/
+-          tar -czf artifacts/SUSFS_ADDED_SOURCES.tar.gz -C kernel_workspace/susfs4ksu kernel_patches/fs kernel_patches/include/linux
+-          cp "$common/arch/arm64/configs/plk110_stock.fragment" artifacts/
+-          cp "$common/certs/plk110_stock.pem" artifacts/
+-          git -C kernel_workspace diff -- kernel_platform/build/kernel/kleaf/impl/stamp.bzl > artifacts/KLEAF_STAMP_ADAPTATION.patch
+-          git -C "$common" diff --name-only -z | xargs -0 -r git -C "$common" update-index --assume-unchanged
+-          test -z "$(git -C "$common" status -uno --porcelain)"
+-          (cd kernel_workspace && repo manifest -r) > artifacts/SOURCE_MANIFEST.xml
+-
+-      - name: Preflight upstream GKI configuration
+-        run: |
+-          bash scripts/build_gki.sh preflight
+-          python3 scripts/verify_gki.py --preflight --additions baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
+-
+-      - name: Build the GKI used by official canoe perf
+-        run: bash scripts/build_gki.sh build
+-
+-      - name: Verify actual Image config and stock module symbol CRCs
+-        run: python3 scripts/verify_gki.py --additions baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
+-
+-      - name: Verify compiled feature code
+-        run: |
+-          set -euo pipefail
+-          grep -Eq ' [Tt] kernelsu_init$' artifacts/System.map
+-          grep -Eq ' [Tt] susfs_init$' artifacts/System.map
+-          python3 - <<'PY'
+-          from pathlib import Path
+-          image = Path('artifacts/Image').read_bytes()
+-          assert b'v4.2.0-e2912817@builtin' in image, 'wrong SukiSU version metadata'
+-          assert b'v2.3.0' in image, 'SUSFS version missing'
+-          PY
+-
+-      - name: Package verified Image
+-        run: bash scripts/package_gki.sh
+-
+-      - name: Generate checksums
+-        if: always()
+-        run: |
+-          set -euo pipefail
+-          mkdir -p artifacts
+-          (
+-            cd artifacts
+-            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+-              | sort -z \
+-              | xargs -0 -r sha256sum \
+-              > SHA256SUMS.txt
+-          )
+-
+-      - name: Upload reproduction diagnostics and image
+-        if: always()
+-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+-        with:
+-          name: PLK110-A67-SukiSU-4.2-SUSFS-2.3-${{ github.run_number }}
+-          path: artifacts/
+-          if-no-files-found: warn
+-          compression-level: 6
+-          retention-days: 14
+diff --git a/.github/workflows/package-visibility-probe-manual.yml b/.github/workflows/package-visibility-probe-manual.yml
+--- a/.github/workflows/package-visibility-probe-manual.yml
++++ /dev/null
+@@ -1,51 +0,0 @@
+-name: Package Visibility Probe APK
+-
+-on:
+-  workflow_dispatch:
+-
+-jobs:
+-  build:
+-    runs-on: ubuntu-latest
+-    permissions:
+-      contents: read
+-
+-    steps:
+-      - name: Checkout probe source branch
+-        uses: actions/checkout@v4
+-        with:
+-          ref: package-visibility-probe-20260921
+-
+-      - name: Set up Java 17
+-        uses: actions/setup-java@v4
+-        with:
+-          distribution: temurin
+-          java-version: '17'
+-
+-      - name: Set up Gradle
+-        uses: gradle/actions/setup-gradle@v4
+-        with:
+-          gradle-version: '8.11.1'
+-
+-      - name: Set up Android SDK
+-        uses: android-actions/setup-android@v3
+-
+-      - name: Install Android SDK 35
+-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+-
+-      - name: Build three test APKs
+-        run: gradle :app:assembleDebug --stacktrace
+-
+-      - name: Collect APKs
+-        run: |
+-          mkdir -p out
+-          cp app/build/outputs/apk/plain/debug/app-plain-debug.apk out/PackageProbe-Plain.apk
+-          cp app/build/outputs/apk/targeted/debug/app-targeted-debug.apk out/PackageProbe-Targeted.apk
+-          cp app/build/outputs/apk/all/debug/app-all-debug.apk out/PackageProbe-QUERY_ALL.apk
+-          sha256sum out/*.apk | tee out/SHA256SUMS.txt
+-
+-      - name: Upload APK bundle
+-        uses: actions/upload-artifact@v4
+-        with:
+-          name: package-visibility-probe-apks
+-          path: out/*
+-          if-no-files-found: error
+diff --git a/.gitignore b/.gitignore
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,2 +1,14 @@
++/kernel_workspace/
++/.inputs/
++/artifacts/
++/bazel-cache/
++/AnyKernelSource/
++/AnyKernel3/
++/*.tar.gz
+ __pycache__/
+ *.pyc
++/manager-workspace/
++/manager-artifacts/
++*.jks
++*.keystore
++*.pass
+diff --git a/AGENTS.md b/AGENTS.md
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,7 @@
++# 工作规则入口
++
++本仓库遵守 `D:\Users\admin\Documents\设备协作\AGENTS.md`，开工同时读取该项目的 `协作/进度.md`。
++
++当前阶段：用户已授权准备官方 KernelSU + 官方 SUSFS 519 的代码；代码完成后必须停下，待用户安排 Claude 审查且无异议后，才能开始内核编译。不要通过提交、推送、workflow_dispatch 或其他方式提前触发编译。
++
++不要修改 `代码/DailyNotes` 的既有未提交改动。管理器 D2 在内核编译等待期间推进，需审计自有包名、组件、类名、资源、JNI 与原生库静态身份；内核协议常量保持兼容。
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,27 @@
+-# 食用说明
+-一加内核开源地址：[OnePlusOSS](https://github.com/OnePlusOSS/kernel_manifest)
++# OnePlus 15 A67: official KernelSU + official SUSFS
+ 
+-# 原始项目
+-[MKSU-SKN](https://github.com/ShirkNeko/KernelSU)
++状态：**Claude 首轮审查 B1/R1/R2 已修复，等待复核；未编译、未推送、未安装。**
++
++输入唯一来源为 `inputs.lock.json`。一加源码、编译器、模块 ABI 与签名信任沿用已验证 K32 基础；KernelSU 固定官方 `75e179d3`，SUSFS 固定官方 `519c86c`。两侧官方补丁均使用同一 SUSFS 提交。
++
++本版本保留 K32 的管理器 fd / 信息接口访问限制，管理器门槛采用官方包名、证书长度和证书哈希构建参数。不包含 PGuard，不携带内嵌 K 编号；官方数字版本为 `30000 + 2705 = 32705`。原厂完整 Linux banner、公开 IKCONFIG、调度器、模块 CRC 和原厂模块证书信任均为强制门槛。
++
++## 审查入口
++
++先读 `docs/kernel-review.md`，再看 `review/LOCAL_OFFICIAL_OVERLAY.patch` 与相关脚本。`review/` 是本轮源码检查的具体证据；它不表示编译或设备验证通过。
++
++工作分支 `codex/official-ksu-susfs` 基于原 `main` 的 `0024c872`。旧实验 workflow / 触发器 / 专属补丁从新主线工作树移除，历史与归档分支保留。保留内核 workflow 原文件名以延续原流水线身份，实际 K 号只认后续 Actions 返回的 `run_number`。
++
++## 构建流程
++
++唯一内核入口 `.github/workflows/Build-ReSukiSU-StockSched.yml` 只允许手动触发；收到用户转达的 Claude 审查无异议结论后，按已有授权传入 `review_ack=reviewed` 才会运行。提交或推送代码不会触发编译。
++
++流水线：固定原厂源码与工具链 → 原厂构建适配和证书信任 → 官方 KSU / SUSFS 严格上下文补丁与独立 A67 smaps 适配 → 管理器参数、访问加固与原厂公开配置 → 源码门槛/反向检查 → 配置预检 → 编译 → 完整 banner / ABI / 证书 / preinit / 源码指纹复核 → 只打包验证通过的 Image。
++
++产物 ZIP 为 `PLK110_A67_K<run_number>_KernelSU_SUSFS.zip`；`BUILD_RECORD.json` 保存 K 号、构建定义提交、两侧上游提交与 Image SHA256。包只更新 boot 中的内核，不附带模块、DTB/DTBO 或其他分区镜像。编译成功仍需手机启动与模块兼容验收。
++
++## 管理器后续
++
++在审查通过并开始内核编译后推进 D2.0.0/36200，范围见 `docs/D2-port-contract.md`。内核与管理器/ksud 用同一官方 KernelSU 提交，`ksu_susfs` 用同一 SUSFS 提交。签名密钥只在本机；新后端不能被旧 finalize 参数替换回 D91 后端。
++
++本轮未读取密钥或连接手机。实际刷机之前须另行核对实机与 K32 启动链、D1.1.1、`/data/adb` 回退材料，不能把 B 槽当作可靠回退槽。
+diff --git a/README_PLK110.md b/README_PLK110.md
+--- a/README_PLK110.md
++++ /dev/null
+@@ -1,71 +0,0 @@
+-# 一加 15 PLK110 A.67 内核构建
+-
+-## 固定基线
+-
+-- 设备：OnePlus 15 / `PLK110`
+-- 固件：`PLK110_16.0.8.302(CN01)`
+-- 内核：`6.12.23-android16-5-gb2a876903b49-ab14541642-4k`
+-- 目标功能：SukiSU builtin `4.2.0` + SUSFS `2.3.0`
+-- 2026-09-15 只读检查：手机仍使用原厂 boot，SukiSU LKM 位于 init_boot。
+-
+-common、SoC、modules、manifest、SukiSU、SUSFS 和 AnyKernel 源码均固定到
+-工作流记录的完整提交号。`SOURCE_PINS.txt` 和 `SOURCE_MANIFEST.xml` 随产物保存。
+-编译器沿用固定一加源码配套工具链；与原厂编译器的构建号差异会在报告中保留，
+-不宣称与原厂镜像逐字节相同。
+-
+-## 两阶段构建
+-
+-1. `Build-Stock-A67.yml` 先构建不含 SukiSU/SUSFS 的 GKI。
+-2. 纯内核离线核验成功后，`Build-SukiSU.yml` 才允许开始功能构建。
+-   工作流会验证指定纯内核运行的提交号和成功状态。
+-
+-二者使用同一套 `scripts/build_gki.sh`、产物收集和离线核验脚本。
+-支持手动运行，也分别支持修改 `.github/plk110-stock-trigger` 和
+-`.github/plk110-build-trigger` 后触发。
+-
+-### 保留正常配置和 KMI 检查
+-
+-- 使用源码自带的 `gki_defconfig`，不把手机的完整 `.config` 写成 defconfig。
+-- 直接构建官方 canoe perf 的 base_kernel 指向的 `//common:kernel_aarch64`。
+-- 保留 Bazel 的 minimized defconfig、KMI 严格检查和符号裁剪。
+-- 通过 Bazel 标准参数开启原厂已有的 ZSTD 调试信息压缩，覆盖 SoC rc 的关闭设置。
+-- 使用标准 post-defconfig fragments 加入原厂公开证书及第二阶段功能配置。
+-- 保留 `MODULE_SIG`、`MODULE_SIG_ALL`、`MODULE_SIG_PROTECT`、
+-  `TRIM_UNUSED_KSYMS`、`MODVERSIONS`、原厂 LTO/CFI 和调度配置。
+-- 固定源码只补齐构建脚本所需的 `vmlinux_oki` 复制步骤，并修正与原厂不一致的
+-  版本字符串 OKI 后缀；所有源码改动随产物导出。
+-
+-### 核验实际 Image
+-
+-配置预检在完整编译前完成。最终配置从 **Image 内嵌的 IKCONFIG** 提取，
+-并与同一个 GKI 目标的预检配置逐项核对。
+-
+-`dist/out_dir/.config` 属于一加设备模块目标，不能当作 boot Image 的配置。
+-此前第 14 次功能产物的导出配置与实际 Image 存在 432 个配置值差异；
+-实际 Image 与原厂只有 13 个配置值差异。不能据错误的导出配置判断
+-该 Image 关闭了模块签名保护。
+-
+-原厂模块基线覆盖 system_dlkm、vendor_dlkm 和原厂 vendor_boot：
+-1018 个文件记录包含跨分区副本，覆盖实时加载的全部 664 个原厂模块。
+-现有 SukiSU LKM 不属于原厂模块基线。核验会检查内核提供的符号 CRC，
+-并区分由原厂模块彼此提供的依赖符号。
+-
+-全部 103 个带签名的原厂模块均已离线验证由同一个原厂证书签名。
+-构建将该**公开证书**加入内置信任表，最终用 System.map 定位 Image 内的
+-`system_certificate_list` 并检查证书内容。没有原厂私钥，也不需要原厂私钥。
+-详见 [证书来源](baselines/PLK110_A67_stock_module_signer.md)。
+-
+-## 功能与产物
+-
+-第二阶段仅允许基线文件列出的 SukiSU/SUSFS 功能差异。KPM、ADB root、
+-SukiSU debug 和 SUSFS 日志关闭。SukiSU 版本信息固定为
+-`v4.2.0-e2912817@builtin`，版本码采用官方 v4.2.0 发布的 `40900`，
+-构建期间不再查询最新版本或读取错误仓库的提交号。
+-
+-产物包含 Image、vmlinux、System.map、Module.symvers、实际配置、预检配置、
+-VERDICT.json、模块 ABI 报告、源码改动和 SHA256SUMS.txt。
+-第二阶段核验成功后才生成仅替换 boot 内核的 AnyKernel3 包。
+-
+-**离线核验通过不代表实机启动通过。** 本流程不刷写、不重启手机。
+-当前 init_boot 中的 SukiSU LKM 与将来的 builtin 切换需要独立的启动及恢复安排。
+-没有 pstore 或启动日志时，不将历史启动失败归结为已证明的单一原因。
+diff --git a/baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions b/baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
+--- a/baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions
++++ /dev/null
+@@ -1,14 +0,0 @@
+-# CONFIG_KPM is not set
+-# CONFIG_KSU_DEBUG is not set
+-# CONFIG_KSU_FEATURE_ADBROOT is not set
+-# CONFIG_KSU_SUSFS_ENABLE_LOG is not set
+-CONFIG_KSU=y
+-CONFIG_KSU_SUSFS=y
+-CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+-CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+-CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+-CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+-CONFIG_KSU_SUSFS_SUS_KSTAT=y
+-CONFIG_KSU_SUSFS_SUS_MAP=y
+-CONFIG_KSU_SUSFS_SUS_MOUNT=y
+-CONFIG_KSU_SUSFS_SUS_PATH=y
+diff --git a/baselines/PLK110_A67_official.config.additions b/baselines/PLK110_A67_official.config.additions
+--- /dev/null
++++ b/baselines/PLK110_A67_official.config.additions
+@@ -0,0 +1,15 @@
++# Official KernelSU 75e179d3 + official SUSFS 519c86c; no PGuard or fork options.
++CONFIG_KSU=y
++# CONFIG_KSU_DEBUG is not set
++# CONFIG_KSU_DISABLE_MANAGER is not set
++# CONFIG_KSU_DISABLE_POLICY is not set
++CONFIG_KSU_SUSFS=y
++# CONFIG_KSU_SUSFS_ENABLE_LOG is not set
++CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
++CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
++CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
++CONFIG_KSU_SUSFS_SPOOF_UNAME=y
++CONFIG_KSU_SUSFS_SUS_KSTAT=y
++CONFIG_KSU_SUSFS_SUS_MAP=y
++CONFIG_KSU_SUSFS_SUS_MOUNT=y
++CONFIG_KSU_SUSFS_SUS_PATH=y
+diff --git a/baselines/PLK110_A67_stock.banner b/baselines/PLK110_A67_stock.banner
+--- /dev/null
++++ b/baselines/PLK110_A67_stock.banner
+@@ -0,0 +1 @@
++Linux version 6.12.23-android16-5-gb2a876903b49-ab14541642-4k (kleaf@build-host) (Android (14043575, +pgo, +bolt, +lto, +mlgo, based on r536225) clang version 19.0.1 (https://android.googlesource.com/toolchain/llvm-project b3a530ec6537146650e42be89f1089e9a3588460), LLD 19.0.1) #1 SMP PREEMPT Fri Dec  5 02:05:55 UTC 2025
+diff --git a/docs/A67-SUSFS-519-adaptation.md b/docs/A67-SUSFS-519-adaptation.md
+--- /dev/null
++++ b/docs/A67-SUSFS-519-adaptation.md
+@@ -0,0 +1,29 @@
++# SUSFS 519 在一加 A67 上的严格上下文适配
++
++官方 519 的 `50_add_susfs_in_gki-android16-6.12.patch` 原件保持不变并保存到审查材料。原来使用 fuzz=3，导致三个 SUS_MAP 块错误落入 `smaps_rollup_open()` / `pte_is_pinned()`，已废止该做法。
++
++现在所有 common 补丁使用 `git apply --check` 后再 `git apply`，不使用 GNU patch 的 fuzz、忽略上下文或 unidiff-zero 模式。任何非零 fuzz 的成功日志也会被守卫拒绝。
++
++## 六个被替换的官方块
++
++`scripts/susfs_patch_policy.py` 精确列出以下文件/块号，并核对 show_smap/show_smaps_rollup 的 hunk 头。其余官方块原文保留；移除的六块由 `patches/PLK110_A67_SUSFS_519_compat.patch` 替代。
++
++| 官方文件 | 官方块号 | A67 适配 |
++|---|---|---|
++| fs/exec.c | 1 | 同样的 SUSFS 头文件引入，以 A67 实际 include 列表严格定位 |
++| fs/proc/base.c | 1 | 同样的 SUSFS 头文件引入，以 A67 实际 include 列表严格定位 |
++| security/selinux/hooks.c | 1 | 同样的两个 extern 声明，以 A67 的 selinux_state 定义严格定位 |
++| fs/proc/task_mmu.c | 4 | show_smap 在 vma_pages 判断前对隐藏 VMA 返回 0 |
++| fs/proc/task_mmu.c | 5、6 | 在 A67 旧 do/for_each_vma 结构中的三条 gather 路径分别过滤隐藏 VMA，last_vma_end 始终更新 |
++
++这里没有给 A67 加原本不存在的 dma-buf include，也没有把新内核的 rollup 循环结构搬回旧源码。两条 pagemap_read 官方块保留并通过严格上下文匹配。
++
++## 语义与守卫
++
++- show_smap 的隐藏判断位于该函数体内、统计和 pad 处理之前。
++- show_smaps_rollup 的普通循环、锁竞争后 case 1/2、锁竞争后 case 4 三条路径，都只对可见 VMA 调用 smap_gather_stats；无论是否隐藏，均更新 last_vma_end，保持继续迭代/重获锁的既有行为。
++- SUS_MAP 关闭时，预处理后的三条原厂统计调用和游标更新保持原有流程。
++- `scripts/c_source_checks.py` 按具名 C 函数体检查，忽略注释/字符串中的括号；禁止 SUS_MAP 或 bypass_orig_flow 出现在 smaps_rollup_open / pte_is_pinned。
++- 本地与 CI 都运行 12 项源码破坏反向检查，结束后核对原始字节恢复；包括两个错误函数落点、遗漏 rollup 过滤、破坏游标更新和魔数返回成功等回归。
++
++源码文件副本检查通过仍不代表内核已编译或运行；内存统计、锁竞争场景和实际隐藏效果留待后续编译/实机验收。
+diff --git a/docs/D2-port-contract.md b/docs/D2-port-contract.md
+--- /dev/null
++++ b/docs/D2-port-contract.md
+@@ -0,0 +1,56 @@
++# Daily Notes 2 移植与静态特征审计约束
++
++状态：待内核审查通过并开始编译后推进；本文件不表示管理器已经实现、构建或验收。
++
++版本 `D2.0.0/36200`，应用包名 `com.daily.notes`。官方管理器、ksud 与内核都固定 `inputs.lock.json` 的 KernelSU 提交；SUSFS 用户态执行端固定同一个 `519c86c`，不使用 fork 后端或 D91 固定二进制。
++
++## 功能清单
++
++| 部分 | 必须覆盖 |
++|---|---|
++| 官方管理功能 | 官方授权/应用配置、模块、WebUI、日志、设置及上游新增功能；检查官方默认值，不照搬 fork 的私有协议 |
++| DN 工具页 | 双栏文件、批量操作、编辑/排序/打开、Root PTY/ATE、脚本后台执行、会话恢复与生命周期、字体/输入法/回车关闭等既有细节 |
++| 授权 | 主空间默认显示、点标题展开其他空间、用户区分、批量控制、单应用控制 |
++| 模块 | 默认隐藏、点标题显示；以真实模块标识打开 WebUI，核查旧修复是否由官方实现覆盖 |
++| 设置 | 标题点按切换 0/11；长按清理 10/11 的无线与移动流量记录，覆盖卸载应用和已删除用户 |
++| ADB | USB/网络/Root 开关，完整保留 D111 状态读取与保活同步解耦、错误独立提示和现有门控行为；不夹带暂缓的两开关拆分 |
++| SUSFS | 保留 DN 设置入口；官方 ksu_susfs 执行；通用开机脚本目录而非额外模块；写入前按实机核对配置范围 |
++| 外观与入口 | DN 应用名、图标切换、组件与命名空间；保留用户已确认的默认启动入口和界面行为 |
++
++先把现有实际源码/配置整理成逐项移植清单，再分功能实现，不重新叠加旧 43 个锚点替换脚本。原 `代码/DailyNotes` 工作树只读提取，不 reset/clean、不全量 add、不覆盖其脏改动。
++
++DN 功能输入以 Claude 当天最终交付 D1.1.1/36111 为准，已知最终 APK SHA256 为 `06b764651d8c14af8f79fe2fd00327023faa6d51119b2742241e6d2ba0083eb3`。正式移植前锁定其对应最终源码/资源/脚本与快照指纹；当前只核对了交付记录、APK 哈希和公开证书，不把源码全量对应关系写成已验证。
++
++## 模块挂载与配置迁移（上机前门槛）
++
++固定官方提交的 `website/docs/guide/metamodule.md` 明确：需要挂载 system 内容的模块依赖 metamodule，纯脚本模块不一定需要；同一时刻只能有一个。先根据实机模块清单与每个模块实际文件/脚本列出挂载、Zygisk、生命周期和依赖矩阵，再选择实现。官方 meta-overlayfs 是候选，不在本轮自动预装，也不据现有源码推断手机已经安装。
++
++SukiSU 的 allowlist/app profile 与官方格式须逐项对照，不能直接覆盖导入。上机前备份整份 `/data/adb`、记录 shell(2000) 与各用户的授权/配置，明确迁移支持范围；准备新管理器重新授权 shell 和应用的操作步骤，以及远程 Root/ADB 不可用时的本地 USB 恢复路径。
++
++D2 正式包、配套官方 ksud/ksu_susfs、初始化/授权及模块恢复方案未齐全时，不刷入新内核。现有 D1.1.1 会被包名/证书门槛识别，但这不证明旧后端兼容新协议。旧 init_boot 的 SukiSU LKM 是否会重复加载也必须在部署方案中解决，恢复原厂 init_boot 尚属待用户确定的设备操作。
++
++## 静态特征清理
++
++审计分源码和最终 APK 两层，不能只改显示名或 applicationId。
++
++| 表面 | 检查内容 |
++|---|---|
++| Manifest / 包信息 | applicationId、namespace、组件全名、别名、authority、permission、action、进程名、zygote preload、元数据、label/icon |
++| DEX | 自有包名/类名、BuildConfig/R 引用、反射/序列化类型名、硬编码上游身份、URL、日志与错误文字 |
++| 资源与资产 | 自有资源键和文字、图标、HTML/JS/WebUI bridge、文件名、配置、SourceDebugExtension/源路径等编译残留 |
++| JNI / 原生库 | Java 类与导出函数配套重命名；动态注册类路径、System.loadLibrary、ELF SONAME/依赖、可见符号、字符串和调试路径 |
++| 后端包装 | 使用中性的包内库名；校验新的 ksud 字节和来源，不能仅改名后仍留旧载荷 |
++
++现有 DN 身份映射作为移植参考：`RuntimeApplication`、`HomeActivity`、`DesktopEntry`、`StartupPreload`、`NativeApi`、`BootstrapService`、`BootReceiver`、`IDeviceCatalog`、`PackageCatalogService` 均在 `com.daily.notes` 下；后端与 JNI 库沿用中性命名 `libnote_runtime.so` / `libnote_bridge.so`。
++
++必须保持的内核 ABI/IOCTL、root 数据目录/命令接口与第三方依赖另作精确例外记录。例外必须写到具体字符串、位置和用途，不能用“包含 ksu 都放行”一类宽泛规则。自有身份中的 `me.weishu.kernelsu`、`com.resukisu` 等残留直接阻断交付。第三方许可文本按原许可保留并单列审计范围。
++
++最终静态报告需同时审计签名前与 finalize 后的 APK；JNI 启动、Root/Binder/PTY、跨用户授权、模块 WebUI 等功能验证不能被“扫描无残留”替代。
++
++## 出包约束
++
++CI 只出未签名 arm64 包；本机原证书 V2-only 签名。核对 APK 内 ksud / ksu_susfs 的输入提交、SHA256、版本和签名前后字节，禁止使用旧命令中的 `D91-preserved-backend.bin`。
++
++已查看同一官方提交的 `repack_apk.py`：可参考其 ksud 注入与 zipalign 流程，但不能代替 DN 源码移植和静态身份清理。该版本会把密码以 pass: 参数传给签名工具，且按 libksud.so 搜索载荷；若复用，必须先适配本地 password-file、中性库名、固定证书/V2-only 和签名前后载荷核对，不能直接照用。
++
++跨框架升级可能涉及 `/data/adb` 数据格式与模块兼容，实际迁移之前必须具备整包备份。刷写、安装、重启与用户验收分别记录。
+diff --git a/docs/deployment-gates.md b/docs/deployment-gates.md
+--- /dev/null
++++ b/docs/deployment-gates.md
+@@ -0,0 +1,25 @@
++# 构建完成到实际部署之间的门槛
++
++此文件记录后续必须解决的交付问题，不是新的刷写/安装授权。本轮不连接手机、不刷写、不预装模块。
++
++## 内核和管理器同时准备
++
++必须先有正式 D2.0.0/36200 与配套官方 ksud/ksu_susfs，通过包名/证书、协议、后端哈希及静态特征审计，再确定升级次序。D1.1.1 被新内核识别为管理器不等于旧 SukiSU 协议后端可用；D2 未齐不能先刷内核。
++
++## 启动链和回退
++
++先核对实机身份、活动槽、K32 boot 与 init_boot，以及 `/data/adb` 的完整备份与哈希。B 槽不作为可靠回退槽。USB fastboot/离线恢复由用户在场配合，不能把远程隧道作为唯一入口。
++
++首轮审查认为“K32 PGuard 会拦截 AnyKernel 写 boot”，该推断与现有证据冲突：`协作/设备现状.md` 手机摘要记载 boot/boot_a/boot_b 放行；K32 封存 `PLK110_PGuard_v2_source.c` 第56–58行也明确放行 raw boot 以便本地 AnyKernel 升级。因此不把 AnyKernel 必然被拦写作为既定事实。实际刷入方式待核对实机及安装包脚本后定，仍可按完整 boot.img + USB fastboot 方案准备；本轮没有试写。
++
++当前记录中 init_boot_a 仍为旧 SukiSU LKM。新内置官方 KSU 下的重复加载风险需要解决；恢复为 A67 官方原版的具体镜像、操作分区、顺序和回滚仍须按桌面索引/实机与用户确认，不能仅凭此审查自动刷入。
++
++## 模块挂载和授权数据
++
++逐项核对实机模块与实际文件/脚本，区分需要 system 挂载的模块和纯脚本模块。官方 metamodule 仅对需要挂载的功能构成依赖；先选择兼容实现再形成部署方案，不自动安装。固定官方源码的 metamodule 文档及 FAQ 已核对，详见 `D2-port-contract.md`。
++
++备份并比较旧 allowlist/app profile 与官方格式，记录各用户及 shell(2000) 的授权，明确可迁移和必须重新授权的项目。准备本地重新授权、官方 ksud 初始化、模块禁用/恢复及回退步骤，不能假定远程 Root/ADB 在切换后仍可用。
++
++## 已明确的范围
++
++用户本轮已确认这一版不带 PGuard，稳定后再独立考虑分区保护及 `/dev/sg*` 覆盖。该选择不改变现有设备状态；上机后要分别记录新内核/管理器安装、重启、Root、模块、SUSFS、ADB 门控、检测与稳定性验收。
+diff --git a/docs/kernel-review.md b/docs/kernel-review.md
+--- /dev/null
++++ b/docs/kernel-review.md
+@@ -0,0 +1,48 @@
++# 编译前审查：官方 KernelSU + SUSFS 519
++
++本轮边界：**源码与构建定义准备完成；没有内核/管理器编译，没有提交、推送、Actions 触发、手机连接或刷写。**
++
++当前为 Claude 首轮审查 B1/R1/R2 修正版，修复后再次停等复核。用户要求审查无异议后才开始编译；本轮没有编译。
++
++## 审查顺序
++
++1. 看 `inputs.lock.json`：官方 KernelSU `75e179d3` / 32705、SUSFS `519c86c`、一加 A67 四组源码与 clang 固定提交。
++2. 看 `review/LOCAL_OFFICIAL_OVERLAY.patch`：官方 SUSFS 之后仅额外改 Kbuild 的可复现版本/官方管理器参数、管理器 fd 两处权限门槛、三个信息 ioctl、负 fd 失败回收及 common 的 root fragment。
++3. 看 `patches/PLK110_A67_SUSFS_519_compat.patch`、`scripts/susfs_patch_policy.py` 与 `review/OFFICIAL_SUSFS_INTEGRATION.json`：六个不兼容块由独立 A67 适配替代，其余官方原文保留；全部使用 git apply 严格上下文，禁止 fuzz。
++4. 看 `scripts/link_official_driver.py`、`prepare_stock_build.py`、`prepare_stock_trust.py`、`prepare_stock_ikconfig.py`：driver 链接、两处原厂构建适配、模块证书信任、原厂公开配置。
++5. 看 `verify_official_sources.py`、`verify_gki.py`、`verify_official_image.py` 和 workflow：检查是否能在错误输入、ABI/证书/完整 banner 漂移时阻断，并且打包前没有绕过检查。
++6. 看 `docs/D2-port-contract.md`：管理器功能与静态身份审计范围。本轮未开始管理器移植。
++
++不直接复用旧 K30/K32 修复脚本、SELinux 实验移植、fork 专属选项和 PGuard。它们已经被移出新主线流程，不能因文件名相似又接回去。
++
++## 具体实现边界
++
++- `KSU_PACKAGE_NAME/KSU_EXPECTED_SIZE/KSU_EXPECTED_HASH` 使用官方 Kbuild 参数，签名解析代码未修改；证书长度 890，SHA256 与现有 D1.1.1 一致。
++- `ksu_install_fd()` 在实际安装管理器 fd 时检查 `manager_or_root`，异步入口 `ksu_supercall_reboot_handler()` 在分配任务前再次检查，未识别调用返回 -EPERM，使 common reboot 回到原厂校验路径。`ksu_install_su_fd()` 及官方 SU-session 权限例外保持。
++- `GET_INFO`、`GET_INFO_LEGACY`、`CHECK_SAFEMODE` 均为 `manager_or_root`，不允许 SU-session 绕过。K32 的 `GET_FULL_VERSION` 在此官方提交没有对应 ioctl，不添加私有协议。
++- Kbuild 在进入 Bazel 前冻结官方版本表达式 `30000 + git_count`；固定包名/证书使用原有编译定义通路。没有新增版本名、K 后缀或精确 APK 哈希门槛。
++- 官方 519 的 UID filter worker 修复与两处 RCU 同步均保留。官方新增 susfs.c/.h 等逐字节核对；额外 A67 include/声明与旧 smaps 循环适配见 `docs/A67-SUSFS-519-adaptation.md`，另有已知空白规范化。
++- preinit 编译后要求 ksu_preinit_init / ksu_preinit_handle_post_execveat 及非空 runner blob 符号；Image 禁止 KSU_NO_PREINIT 回退字符串，preflight/build 日志出现 preinit disabled 即失败。此门槛已有单元测试，本版真实编译结果尚未产生。
++- 完整 banner、公开 IKCONFIG、模块 CRC、调度器/厂商 tracepoint 和原厂模块证书信任均为编译后门槛。
++- 为保持 stock SCM stamping，先导出完整 diff 和 203 项源码指纹，再在 CI 临时 common 工作树标记已有受控改动为 assume-unchanged；编译前后复核实际字节。官方 UAPI 目录链接及其目标头文件也包含在指纹中。
++- 内核 workflow 保留旧文件名，改成仅手动触发，`review_ack` 必须等于 `reviewed`；没有 push、pull_request 或 workflow_run 自动触发。
++- 打包沿用固定 AnyKernel 提交，只替换 boot 内核；禁用 vbmeta 修补，不附带 ZIP/APK/IMG、模块或其他分区载荷。
++
++## 已实际检查
++
++- 使用固定提交的 33 个原厂文件建立独立副本，完整运行 driver 链接、原厂适配、证书、两侧官方补丁、加固与配置步骤，全部通过。
++- 官方 KSU、保留的 common 官方块、独立 A67 适配全部严格 git apply --check/apply 通过；没有 fuzz/拒绝，记录见 `OFFICIAL_COMMON_PATCH.log`。
++- 17 项单元测试通过（6 配置、4 补丁/函数守卫、7 preinit）；12 项真实源码破坏反向测试全部被拦截，之后已恢复原始字节。CI 同样运行源码反向检查。
++- 203 项适配源码及链接/UAPI 目标指纹一致；Python AST、全部 workflow Bash 片段和 shell 脚本语法通过。
++- `review/` 保存上述实际结果、实际 overlay 和实际输入下载哈希。`SOURCE_STATE.json` 的 review_fixture=true 表示精确源文件子集，不冒充完整 OnePlus checkout。
++- 新 smaps 守卫已实际拒绝首轮错误源码；结果见 `CLAUDE_B1_REGRESSION.json`。原厂参考 run 34980659033 仍可读，stock-gki job 为 completed/success；提交/路径仍由 CI 原有前置步骤核对。
++
++## 尚未验证，编译/验收时必须继续
++
++完整 repo sync、Kleaf/Bazel 沙箱与新官方 preinit runner/UAPI 构建依赖、编译结果的实际 config、完整 banner、厂商模块 CRC 和证书表、AnyKernel 完整包门槛都尚未在本版本运行。源文件子集检查不能证明这些已经通过。
++
++手机未连接，本次不刷新 K32/D1.1.1 的设备记录。后续启动、Root、模块、SUSFS/SELinux、检测软件、ADB 门控和长时间稳定性均需另行验收；本版没有 PGuard，B 槽不作可靠回退槽。
++
++## 提交审查意见
++
++请报告文件/行号、具体问题、触发条件、建议修改，并明确区分阻断项和可选项。未获得用户转达的无异议结论前，不运行任何构建/触发命令。修复审查问题后重新运行相关源码检查；收到用户转达的审查无异议结论后，按已有授权开始编译，不重复申请同一范围的授权。
+diff --git a/inputs.lock.json b/inputs.lock.json
+--- /dev/null
++++ b/inputs.lock.json
+@@ -0,0 +1,40 @@
++{
++  "schema": 1,
++  "device": "PLK110",
++  "firmware": "PLK110_16.0.8.302(CN01)",
++  "kernel_release": "6.12.23-android16-5-gb2a876903b49-ab14541642-4k",
++  "oneplus_manifest": "ecdd4809cbd01fa5f509a4708347026f63498303",
++  "oneplus_common": "b2a876903b495c444a94b16f50d1463ffe953957",
++  "oneplus_soc": "c88c1b3f75f7e88cd651608362ac7b95f11eb400",
++  "oneplus_modules": "f45a4a587a0ba9107a5421a2dd978404f545164b",
++  "kernelsu": {
++    "repository": "https://github.com/tiann/KernelSU.git",
++    "commit": "75e179d378d7aaa0de8946358a3384444c3e36b0",
++    "git_count": 2705,
++    "version": 32705
++  },
++  "susfs": {
++    "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
++    "branch": "gki-android16-6.12",
++    "commit": "519c86c5d8ad3832ff4a2e1a81dc1b81076f1693",
++    "version": "v2.3.0"
++  },
++  "manager": {
++    "package": "com.daily.notes",
++    "certificate_size": 890,
++    "certificate_sha256": "7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e",
++    "version_name": "D2.0.0",
++    "version_code": 36200
++  },
++  "clang_prebuilt": "9a98ca4072ec000f301bd3ece481ea2baca76ca5",
++  "clang_android_build": "14043575",
++  "llvm_commit": "b3a530ec6537146650e42be89f1089e9a3588460",
++  "anykernel": "0fc7569866bb5d5fe51752cc410dca3e92ab332f",
++  "stock_config_sha256": "e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0",
++  "stock_reference_run": "34980659033",
++  "stock_reference_commit": "34e24abcfaac6fc9db1279ad073c15af216fd664",
++  "k32_reference_commit": "ba4ff939d8825906289424a7079e91925c8a4c90",
++  "repo_launcher_sha256": "1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f",
++  "pguard": false,
++  "kernel_embedded_k_number": false
++}
+diff --git a/patches/PLK110_A67_SUSFS_519_compat.patch b/patches/PLK110_A67_SUSFS_519_compat.patch
+--- /dev/null
++++ b/patches/PLK110_A67_SUSFS_519_compat.patch
+@@ -0,0 +1,115 @@
++diff --git a/fs/exec.c b/fs/exec.c
++--- a/fs/exec.c
+++++ b/fs/exec.c
++@@ -67,10 +67,13 @@
++ #include <linux/coredump.h>
++ #include <linux/time_namespace.h>
++ #include <linux/user_events.h>
++ #include <linux/rseq.h>
++ #include <linux/ksm.h>
+++#ifdef CONFIG_KSU_SUSFS
+++#include <linux/susfs_def.h>
+++#endif
++ 
++ #include <linux/uaccess.h>
++ #include <asm/mmu_context.h>
++ #include <asm/tlb.h>
++ 
++diff --git a/fs/proc/base.c b/fs/proc/base.c
++--- a/fs/proc/base.c
+++++ b/fs/proc/base.c
++@@ -98,10 +98,14 @@
++ #include <linux/time_namespace.h>
++ #include <linux/resctrl.h>
++ #include <linux/cn_proc.h>
++ #include <linux/ksm.h>
++ #include <linux/cpufreq_times.h>
+++#if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+++#include <linux/susfs_def.h>
+++#endif // #if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+++
++ #include <uapi/linux/lsm.h>
++ #include <trace/events/oom.h>
++ #include <trace/hooks/sched.h>
++ #include "internal.h"
++ #include "fd.h"
++diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
++--- a/security/selinux/hooks.c
+++++ b/security/selinux/hooks.c
++@@ -107,10 +107,14 @@
++ #include "avc_ss.h"
++ 
++ #define SELINUX_INODE_INIT_XATTRS 1
++ 
++ struct selinux_state selinux_state;
+++#ifdef CONFIG_KSU_SUSFS
+++extern bool ksu_selinux_hide_running __read_mostly;
+++extern int my_setprocattr(const char *name, void *value, size_t size);
+++#endif // #ifdef CONFIG_KSU_SUSFS
++ 
++ /* SECMARK reference count */
++ static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
++ 
++ #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
++diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
++--- a/fs/proc/task_mmu.c
+++++ b/fs/proc/task_mmu.c
++@@ -1344,10 +1344,15 @@
++ static int show_smap(struct seq_file *m, void *v)
++ {
++ 	struct vm_area_struct *vma = v;
++ 	struct mem_size_stats mss = {};
++ 
+++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+++	if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+++		return 0;
+++#endif
+++
++ 	if (!vma_pages(vma))
++ 		goto show_pad;
++ 
++ 	smap_gather_stats(vma, &mss, 0);
++ 
++@@ -1403,11 +1408,14 @@
++ 	if (unlikely(!vma))
++ 		goto empty_set;
++ 
++ 	vma_start = vma->vm_start;
++ 	do {
++-		smap_gather_stats(vma, &mss, 0);
+++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+++		if (!vma->vm_file || !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+++#endif
+++			smap_gather_stats(vma, &mss, 0);
++ 		last_vma_end = vma->vm_end;
++ 
++ 		/*
++ 		 * Release mmap_lock temporarily if someone wants to
++ 		 * access it for write request.
++@@ -1462,18 +1470,24 @@
++ 			if (!vma)
++ 				break;
++ 
++ 			/* Case 1 and 2 above */
++ 			if (vma->vm_start >= last_vma_end) {
++-				smap_gather_stats(vma, &mss, 0);
+++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+++				if (!vma->vm_file || !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+++#endif
+++					smap_gather_stats(vma, &mss, 0);
++ 				last_vma_end = vma->vm_end;
++ 				continue;
++ 			}
++ 
++ 			/* Case 4 above */
++ 			if (vma->vm_end > last_vma_end) {
++-				smap_gather_stats(vma, &mss, last_vma_end);
+++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+++				if (!vma->vm_file || !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+++#endif
+++					smap_gather_stats(vma, &mss, last_vma_end);
++ 				last_vma_end = vma->vm_end;
++ 			}
++ 		}
++ 	} for_each_vma(vmi, vma);
++ 
+diff --git a/patches/PLK110_A67_susfs_selinux_hooks.patch b/patches/PLK110_A67_susfs_selinux_hooks.patch
+--- a/patches/PLK110_A67_susfs_selinux_hooks.patch
++++ /dev/null
+@@ -1,70 +0,0 @@
+-diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
+---- a/security/selinux/hooks.c
+-+++ b/security/selinux/hooks.c
+-@@ -108,6 +108,12 @@
+- #define SELINUX_INODE_INIT_XATTRS 1
+- 
+- struct selinux_state selinux_state;
+-+#ifdef CONFIG_KSU_SUSFS
+-+extern struct selinux_policy *backup_sepolicy;
+-+extern bool ksu_selinux_hide_running __read_mostly;
+-+extern int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
+-+                                               u32 *sid, u32 def_sid, gfp_t gfp_flags);
+-+#endif // #ifdef CONFIG_KSU_SUSFS
+- 
+- /* SECMARK reference count */
+- static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
+-@@ -6593,6 +6599,41 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
+- 	return -EINVAL;
+- }
+- 
+-+#ifdef CONFIG_KSU_SUSFS
+-+static int my_setprocattr(const char *name, void *value, size_t size)
+-+{
+-+	u32 mysid = current_sid(), sid = 0;
+-+	int error;
+-+	char *str = value;
+-+
+-+	// apply to all app uids
+-+	if (likely(current_uid().val < 10000 ||
+-+				!ksu_selinux_hide_running ||
+-+				strcmp(name, "current")))
+-+		return selinux_setprocattr(name, value, size);
+-+
+-+	error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS,
+-+				     PROCESS__SETCURRENT, NULL);
+-+
+-+	if (error)
+-+		return error;
+-+
+-+	/* Obtain a SID for the context, if one was specified. */
+-+	if (size && str[0] && str[0] != '\n') {
+-+		if (str[size-1] == '\n') {
+-+			str[size-1] = 0;
+-+			size--;
+-+		}
+-+
+-+		error = security_context_to_sid_with_policy(backup_sepolicy, str, size, &sid, SECSID_NULL, GFP_KERNEL);
+-+		if (error)
+-+			return error;
+-+	}
+-+
+-+	return selinux_setprocattr(name, value, size);
+-+}
+-+#endif // #ifdef CONFIG_KSU_SUSFS
+-+
+- static int selinux_ismaclabel(const char *name)
+- {
+- 	return (strcmp(name, XATTR_SELINUX_SUFFIX) == 0);
+-@@ -7224,7 +7265,11 @@ static struct security_hook_list selinux_hooks[] __ro_after_init = {
+- 	LSM_HOOK_INIT(getselfattr, selinux_getselfattr),
+- 	LSM_HOOK_INIT(setselfattr, selinux_setselfattr),
+- 	LSM_HOOK_INIT(getprocattr, selinux_getprocattr),
+-+#ifdef CONFIG_KSU_SUSFS
+-+	LSM_HOOK_INIT(setprocattr, my_setprocattr),
+-+#else
+- 	LSM_HOOK_INIT(setprocattr, selinux_setprocattr),
+-+#endif // #ifdef CONFIG_KSU_SUSFS
+- 
+- 	LSM_HOOK_INIT(ismaclabel, selinux_ismaclabel),
+- 	LSM_HOOK_INIT(secctx_to_secid, selinux_secctx_to_secid),
+diff --git a/patches/PLK110_SukiSU_4.2_6.12_compat.patch b/patches/PLK110_SukiSU_4.2_6.12_compat.patch
+--- a/patches/PLK110_SukiSU_4.2_6.12_compat.patch
++++ /dev/null
+@@ -1,45 +0,0 @@
+-diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
+---- a/kernel/feature/kernel_umount.c
+-+++ b/kernel/feature/kernel_umount.c
+-@@ -3,7 +3,15 @@
+- static int kernel_umount_feature_get(u64 *value)
+- {
+-     *value = ksu_kernel_umount_enabled ? 1 : 0;
+-     return 0;
+- }
+- 
+-+static int kernel_umount_feature_set(u64 value)
+-+{
+-+    bool enable = value != 0;
+-+    ksu_kernel_umount_enabled = enable;
+-+    pr_info("kernel_umount: set to %d\n", enable);
+-+    return 0;
+-+}
+-+
+- static const struct ksu_feature_handler kernel_umount_handler = {
+-     .feature_id = KSU_FEATURE_KERNEL_UMOUNT,
+-     .name = "kernel_umount",
+-diff --git a/kernel/hook/lsm_hook.c b/kernel/hook/lsm_hook.c
+---- a/kernel/hook/lsm_hook.c
+-+++ b/kernel/hook/lsm_hook.c
+-@@ -173,3 +173,10 @@
+- #endif
+- 
+-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+-+static const struct lsm_id ksu_lsmid = {
+-+    .name = "ksu",
+-+    .id = LSM_ID_UNDEF,
+-+};
+-+#endif
+-+
+- static struct security_hook_list ksu_hooks[] = {
+-@@ -185,6 +192,8 @@
+- void __init ksu_lsm_hook_init(void)
+- {
+--#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+-+    security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), &ksu_lsmid);
+-+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+-     security_add_hooks(ksu_hooks, ARRAY_SIZE(ksu_hooks), "ksu");
+- #else
+-     // https://elixir.bootlin.com/linux/v4.10.17/source/include/linux/lsm_hooks.h#L1892
+diff --git a/scripts/c_source_checks.py b/scripts/c_source_checks.py
+--- /dev/null
++++ b/scripts/c_source_checks.py
+@@ -0,0 +1,67 @@
++"""Small source assertions scoped to actual named C function bodies."""
++import re
++
++
++def masked_c(text):
++    pattern = r'/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
++    return re.sub(pattern, lambda match: re.sub(r'[^\n]', ' ', match[0]), text, flags=re.S)
++
++
++def function_span(text, name):
++    masked = masked_c(text)
++    found = []
++    for match in re.finditer(r'\b' + re.escape(name) + r'\s*\(', masked):
++        position = match.end()
++        depth = 1
++        while position < len(masked) and depth:
++            depth += (masked[position] == '(') - (masked[position] == ')')
++            position += 1
++        while position < len(masked) and masked[position].isspace():
++            position += 1
++        if position >= len(masked) or masked[position] != '{':
++            continue
++        start = position
++        depth = 1
++        position += 1
++        while position < len(masked) and depth:
++            depth += (masked[position] == '{') - (masked[position] == '}')
++            position += 1
++        if depth:
++            raise ValueError(f'unbalanced function body: {name}')
++        found.append((start, position))
++    if len(found) != 1:
++        raise ValueError(f'expected one C definition for {name}, got {len(found)}')
++    return found[0]
++
++
++def function_body(text, name):
++    start, end = function_span(text, name)
++    return text[start:end]
++
++
++def verify_smaps_hooks(text):
++    smap = function_body(text, 'show_smap')
++    rollup = function_body(text, 'show_smaps_rollup')
++    predicate = 'SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))'
++    if smap.count(predicate) != 1:
++        raise ValueError('show_smap: exactly one SUS_MAP predicate is required')
++    if not smap.index(predicate) < smap.index('return 0;') < smap.index('if (!vma_pages(vma))'):
++        raise ValueError('show_smap: hidden VMA must return before stats/pad handling')
++    for forbidden in ('smaps_rollup_open', 'pte_is_pinned'):
++        body = function_body(text, forbidden)
++        if 'SUSFS_IS_INODE_SUS_MAP' in body or 'bypass_orig_flow' in body:
++            raise ValueError(f'SUS_MAP hook in wrong function: {forbidden}')
++    if rollup.count('smap_gather_stats(') != 3 or rollup.count(predicate) != 3:
++        raise ValueError('show_smaps_rollup: all three old-structure paths must be guarded')
++    for indent, offset in (('\t\t', '0'), ('\t\t\t\t', '0'), ('\t\t\t\t', 'last_vma_end')):
++        expected = ('#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n'
++                    f'{indent}if (!vma->vm_file || !{predicate})\n'
++                    '#endif\n'
++                    f'{indent}\tsmap_gather_stats(vma, &mss, {offset});\n'
++                    f'{indent}last_vma_end = vma->vm_end;')
++        if expected not in rollup:
++            raise ValueError(f'rollup guard or last_vma_end update missing: {offset}/{len(indent)}')
++    if 'goto bypass_orig_flow' in rollup:
++        raise ValueError('unexpected new-structure rollup label in the A67 adaptation')
++    return {'show_smap': 'early hidden-VMA return', 'show_smaps_rollup': '3 guarded gather paths; cursor always advances',
++            'forbidden_functions': ['smaps_rollup_open', 'pte_is_pinned']}
+diff --git a/scripts/check_definition.py b/scripts/check_definition.py
+--- /dev/null
++++ b/scripts/check_definition.py
+@@ -0,0 +1,48 @@
++"""Review gate for manual triggers, source pins, and build command structure."""
++import ast
++import json
++import os
++from pathlib import Path
++import re
++import subprocess
++import yaml
++
++root = Path.cwd()
++workflow = root / '.github/workflows/Build-ReSukiSU-StockSched.yml'
++definition = yaml.load(workflow.read_text(), Loader=yaml.BaseLoader)
++assert set(definition['on']) == {'workflow_dispatch'}, 'automatic build trigger is forbidden'
++dispatch = definition['on']['workflow_dispatch']
++assert dispatch['inputs']['review_ack']['required'] == 'true'
++job = definition['jobs']['official-stock-sched']
++assert "inputs.review_ack == 'reviewed'" in job['if']
++assert definition['permissions'] == {'contents': 'read', 'actions': 'read'}
++steps = job['steps']
++commands = '\n'.join(step.get('run', '') for step in steps)
++for old in ('apply_susfs_post230_fixes.py', 'port_ksu_3877_selinux_hide.py',
++            'apply_k30_upstream_fixes.py', 'apply_k32_kernel_fixes.py', 'apply_plk110_pguard.py',
++            'github.com/ReSukiSU', 'github.com/cctv18', 'D91-preserved-backend'):
++    assert old not in commands, old
++for command in ('scripts/integrate_official_susfs.py', 'scripts/prepare_official_kernel.py',
++                'scripts/link_official_driver.py',
++                'scripts/verify_official_sources.py', 'scripts/prepare_stock_ikconfig.py',
++                'scripts/verify_official_image.py', 'scripts/package_official_gki.sh'):
++    assert commands.count(command) == 1, command
++order = [commands.index(marker) for marker in (
++    'scripts/integrate_official_susfs.py', 'scripts/prepare_official_kernel.py',
++    'scripts/prepare_stock_ikconfig.py', 'scripts/verify_official_sources.py',
++    'scripts/check_source_guards.py --fixture .',
++    'scripts/source_state.py record', 'scripts/build_gki.sh preflight',
++    'scripts/build_gki.sh build', 'scripts/source_state.py verify',
++    'scripts/verify_official_image.py', 'scripts/package_official_gki.sh')]
++assert order == sorted(order), 'build/source/packaging gate order drift'
++for path in (root / 'scripts').glob('*.py'):
++    ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
++for step in steps:
++    if 'run' in step:
++        subprocess.run([os.environ.get('TASK_BASH_EXE', 'bash'), '-n'], input=step['run'].encode(), check=True)
++for path in (root / 'scripts').glob('*.sh'):
++    subprocess.run([os.environ.get('TASK_BASH_EXE', 'bash'), '-n', str(path)], check=True)
++lock = json.loads((root / 'inputs.lock.json').read_text())
++assert lock['susfs']['commit'] == '519c86c5d8ad3832ff4a2e1a81dc1b81076f1693'
++assert lock['manager']['version_code'] == 36200 and lock['pguard'] is False
++print(f'PASS: manual reviewed trigger, {len(steps)} step bodies, Python/Bash syntax, fixed 519 inputs.')
+diff --git a/scripts/check_source_guards.py b/scripts/check_source_guards.py
+--- /dev/null
++++ b/scripts/check_source_guards.py
+@@ -0,0 +1,83 @@
++"""Exercise source gates by injecting real regressions, always restoring bytes.
++
++This is a source-only test. It never invokes a kernel build or contacts devices.
++"""
++import argparse
++import json
++from pathlib import Path
++import subprocess
++import sys
++
++
++def main():
++    cli = argparse.ArgumentParser(description=__doc__)
++    cli.add_argument('--fixture', type=Path, required=True)
++    args = cli.parse_args()
++    fixture = args.fixture.resolve()
++    verifier = Path(__file__).with_name('verify_official_sources.py').resolve()
++    ksu = 'kernel_workspace/kernel_platform/KernelSU/kernel/'
++    common = 'kernel_workspace/kernel_platform/common/'
++    cases = [
++        ('manager fd exposed', ksu + 'supercall/supercall.c',
++         '    if (!manager_or_root())\n        return -EPERM;', '    if (0)\n        return -EPERM;'),
++        ('unprivileged reboot task queued', ksu + 'supercall/supercall.c',
++         '    /* Return to stock reboot validation without queueing work or exposing a fd. */\n'
++         '    if (!manager_or_root())\n        return -EPERM;',
++         '    if (0)\n        return -EPERM;'),
++        ('reboot magic success leaks driver presence', ksu + 'supercall/supercall.c',
++         '    /* Return to stock reboot validation without queueing work or exposing a fd. */\n'
++         '    if (!manager_or_root())\n        return -EPERM;',
++         '    if (!manager_or_root())\n        return 0;'),
++        ('info permission reopened', ksu + 'supercall/dispatch.c',
++         '.name = "GET_INFO",\n        .handler = do_get_info,\n        .perm_check = manager_or_root',
++         '.name = "GET_INFO",\n        .handler = do_get_info,\n        .perm_check = always_allow'),
++        ('SU session accidentally restricted', ksu + 'supercall/supercall.c',
++         '    // This descriptor must be installed after the exec into ksud.',
++         '    if (!manager_or_root()) return -EPERM;'),
++        ('SUSFS source changed', common + 'fs/susfs.c', 'synchronize_rcu();', '/* removed RCU synchronization */'),
++        ('public IKCONFIG leaked root delta', common + 'arch/arm64/configs/plk110_a67_stock_ikconfig',
++         'CONFIG_IKCONFIG=y', 'CONFIG_IKCONFIG=n'),
++        ('old fork Kconfig silently introduced', common + 'arch/arm64/configs/plk110_official.fragment',
++         'CONFIG_KSU=y', 'CONFIG_KSU=y\nCONFIG_KSU_MULTI_MANAGER_SUPPORT=y'),
++        ('SUS_MAP misplaced into smaps_rollup_open', common + 'fs/proc/task_mmu.c',
++         'static int smaps_rollup_open(struct inode *inode, struct file *file)\n{',
++         'static int smaps_rollup_open(struct inode *inode, struct file *file)\n{\n'
++         '\tif (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) return 0;'),
++        ('SUS_MAP misplaced into pte_is_pinned', common + 'fs/proc/task_mmu.c',
++         'static inline bool pte_is_pinned(struct vm_area_struct *vma, unsigned long addr, pte_t pte)\n{',
++         'static inline bool pte_is_pinned(struct vm_area_struct *vma, unsigned long addr, pte_t pte)\n{\n'
++         '\tif (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) goto bypass_orig_flow;'),
++        ('rollup path left unfiltered', common + 'fs/proc/task_mmu.c',
++         '\t\tif (!vma->vm_file || !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))', '\t\tif (1)'),
++        ('rollup cursor no longer advances', common + 'fs/proc/task_mmu.c',
++         '\t\tlast_vma_end = vma->vm_end;', '\t\tif (0) last_vma_end = vma->vm_end;'),
++    ]
++    passed = []
++    subprocess.run([sys.executable, str(verifier)], cwd=fixture, check=True,
++                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++    for label, relative, old, new in cases:
++        target = fixture / relative
++        original = target.read_bytes()
++        text = original.decode()
++        if old not in text:
++            raise RuntimeError(f'test preimage drift: {label}')
++        try:
++            target.write_bytes(text.replace(old, new, 1).encode())
++            result = subprocess.run([sys.executable, str(verifier)], cwd=fixture,
++                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++            if result.returncode == 0:
++                raise RuntimeError(f'source gate missed regression: {label}')
++            passed.append(label)
++        finally:
++            target.write_bytes(original)
++    subprocess.run([sys.executable, str(verifier)], cwd=fixture, check=True,
++                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++    (fixture / 'artifacts/NEGATIVE_SOURCE_GUARDS.json').write_text(json.dumps({
++        'passed': True, 'caught_regressions': passed, 'original_sources_restored': True,
++        'compiled': False,
++    }, indent=2) + '\n')
++    print(f'PASS: all {len(passed)} injected regressions rejected; original sources restored.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/export_inputs.py b/scripts/export_inputs.py
+--- /dev/null
++++ b/scripts/export_inputs.py
+@@ -0,0 +1,33 @@
++"""Export the single source lock to Actions; no compiler or network calls."""
++import json
++import os
++from pathlib import Path
++
++lock = json.loads(Path('inputs.lock.json').read_text(encoding='utf-8'))
++assert lock['pguard'] is False and lock['kernel_embedded_k_number'] is False
++assert lock['kernelsu']['version'] == 30000 + lock['kernelsu']['git_count']
++values = {
++    'MANIFEST_COMMIT': lock['oneplus_manifest'],
++    'COMMON_COMMIT': lock['oneplus_common'],
++    'SOC_COMMIT': lock['oneplus_soc'],
++    'MODULES_COMMIT': lock['oneplus_modules'],
++    'KERNELSU_COMMIT': lock['kernelsu']['commit'],
++    'SUSFS_COMMIT': lock['susfs']['commit'],
++    'ANYKERNEL_COMMIT': lock['anykernel'],
++    'EXPECTED_KERNEL_RELEASE': lock['kernel_release'],
++    'STOCK_CONFIG_SHA256': lock['stock_config_sha256'],
++    'AOSP_CLANG_PREBUILT_COMMIT': lock['clang_prebuilt'],
++    'EXPECTED_CLANG_BUILD': lock['clang_android_build'],
++    'EXPECTED_LLVM_COMMIT': lock['llvm_commit'],
++    'VERIFIED_STOCK_RUN': lock['stock_reference_run'],
++    'VERIFIED_STOCK_COMMIT': lock['stock_reference_commit'],
++    'REPO_LAUNCHER_SHA256': lock['repo_launcher_sha256'],
++}
++lines = []
++for key, value in values.items():
++    if not isinstance(value, str) or '\n' in value or '\r' in value:
++        raise SystemExit(f'invalid environment value: {key}')
++    lines.append(f'{key}={value}\n')
++with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8', newline='\n') as output:
++    output.writelines(lines)
++print('Exported pinned inputs; KSU version', lock['kernelsu']['version'])
+diff --git a/scripts/export_review_bundle.py b/scripts/export_review_bundle.py
+--- /dev/null
++++ b/scripts/export_review_bundle.py
+@@ -0,0 +1,66 @@
++"""Export uncommitted code and actual source-check evidence for human review."""
++import argparse
++import difflib
++import hashlib
++import json
++from pathlib import Path
++import shutil
++import subprocess
++
++
++def git(*args):
++    return subprocess.check_output(['git', *args])
++
++
++def main():
++    cli = argparse.ArgumentParser(description=__doc__)
++    cli.add_argument('--fixture', type=Path, required=True)
++    args = cli.parse_args()
++    out = Path('review')
++    out.mkdir(exist_ok=True)
++    evidence = args.fixture / 'artifacts'
++    copied = []
++    for name in ('LOCAL_OFFICIAL_OVERLAY.patch', 'OFFICIAL_COMMON_PATCH.log', 'OFFICIAL_KSU_PATCH.log',
++                 'OFFICIAL_10_KSU.patch', 'OFFICIAL_50_COMMON.patch',
++                 'OFFICIAL_50_STRICT_SUBSET.patch', 'A67_SUSFS_519_COMPAT.patch',
++                 'OFFICIAL_SUSFS_INTEGRATION.json', 'OFFICIAL_KERNEL_PREPARATION.json',
++                 'SOURCE_INVARIANTS.json', 'SOURCE_STATE.json', 'NEGATIVE_SOURCE_GUARDS.json',
++                 'MANAGER_CERTIFICATE_GATE.json', 'REVIEW_SOURCE_DOWNLOADS.json',
++                 'CLAUDE_B1_REGRESSION.json', 'VERIFIED_STOCK_RUN_CHECK.json',
++                 'STATIC_UNIT_TESTS.log',
++                 'COMMON_BUILD_ADAPTATIONS.patch', 'KERNELSU_EFFECTIVE.patch', 'KLEAF_STAMP_ADAPTATION.patch'):
++        shutil.copyfile(evidence / name, out / name)
++        copied.append(name)
++    tracked = {entry.decode() for entry in git('ls-files', '-z').split(b'\0') if entry}
++    others = {entry.decode() for entry in git('ls-files', '--others', '--exclude-standard', '-z').split(b'\0') if entry}
++    changes = []
++    files = {}
++    for relative in sorted(tracked | others):
++        if relative.startswith('review/'):
++            continue
++        path = Path(relative)
++        before = git('show', 'HEAD:' + relative) if relative in tracked else b''
++        after = path.read_bytes() if path.is_file() else b''
++        if after:
++            files[relative] = hashlib.sha256(after).hexdigest()
++        if before == after:
++            continue
++        if b'\0' in before or b'\0' in after:
++            raise RuntimeError(f'binary file requires explicit review export: {relative}')
++        changes.append(f'diff --git a/{relative} b/{relative}\n')
++        changes.extend(difflib.unified_diff(before.decode().splitlines(keepends=True),
++            after.decode().splitlines(keepends=True),
++            fromfile='a/' + relative if relative in tracked else '/dev/null',
++            tofile='b/' + relative if path.is_file() else '/dev/null'))
++    (out / 'BUILD_DEFINITION_CHANGESET.patch').write_text(''.join(changes), encoding='utf-8', newline='\n')
++    (out / 'CODE_SHA256.json').write_text(json.dumps({
++        'base_commit': git('rev-parse', 'HEAD').decode().strip(),
++        'branch': git('branch', '--show-current').decode().strip(),
++        'code_sha256': files, 'source_evidence': copied,
++        'committed': False, 'pushed': False, 'compiled': False, 'device_connected': False,
++    }, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
++    print(f'Exported complete review changeset, {len(files)} code fingerprints and {len(copied)} evidence files.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/integrate_official_susfs.py b/scripts/integrate_official_susfs.py
+--- /dev/null
++++ b/scripts/integrate_official_susfs.py
+@@ -0,0 +1,118 @@
++"""Integrate official SUSFS using strict contexts and a separate A67 adaptation.
++
++Six incompatible common hunks are replaced by the reviewed A67 source patch.
++All other official content is retained verbatim. No fuzzy patching is accepted.
++Logs, original/applied patch bytes and hashes are exported for review.
++"""
++import hashlib
++import json
++from pathlib import Path
++import shutil
++import subprocess
++from susfs_patch_policy import strict_official_patch, reject_fuzzy_log
++
++
++def command(args, *, cwd=None, data=None):
++    result = subprocess.run(args, cwd=cwd, input=data, stdout=subprocess.PIPE,
++                            stderr=subprocess.STDOUT)
++    output = result.stdout.decode('utf-8', errors='replace')
++    if result.returncode:
++        raise RuntimeError(f'{args[0]} failed ({result.returncode}):\n{output[-6000:]}')
++    return output
++
++
++def main():
++    lock = json.loads(Path('inputs.lock.json').read_text())
++    workspace = Path('kernel_workspace')
++    ksu = workspace / 'kernel_platform/KernelSU'
++    common = workspace / 'kernel_platform/common'
++    susfs = workspace / 'susfs4ksu'
++    out = Path('artifacts')
++    out.mkdir(exist_ok=True)
++    for source, expected in ((ksu, lock['kernelsu']['commit']), (susfs, lock['susfs']['commit'])):
++        actual = command(['git', 'rev-parse', 'HEAD'], cwd=source).strip()
++        if actual != expected:
++            raise RuntimeError(f'{source}: wrong commit {actual}')
++        command(['git', 'diff', '--exit-code'], cwd=source)
++    if command(['git', 'rev-parse', '--is-shallow-repository'], cwd=ksu).strip() != 'false':
++        raise RuntimeError('KernelSU full history is required for the official numeric version')
++    count = int(command(['git', 'rev-list', '--count', 'HEAD'], cwd=ksu))
++    if count != lock['kernelsu']['git_count']:
++        raise RuntimeError(f'KernelSU version count drift: {count}')
++
++    ksu_patch = (susfs / 'kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch').read_bytes()
++    common_patch = (susfs / 'kernel_patches/50_add_susfs_in_gki-android16-6.12.patch').read_bytes()
++    ksu_log = command(['git', 'apply', '--check', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
++    ksu_log += command(['git', 'apply', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
++    (out / 'OFFICIAL_KSU_PATCH.log').write_text(ksu_log or 'git apply --check and apply: PASS\n')
++
++    strict_patch, replacements = strict_official_patch(common_patch)
++    compat_path = Path(__file__).resolve().parents[1] / 'patches/PLK110_A67_SUSFS_519_compat.patch'
++    compat_patch = compat_path.read_bytes()
++    common_log = ''
++    for name, data in (('Retained official hunks', strict_patch), ('A67 compatibility hunks', compat_patch)):
++        common_log += name + ': strict git apply (no fuzz)\n'
++        common_log += command(['git', 'apply', '--check', '--verbose', '--whitespace=nowarn', '-'], cwd=common, data=data)
++        common_log += command(['git', 'apply', '--verbose', '--whitespace=nowarn', '-'], cwd=common, data=data)
++    reject_fuzzy_log(common_log)
++    (out / 'OFFICIAL_COMMON_PATCH.log').write_text(common_log)
++    rejected = [str(path) for path in common.rglob('*.rej')]
++    if rejected:
++        raise RuntimeError(f'patch rejects exist: {rejected[:10]}')
++
++    hashes = {}
++    for directory in ('fs', 'include/linux'):
++        for source in sorted((susfs / 'kernel_patches' / directory).iterdir()):
++            if source.is_file():
++                target = common / directory / source.name
++                target.parent.mkdir(parents=True, exist_ok=True)
++                shutil.copyfile(source, target)
++                hashes[str(target.relative_to(common))] = hashlib.sha256(source.read_bytes()).hexdigest()
++
++    # Upstream whitespace only: Kconfig space-tab, SELinux blank lines, dispatch.
++    # Read/write with LF also avoids Windows checkout line-ending artifacts.
++    whitespace = []
++    for source in (ksu / 'kernel/Kconfig', ksu / 'kernel/selinux/selinux.c',
++                   ksu / 'kernel/supercall/dispatch.c'):
++        original = source.read_text()
++        fixed = '\n'.join(line.rstrip() for line in original.splitlines()) + '\n'
++        if source.name == 'Kconfig':
++            fixed = fixed.replace('\t  \tjust disable', '\t  just disable')
++        if fixed != original:
++            source.write_text(fixed, encoding='utf-8', newline='\n')
++            whitespace.append(str(source.relative_to(ksu)))
++    stat = common / 'fs/stat.c'
++    lines = stat.read_text().splitlines()
++    for index, line in enumerate(lines):
++        if 'query_flags | AT_GETATTR_NOSEC);' in line and index and 'request_mask,' in lines[index-1]:
++            lines[index] = '\t\t\t\t\t\tquery_flags | AT_GETATTR_NOSEC);'
++    stat.write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
++    memory = common / 'mm/memory.c'
++    memory.write_text('\n'.join(line.rstrip() for line in memory.read_text().splitlines()) + '\n',
++                      encoding='utf-8', newline='\n')
++    for repo in (ksu, common):
++        command(['git', 'diff', '--check'], cwd=repo)
++
++    (out / 'OFFICIAL_10_KSU.patch').write_bytes(ksu_patch)
++    (out / 'OFFICIAL_50_COMMON.patch').write_bytes(common_patch)
++    (out / 'OFFICIAL_50_STRICT_SUBSET.patch').write_bytes(strict_patch)
++    (out / 'A67_SUSFS_519_COMPAT.patch').write_bytes(compat_patch)
++    report = {
++        'kernelsu': lock['kernelsu'], 'susfs': lock['susfs'],
++        'ksu_patch_sha256': hashlib.sha256(ksu_patch).hexdigest(),
++        'common_patch_sha256': hashlib.sha256(common_patch).hexdigest(),
++        'strict_official_subset_sha256': hashlib.sha256(strict_patch).hexdigest(),
++        'a67_compatibility_patch_sha256': hashlib.sha256(compat_patch).hexdigest(),
++        'a67_replaced_official_hunks': replacements,
++        'copied_sources': hashes, 'ksu_whitespace_only_normalization': whitespace,
++        'common_whitespace_only_normalization': ['fs/stat.c', 'mm/memory.c'],
++        'ksu_patch_check': 'PASS', 'common_patch_dry_run_and_apply': 'PASS',
++        'common_patch_max_fuzz': 0, 'patch_engine': 'strict git apply', 'rejected_hunks': 0,
++        'compiled': False, 'device_tested': False,
++    }
++    (out / 'OFFICIAL_SUSFS_INTEGRATION.json').write_text(json.dumps(report, indent=2) + '\n')
++    print('Official KSU + retained common + explicit A67 compatibility patches applied with no fuzz/rejects.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/link_official_driver.py b/scripts/link_official_driver.py
+--- /dev/null
++++ b/scripts/link_official_driver.py
+@@ -0,0 +1,19 @@
++"""The official driver linkage, with checked preimages for the pinned stock tree."""
++from pathlib import Path
++
++common = Path('kernel_workspace/kernel_platform/common')
++link = common / 'drivers/kernelsu'
++make = common / 'drivers/Makefile'
++kconfig = common / 'drivers/Kconfig'
++obj = 'obj-$(CONFIG_KSU) += kernelsu/'
++source = 'source "drivers/kernelsu/Kconfig"'
++make_text = make.read_text()
++config_text = kconfig.read_text()
++assert not link.exists() and not link.is_symlink(), 'KernelSU driver link already exists'
++assert obj not in make_text and source not in config_text
++assert config_text.splitlines().count('endmenu') == 1, 'unexpected stock drivers/Kconfig layout'
++link.symlink_to(Path('..') / '..' / 'KernelSU' / 'kernel', target_is_directory=True)
++make.write_text(make_text + '\n' + obj + '\n', encoding='utf-8', newline='\n')
++kconfig.write_text(config_text.replace('\nendmenu', '\n' + source + '\nendmenu', 1),
++                  encoding='utf-8', newline='\n')
++print('Linked the pinned official driver into the stock build tree.')
+diff --git a/scripts/package_gki.sh b/scripts/package_gki.sh
+--- a/scripts/package_gki.sh
++++ /dev/null
+@@ -1,51 +0,0 @@
+-#!/bin/bash
+-set -euo pipefail
+-python3 - <<'PY'
+-import json
+-from pathlib import Path
+-assert json.loads(Path('artifacts/VERDICT.json').read_text())['passed'] is True
+-PY
+-git clone --filter=blob:none --no-checkout --depth=1 --branch master \
+-  https://github.com/Numbersf/AnyKernel3.git AnyKernelSource
+-git -C AnyKernelSource fetch --depth=1 origin "$ANYKERNEL_COMMIT"
+-git -C AnyKernelSource checkout --detach "$ANYKERNEL_COMMIT"
+-test "$(git -C AnyKernelSource rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
+-mkdir AnyKernel3
+-git -C AnyKernelSource archive HEAD | tar -x -C AnyKernel3
+-cp artifacts/Image AnyKernel3/Image
+-sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 SukiSU 4.2 + SUSFS 2.3/' AnyKernel3/anykernel.sh
+-sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
+-sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
+-sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
+-sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
+-grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
+-grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
+-grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
+-grep -qx 'do.modules=0' AnyKernel3/anykernel.sh
+-! grep -Eq '^[[:space:]]*(patch_fstab|flash_generic|write_boot.*vendor)' AnyKernel3/anykernel.sh
+-for forbidden in \
+-  dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
+-  vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
+-  vendor_kernel_boot vendor_kernel_boot.img \
+-  vendor_dlkm vendor_dlkm.img system_dlkm system_dlkm.img \
+-  recovery recovery.img abl abl.img vendor_ramdisk vendor_patch modules; do
+-  test ! -e "AnyKernel3/$forbidden"
+-done
+-! find AnyKernel3 -iname '*.zip' -print -quit | grep -q .
+-(
+-  cd AnyKernel3
+-  zip -r9 ../artifacts/PLK110_A67_SukiSU-4.2_SUSFS-2.3_NoKPM.zip .
+-)
+-cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
+-printf 'anykernel=%s\nverified_stock_run=%s\nverified_stock_commit=%s\n' \
+-  "$ANYKERNEL_COMMIT" "$VERIFIED_STOCK_RUN" "$VERIFIED_STOCK_COMMIT" >> artifacts/SOURCE_PINS.txt
+-cat > artifacts/READ_ME.txt <<'EOF'
+-Target: OnePlus 15 PLK110, PLK110_16.0.8.302(CN01), A67 kernel 6.12.23.
+-SukiSU 4.2 builtin + SUSFS 2.3; KPM, adb root and SUSFS debug logging disabled.
+-Offline Image configuration, stock module CRCs and original module signer trust
+-have passed verification. See VERDICT.json and SOURCE_PINS.txt for evidence.
+-The AnyKernel package replaces only the boot kernel and contains no modules,
+-device trees, init_boot or vendor_boot images. Device boot has NOT been tested.
+-The phone baseline uses SukiSU LKM in init_boot. Any future transition from LKM
+-to builtin needs its own boot/recovery plan; this build does not perform it.
+-EOF
+diff --git a/scripts/package_official_gki.sh b/scripts/package_official_gki.sh
+--- /dev/null
++++ b/scripts/package_official_gki.sh
+@@ -0,0 +1,71 @@
++#!/bin/bash
++set -euo pipefail
++python3 - <<'PY'
++import json
++from pathlib import Path
++for name in ('VERDICT.json', 'OFFICIAL_IMAGE_GATE.json'):
++    assert json.loads((Path('artifacts') / name).read_text())['passed'] is True, name
++PY
++
++git clone --filter=blob:none --no-checkout --depth=1 --branch master \
++  https://github.com/Numbersf/AnyKernel3.git AnyKernelSource
++git -C AnyKernelSource fetch --depth=1 origin "$ANYKERNEL_COMMIT"
++git -C AnyKernelSource checkout --detach "$ANYKERNEL_COMMIT"
++test "$(git -C AnyKernelSource rev-parse HEAD)" = "$ANYKERNEL_COMMIT"
++mkdir AnyKernel3
++git -C AnyKernelSource archive HEAD | tar -x -C AnyKernel3
++cp artifacts/Image AnyKernel3/Image
++sed -i 's/^kernel.string=.*/kernel.string=PLK110 A67 KernelSU + SUSFS/' AnyKernel3/anykernel.sh
++sed -i 's/^do.devicecheck=.*/do.devicecheck=1/' AnyKernel3/anykernel.sh
++sed -i 's/^device.name1=.*/device.name1=PLK110/' AnyKernel3/anykernel.sh
++sed -i 's/^device.name2=.*/device.name2=OP60FFL1/' AnyKernel3/anykernel.sh
++sed -i 's/^PATCH_VBMETA_FLAG=.*/PATCH_VBMETA_FLAG=0/' AnyKernel3/anykernel.sh
++grep -qx 'BLOCK=boot' AnyKernel3/anykernel.sh
++grep -qx 'IS_SLOT_DEVICE=auto' AnyKernel3/anykernel.sh
++grep -qx 'PATCH_VBMETA_FLAG=0' AnyKernel3/anykernel.sh
++grep -qx 'do.devicecheck=1' AnyKernel3/anykernel.sh
++grep -qx 'do.modules=0' AnyKernel3/anykernel.sh
++! grep -Eq '^[[:space:]]*(patch_fstab|flash_generic|write_boot.*vendor)' AnyKernel3/anykernel.sh
++for forbidden in \
++  dtb dtb.img dtbo dtbo.img recovery_dtbo recovery_dtbo.img \
++  vendor_boot vendor_boot.img init_boot init_boot.img vbmeta vbmeta.img \
++  vendor_kernel_boot vendor_kernel_boot.img vendor_dlkm vendor_dlkm.img \
++  system_dlkm system_dlkm.img recovery recovery.img abl abl.img \
++  vendor_ramdisk vendor_patch modules; do
++  test ! -e "AnyKernel3/$forbidden"
++done
++test -z "$(find AnyKernel3 -type f \( -iname '*.zip' -o -iname '*.apk' -o -iname '*.img' \) -print -quit)"
++run_number="${GITHUB_RUN_NUMBER:?Actions run number is required for the package label}"
++cp inputs.lock.json artifacts/inputs.lock.json
++cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
++(
++  cd AnyKernel3
++  zip -r9 "../artifacts/PLK110_A67_K${run_number}_KernelSU_SUSFS.zip" .
++)
++python3 - <<'PY'
++import hashlib
++import json
++import os
++from pathlib import Path
++lock = json.loads(Path('inputs.lock.json').read_text())
++record = {
++    'K': int(os.environ['GITHUB_RUN_NUMBER']), 'definition_commit': os.environ['GITHUB_SHA'],
++    'image_sha256': hashlib.sha256(Path('artifacts/Image').read_bytes()).hexdigest(),
++    'kernelsu': lock['kernelsu'], 'susfs': lock['susfs'], 'anykernel': lock['anykernel'],
++    'pguard': False, 'embedded_k_number': False,
++    'on_device': 'UNTESTED; not installed or booted by CI',
++}
++Path('artifacts/BUILD_RECORD.json').write_text(json.dumps(record, indent=2) + '\n')
++PY
++cat > artifacts/READ_ME.txt <<'EOF'
++Target: OnePlus 15 PLK110, PLK110_16.0.8.302(CN01), A67, stock scheduler.
++Official tiann KernelSU + official simonpunk SUSFS; exact inputs in inputs.lock.json.
++K is an external Actions/package label. Image identity is recorded by SHA256.
++The Image uses the stock banner and stock public IKCONFIG. No embedded K suffix.
++This version has NO PGuard partition-write protection.
++Checks cover config deltas, stock module symbol CRCs, signer trust and source invariants.
++The AnyKernel package replaces the boot kernel Image only and contains no vendor modules,
++device trees, init_boot, vendor_boot, vbmeta, vendor_dlkm or system_dlkm images.
++CI success does not establish device boot, root, module compatibility or detection results.
++Do not flash without verified K32/boot and /data/adb backups and the planned USB recovery path.
++EOF
+diff --git a/scripts/preinit_gate.py b/scripts/preinit_gate.py
+--- /dev/null
++++ b/scripts/preinit_gate.py
+@@ -0,0 +1,26 @@
++"""Require compiled preinit runner support; forbid silent KSU_NO_PREINIT fallback."""
++import re
++
++
++def verify_preinit(image, system_map, logs):
++    for name in ('preflight.log', 'build.log'):
++        if name not in logs:
++            raise ValueError(f'missing compiler log: {name}')
++        if re.search(r'\bpreinit disabled\b', logs[name], re.I):
++            raise ValueError(f'preinit silently disabled in {name}')
++    if b'KSU_NO_PREINIT flag is defined' in image:
++        raise ValueError('compiled KSU_NO_PREINIT fallback present in Image')
++    for symbol in ('ksu_preinit_init', 'ksu_preinit_handle_post_execveat'):
++        if not re.search(r' [Tt] ' + symbol + r'$', system_map, re.M):
++            raise ValueError(f'compiled preinit function missing: {symbol}')
++    addresses = {}
++    for symbol in ('ksu_preinit_runner_start', 'ksu_preinit_runner_end'):
++        match = re.search(r'^([0-9a-fA-F]+) \w ' + symbol + r'$', system_map, re.M)
++        if not match:
++            raise ValueError(f'preinit runner blob symbol missing: {symbol}')
++        addresses[symbol] = int(match[1], 16)
++    size = addresses['ksu_preinit_runner_end'] - addresses['ksu_preinit_runner_start']
++    if size <= 0:
++        raise ValueError('empty or inverted compiled preinit runner blob')
++    return {'passed': True, 'runner_bytes': size, 'no_preinit_fallback': False,
++            'compiler_logs_checked': ['preflight.log', 'build.log']}
+diff --git a/scripts/prepare_official_kernel.py b/scripts/prepare_official_kernel.py
+--- /dev/null
++++ b/scripts/prepare_official_kernel.py
+@@ -0,0 +1,113 @@
++"""Hermetic official metadata, official manager parameters, and K32 access gates.
++
++Does not alter the APK signature parser, protocol layouts, SU-session creation,
++or official KSU feature defaults. No PGuard and no embedded K/run identifier.
++"""
++import hashlib
++import difflib
++import json
++from pathlib import Path
++
++
++def once(text, old, new, label):
++    if text.count(old) != 1 or new in text:
++        raise RuntimeError(f'{label}: expected exactly one unmodified preimage')
++    return text.replace(old, new, 1)
++
++
++def harden_supercall(text):
++    text = once(text,
++        'int ksu_install_fd(void)\n{\n    return ksu_install_fd_with_permissions(O_CLOEXEC, 0);\n}',
++        'int ksu_install_fd(void)\n{\n'
++        '    /* Keep manager descriptors private; SU-session descriptors use their own path. */\n'
++        '    if (!manager_or_root())\n        return -EPERM;\n'
++        '    return ksu_install_fd_with_permissions(O_CLOEXEC, 0);\n}', 'manager fd')
++    text = once(text,
++        'int ksu_supercall_reboot_handler(void __user **arg)\n{\n    struct ksu_install_fd_tw *tw;\n',
++        'int ksu_supercall_reboot_handler(void __user **arg)\n{\n    struct ksu_install_fd_tw *tw;\n\n'
++        '    /* Return to stock reboot validation without queueing work or exposing a fd. */\n'
++        '    if (!manager_or_root())\n        return -EPERM;\n', 'reboot install entry')
++    # Installation is checked again in ksu_install_fd when task_work actually runs.
++    # Never pass a negative return value to ksu_close_fd on copy_to_user failure.
++    text = once(text, '        ksu_close_fd(fd);\n',
++                '        if (fd >= 0)\n            ksu_close_fd(fd);\n', 'fd failure cleanup')
++    return text
++
++
++def harden_dispatch(text):
++    for cmd in ('GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'):
++        marker = f'.cmd = KSU_IOCTL_{cmd},'
++        if text.count(marker) != 1:
++            raise RuntimeError(f'ioctl preimage drift: {cmd}')
++        start = text.index(marker)
++        end = text.index('    },', start)
++        block = text[start:end]
++        block = once(block, '.perm_check = always_allow', '.perm_check = manager_or_root', cmd)
++        if '.allow_su_session = true' in block:
++            raise RuntimeError(f'unexpected SU-session bypass: {cmd}')
++        text = text[:start] + block + text[end:]
++    return text
++
++
++def main():
++    lock = json.loads(Path('inputs.lock.json').read_text())
++    ksu = Path('kernel_workspace/kernel_platform/KernelSU/kernel')
++    common = Path('kernel_workspace/kernel_platform/common')
++    kbuild_path = ksu / 'Kbuild'
++    kbuild = kbuild_path.read_text()
++    start = kbuild.index('MDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))')
++    end = kbuild.index('KSU_NEW_DCACHE_FLUSH :=', start)
++    # Retain the official 30000 + history-count formula; freeze the count outside
++    # Bazel, where the sibling KernelSU .git is otherwise invisible.
++    frozen = ('# Official version formula, frozen from the pinned complete Git history.\n'
++              f"KSU_GIT_VERSION := {lock['kernelsu']['git_count']}\n"
++              '$(eval KSU_VERSION=$(shell expr 30000 + $(KSU_GIT_VERSION)))\n'
++              '$(info -- KernelSU version: $(KSU_VERSION))\n'
++              'ccflags-y += -DKSU_VERSION=$(KSU_VERSION)\n\n')
++    identity = ('# Values for the official supported build parameters.\n'
++                'KSU_KERNEL_DIR := $(srctree)/drivers/kernelsu\n'
++                f"KSU_PACKAGE_NAME := {lock['manager']['package']}\n"
++                f"KSU_EXPECTED_SIZE := {lock['manager']['certificate_size']}\n"
++                f"KSU_EXPECTED_HASH := {lock['manager']['certificate_sha256']}\n"
++                'KSU_IS_PR_BUILD := 0\n\n')
++    kbuild = identity + kbuild[:start] + frozen + kbuild[end:]
++    build_path = common / 'BUILD.bazel'
++    build = once(build_path.read_text(),
++        'post_defconfig_fragments = ["arch/arm64/configs/plk110_stock.fragment"],',
++        'post_defconfig_fragments = [\n'
++        '        "arch/arm64/configs/plk110_stock.fragment",\n'
++        '        "arch/arm64/configs/plk110_official.fragment",\n    ],', 'root fragment')
++    apk = ksu / 'manager/apk_sign.c'
++    apk_before = hashlib.sha256(apk.read_bytes()).hexdigest()
++    updates = {
++        kbuild_path: kbuild,
++        ksu / 'supercall/supercall.c': harden_supercall((ksu / 'supercall/supercall.c').read_text()),
++        ksu / 'supercall/dispatch.c': harden_dispatch((ksu / 'supercall/dispatch.c').read_text()),
++        build_path: build,
++        common / 'arch/arm64/configs/plk110_official.fragment':
++            Path('baselines/PLK110_A67_official.config.additions').read_text(),
++    }
++    overlay = []
++    for path, text in updates.items():
++        original = path.read_text() if path.exists() else ''
++        relative = str(path.relative_to(Path('kernel_workspace/kernel_platform'))).replace('\\', '/')
++        overlay.extend(difflib.unified_diff(original.splitlines(keepends=True), text.splitlines(keepends=True),
++                                           fromfile='a/' + relative, tofile='b/' + relative))
++        path.write_text(text, encoding='utf-8', newline='\n')
++    Path('artifacts/LOCAL_OFFICIAL_OVERLAY.patch').write_text(''.join(overlay), encoding='utf-8', newline='\n')
++    assert hashlib.sha256(apk.read_bytes()).hexdigest() == apk_before
++    report = {
++        'official_version': lock['kernelsu']['version'], 'embedded_k_number': False,
++        'official_manager_build_parameters': lock['manager'],
++        'apk_signature_parser_unchanged': True,
++        'manager_fd_permission': 'manager_or_root at entry and actual installation',
++        'info_ioctl_permissions': ['GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'],
++        'su_session_fd_path_unchanged': True, 'pguard': False,
++        'compiled': False, 'device_tested': False,
++    }
++    Path('artifacts/OFFICIAL_KERNEL_PREPARATION.json').write_text(json.dumps(report, indent=2) + '\n')
++    print('Prepared official metadata, package/certificate gate, and K32 fd/info access controls.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/prepare_review_fixture.py b/scripts/prepare_review_fixture.py
+--- /dev/null
++++ b/scripts/prepare_review_fixture.py
+@@ -0,0 +1,82 @@
++"""Download only the exact OnePlus files needed for source/patch review.
++
++Creates an isolated fixture, never invokes a compiler, never changes a phone.
++The KernelSU/SUSFS clones are local cached inputs. Existing output is refused.
++"""
++import argparse
++from concurrent.futures import ThreadPoolExecutor
++import hashlib
++import json
++from pathlib import Path
++import re
++import shutil
++import subprocess
++import time
++import urllib.request
++
++
++def main():
++    cli = argparse.ArgumentParser(description=__doc__)
++    cli.add_argument('--output', type=Path, required=True)
++    args = cli.parse_args()
++    root = Path.cwd().resolve()
++    output = args.output.resolve()
++    if not output.is_relative_to(root / '.inputs') or output.exists():
++        raise SystemExit('output must be a new directory inside this project .inputs/')
++    lock = json.loads((root / 'inputs.lock.json').read_text())
++    output.mkdir(parents=True)
++    (output / 'artifacts').mkdir()
++    shutil.copyfile(root / 'inputs.lock.json', output / 'inputs.lock.json')
++    shutil.copytree(root / 'baselines', output / 'baselines')
++    workspace = output / 'kernel_workspace'
++    for name, relative in (('KernelSU', 'kernel_platform/KernelSU'), ('susfs4ksu', 'susfs4ksu')):
++        subprocess.run(['git', 'clone', '--no-hardlinks', '--config', 'core.autocrlf=false',
++                        str(root / '.inputs' / name), str(workspace / relative)], check=True,
++                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++    patch = (workspace / 'susfs4ksu/kernel_patches/50_add_susfs_in_gki-android16-6.12.patch').read_text()
++    common_files = set(re.findall(r'^diff --git a/(\S+) b/\S+$', patch, re.M))
++    common_files.update(('BUILD.bazel', 'drivers/Makefile', 'drivers/Kconfig', 'kernel/Makefile',
++                         'scripts/Makefile.vmlinux', 'arch/arm64/configs/gki_defconfig', 'build.config.gki'))
++    common = workspace / 'kernel_platform/common'
++    (common / 'certs').mkdir(parents=True)
++    (common / 'include/linux').mkdir(parents=True)
++    stamp = 'kernel_platform/build/kernel/kleaf/impl/stamp.bzl'
++    jobs = [('android_kernel_common_oneplus_sm8850', lock['oneplus_common'], rel, common / rel)
++            for rel in sorted(common_files)]
++    jobs.append(('android_kernel_modules_and_devicetree_oneplus_sm8850', lock['oneplus_modules'],
++                 stamp, workspace / stamp))
++
++    def download(job):
++        repo, commit, relative, target = job
++        url = f'https://raw.githubusercontent.com/OnePlusOSS/{repo}/{commit}/{relative}'
++        for attempt in range(3):
++            try:
++                with urllib.request.urlopen(url, timeout=45) as response:
++                    data = response.read()
++                break
++            except Exception:
++                if attempt == 2:
++                    raise
++                time.sleep(2)
++        target.parent.mkdir(parents=True, exist_ok=True)
++        target.write_bytes(data)
++        return {'url': url, 'path': str(target.relative_to(output)),
++                'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
++
++    with ThreadPoolExecutor(max_workers=5) as pool:
++        records = list(pool.map(download, jobs))
++    # Index only explicit downloaded files, so git diff can check the adaptation.
++    # No commit is created and no existing worktree/index is touched.
++    for repo, paths in ((common, sorted(common_files)), (workspace, [stamp])):
++        subprocess.run(['git', 'init', str(repo)], check=True, stdout=subprocess.PIPE)
++        subprocess.run(['git', '-C', str(repo), 'config', 'core.autocrlf', 'false'], check=True)
++        subprocess.run(['git', '-C', str(repo), 'add', '--', *paths], check=True)
++    (output / 'artifacts/REVIEW_SOURCE_DOWNLOADS.json').write_text(json.dumps({
++        'scope': 'Exact pinned source-file subset, not a complete build tree.',
++        'compiled': False, 'files': records,
++    }, indent=2) + '\n')
++    print(f'Prepared {len(records)} exact source files in {output}; no compilation.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/prepare_stock_build.py b/scripts/prepare_stock_build.py
+--- /dev/null
++++ b/scripts/prepare_stock_build.py
+@@ -0,0 +1,30 @@
++"""The two K32-proven A67 build adaptations; exact preimages, no root changes."""
++from pathlib import Path
++
++
++def once(text, old, new, label):
++    if text.count(old) != 1 or new in text:
++        raise RuntimeError(f'{label}: preimage drift or already applied')
++    return text.replace(old, new, 1)
++
++
++def main():
++    common = Path('kernel_workspace/kernel_platform/common')
++    make = common / 'scripts/Makefile.vmlinux'
++    stamp = Path('kernel_workspace/kernel_platform/build/kernel/kleaf/impl/stamp.bzl')
++    rule = ('vmlinux: scripts/link-vmlinux.sh vmlinux.o $(KBUILD_LDS) FORCE\n'
++            '\t+$(call if_changed_dep,link_vmlinux)\n')
++    updates = {
++        make: once(make.read_text(), rule,
++                   rule + '\t$(Q)cp $(objtree)/vmlinux $(objtree)/vmlinux_oki\n', 'vmlinux_oki'),
++        stamp: once(stamp.read_text(),
++                    'scmversion_prefix="-$android_release-$KMI_GENERATION-$oki_infix"',
++                    'scmversion_prefix="-$android_release-$KMI_GENERATION"', 'stock release'),
++    }
++    for path, text in updates.items():
++        path.write_text(text, encoding='utf-8', newline='\n')
++    print('Applied the two pinned stock build adaptations.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/prepare_stock_ikconfig.py b/scripts/prepare_stock_ikconfig.py
+--- /dev/null
++++ b/scripts/prepare_stock_ikconfig.py
+@@ -0,0 +1,50 @@
++#!/usr/bin/env python3
++from pathlib import Path
++import hashlib
++
++BASELINE = Path("baselines/PLK110_16.0.8.302_stock.config")
++COMMON = Path("kernel_workspace/kernel_platform/common")
++PUBLIC = COMMON / "arch/arm64/configs/plk110_a67_stock_ikconfig"
++MAKEFILE = COMMON / "kernel/Makefile"
++
++EXPECTED_SHA256 = "e239b50cb4c660493edfdc2ae4908b56cf5cae1e826f71f637da85e4aea3ecd0"
++
++data = BASELINE.read_bytes()
++actual = hashlib.sha256(data).hexdigest()
++if actual != EXPECTED_SHA256:
++    raise SystemExit(f"stock config SHA256 drift: {actual} != {EXPECTED_SHA256}")
++
++text = data.decode()
++required = ("CONFIG_IKCONFIG=y\n", "CONFIG_IKCONFIG_PROC=y\n")
++for item in required:
++    if item not in text:
++        raise SystemExit(f"stock config missing required line: {item.strip()}")
++
++for forbidden in (
++    "CONFIG_KSU=y",
++    "CONFIG_KSU_SUSFS=y",
++    "CONFIG_PLK110_PARTITION_GUARD=y",
++    "CONFIG_KSU_FULL_NAME_FORMAT=",
++):
++    if forbidden in text:
++        raise SystemExit(f"stock public IKCONFIG unexpectedly contains root/PGuard option: {forbidden}")
++
++PUBLIC.write_bytes(data)
++
++make = MAKEFILE.read_text()
++old = "$(obj)/config_data: $(KCONFIG_CONFIG) FORCE"
++new = "$(obj)/config_data: arch/arm64/configs/plk110_a67_stock_ikconfig FORCE"
++if make.count(old) != 1:
++    raise SystemExit(f"kernel/Makefile IKCONFIG rule preimage count != 1: {make.count(old)}")
++if new in make:
++    raise SystemExit("kernel/Makefile public IKCONFIG rule already modified")
++MAKEFILE.write_text(make.replace(old, new, 1), encoding='utf-8', newline='\n')
++
++# The build's real KCONFIG_CONFIG is deliberately untouched. Only the embedded
++# IKCONFIG source consumed by kernel/configs.c is redirected to the exact stock
++# A67 config, preserving /proc/config.gz while keeping compiled ReSukiSU/SUSFS/PGuard.
++post = MAKEFILE.read_text()
++if post.count(new) != 1 or old in post:
++    raise SystemExit("public IKCONFIG redirection postcondition failed")
++
++print(f"Prepared stock public IKCONFIG: {PUBLIC} sha256={actual}")
+diff --git a/scripts/prepare_stock_trust.py b/scripts/prepare_stock_trust.py
+--- a/scripts/prepare_stock_trust.py
++++ b/scripts/prepare_stock_trust.py
+@@ -8,14 +8,14 @@
+ pem = Path('baselines/PLK110_A67_stock_module_signer.pem').read_text()
+ der = ssl.PEM_cert_to_DER_cert(pem)
+ assert hashlib.sha256(der).hexdigest() == STOCK_CERT_SHA256, 'wrong stock certificate'
+-(root / 'certs/plk110_stock.pem').write_text(pem)
++(root / 'certs/plk110_stock.pem').write_text(pem, encoding='utf-8', newline='\n')
+ (root / 'arch/arm64/configs/plk110_stock.fragment').write_text(
+-    'CONFIG_SYSTEM_TRUSTED_KEYS="certs/plk110_stock.pem"\n')
++    'CONFIG_SYSTEM_TRUSTED_KEYS="certs/plk110_stock.pem"\n', encoding='utf-8', newline='\n')
+ path = root / 'BUILD.bazel'
+ text = path.read_text()
+ anchor = 'common_kernel(\n    name = "kernel_aarch64",\n'
+ assert text.count(anchor) == 1, 'unexpected kernel_aarch64 declaration'
+ text = text.replace(anchor, anchor +
+     '    post_defconfig_fragments = ["arch/arm64/configs/plk110_stock.fragment"],\n', 1)
+-path.write_text(text)
++path.write_text(text, encoding='utf-8', newline='\n')
+ print('Added original public certificate through a post-defconfig fragment; normal checks retained.')
+diff --git a/scripts/prepare_sukisu_config.py b/scripts/prepare_sukisu_config.py
+--- a/scripts/prepare_sukisu_config.py
++++ /dev/null
+@@ -1,30 +0,0 @@
+-"""Declare exact feature choices and pin build metadata without network queries."""
+-from pathlib import Path
+-
+-kp = Path('kernel_workspace/kernel_platform')
+-path = kp / 'KernelSU/kernel/Makefile'
+-text = path.read_text()
+-start = text.index('git_short_sha    = ')
+-end = text.index('$(info -- $(REPO_NAME) version:')
+-assert start < end and 'releases/latest' in text[start:end]
+-# Official v4.2.0 release manager is SukiSU_v4.2.0_40900_releases.apk.
+-# The source is the pinned builtin commit, not a moving main branch or the
+-# surrounding OnePlus modules repository that Bazel's sandbox exposes to git.
+-text = text[:start] + (
+-    '# Fixed to the audited SukiSU v4.2.0 builtin source.\n'
+-    'KSU_VERSION := 40900\n'
+-    'KSU_VERSION_FULL := v4.2.0-e2912817@builtin\n'
+-) + text[end:]
+-path.write_text(text)
+-fragment = kp / 'common/arch/arm64/configs/plk110_sukisu.fragment'
+-fragment.write_text(Path('baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions').read_text())
+-path = kp / 'common/BUILD.bazel'
+-text = path.read_text()
+-anchor = 'post_defconfig_fragments = ["arch/arm64/configs/plk110_stock.fragment"],'
+-assert text.count(anchor) == 1
+-text = text.replace(anchor, 'post_defconfig_fragments = [\n'
+-                    '        "arch/arm64/configs/plk110_stock.fragment",\n'
+-                    '        "arch/arm64/configs/plk110_sukisu.fragment",\n'
+-                    '    ],')
+-path.write_text(text)
+-print('Pinned SukiSU version metadata and feature fragment; upstream gki_defconfig unchanged.')
+diff --git a/scripts/source_state.py b/scripts/source_state.py
+--- /dev/null
++++ b/scripts/source_state.py
+@@ -0,0 +1,75 @@
++"""Record adapted build inputs, then prove they stayed unchanged across build targets."""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import subprocess
++
++
++def git(repo, *args):
++    return subprocess.check_output(['git', '-C', str(repo), *args])
++
++
++def digest(path):
++    if path.is_symlink():
++        return hashlib.sha256(('symlink:' + os.readlink(path)).encode()).hexdigest()
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def main():
++    cli = argparse.ArgumentParser(description=__doc__)
++    cli.add_argument('phase', choices=('record', 'verify'))
++    cli.add_argument('--review-fixture', action='store_true', help='No SCM stamping in an indexed, uncommitted source subset')
++    args = cli.parse_args()
++    workspace = Path('kernel_workspace')
++    out = Path('artifacts')
++    record_path = out / 'SOURCE_STATE.json'
++    if args.phase == 'record':
++        common = workspace / 'kernel_platform/common'
++        ksu = workspace / 'kernel_platform/KernelSU'
++        report = json.loads((out / 'OFFICIAL_SUSFS_INTEGRATION.json').read_text())
++        paths = {Path('inputs.lock.json'), Path('baselines/PLK110_A67_official.config.additions'),
++                 Path('baselines/PLK110_A67_stock.banner')}
++        common_changed = git(common, 'diff', '--name-only', '-z').decode().split('\0')
++        common_extra = set(report['copied_sources']) | {
++            'arch/arm64/configs/plk110_official.fragment',
++            'arch/arm64/configs/plk110_stock.fragment',
++            'arch/arm64/configs/plk110_a67_stock_ikconfig', 'certs/plk110_stock.pem',
++            'drivers/kernelsu',
++        }
++        paths.update(common / rel for rel in common_changed if rel)
++        paths.update(common / rel for rel in common_extra)
++        # All tracked KSU kernel files, including unchanged headers consumed by
++        # the official preinit runner, are part of the frozen build input.
++        paths.update(ksu / rel for rel in git(ksu, 'ls-files', 'kernel', 'uapi').decode().splitlines())
++        paths.add(workspace / 'kernel_platform/build/kernel/kleaf/impl/stamp.bzl')
++        hashes = {str(path).replace('\\', '/'): digest(path)
++                  for path in sorted(paths)}
++        if args.review_fixture and not (out / 'REVIEW_SOURCE_DOWNLOADS.json').is_file():
++            raise RuntimeError('--review-fixture requires the explicit source-subset manifest')
++        record_path.write_text(json.dumps({'sha256': hashes, 'review_fixture': args.review_fixture}, indent=2) + '\n')
++        (out / 'COMMON_BUILD_ADAPTATIONS.patch').write_bytes(git(common, 'diff', '--binary'))
++        (out / 'KERNELSU_EFFECTIVE.patch').write_bytes(git(ksu, 'diff', '--binary'))
++        (out / 'KLEAF_STAMP_ADAPTATION.patch').write_bytes(
++            git(workspace, 'diff', '--', 'kernel_platform/build/kernel/kleaf/impl/stamp.bzl'))
++        # K32's stock SCM stamping requires tracked common adaptations to be
++        # hidden from setlocalversion. Export them FIRST, and verify their bytes
++        # after both build targets; do not discard or silently skip any changes.
++        changed = [rel for rel in common_changed if rel]
++        if changed and not args.review_fixture:
++            git(common, 'update-index', '--assume-unchanged', '--', *changed)
++        if not args.review_fixture and git(common, 'status', '-uno', '--porcelain').strip():
++            raise RuntimeError('common tracked worktree remains dirty for SCM stamping')
++        print(f'Recorded {len(hashes)} adapted source hashes before build.')
++    else:
++        recorded = json.loads(record_path.read_text())['sha256']
++        bad = [rel for rel, expected in recorded.items()
++               if not Path(rel).exists() or digest(Path(rel)) != expected]
++        if bad:
++            raise RuntimeError(f'source inputs changed after preflight: {bad[:10]}')
++        print(f'PASS: all {len(recorded)} source hashes unchanged.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/susfs_patch_policy.py b/scripts/susfs_patch_policy.py
+--- /dev/null
++++ b/scripts/susfs_patch_policy.py
+@@ -0,0 +1,53 @@
++"""Separate six incompatible official hunks from exact-context A67 hunks.
++
++The replacement source changes live in patches/PLK110_A67_SUSFS_519_compat.patch.
++Neither the official upstream patch nor its source repository is modified.
++All retained and replacement hunks are applied with git apply (no fuzz).
++"""
++import re
++
++
++REPLACED = {
++    'fs/exec.c': {1: ''},
++    'fs/proc/base.c': {1: ''},
++    'security/selinux/hooks.c': {1: ''},
++    'fs/proc/task_mmu.c': {4: 'show_smap(', 5: 'show_smaps_rollup(', 6: 'show_smaps_rollup('},
++}
++
++
++def strict_official_patch(data):
++    text = data.decode('utf-8')
++    starts = [match.start() for match in re.finditer(r'^diff --git ', text, re.M)]
++    if not starts:
++        raise ValueError('no official file sections')
++    starts.append(len(text))
++    output = []
++    replaced = []
++    seen = set()
++    for begin, end in zip(starts, starts[1:]):
++        section = text[begin:end]
++        match = re.match(r'diff --git a/(\S+) b/(\S+)\n', section)
++        if not match or match[1] != match[2]:
++            raise ValueError('unsupported official file header')
++        relative = match[1]
++        hunks = list(re.finditer(r'^@@ .*?@@[^\n]*\n', section, re.M))
++        output.append(section[:hunks[0].start()])
++        for number, hunk in enumerate(hunks, 1):
++            stop = hunks[number].start() if number < len(hunks) else len(section)
++            if number in REPLACED.get(relative, {}):
++                expected = REPLACED[relative][number]
++                if expected and expected not in hunk[0]:
++                    raise ValueError(f'official hunk changed: {relative} #{number}')
++                replaced.append({'file': relative, 'hunk': number, 'header': hunk[0].strip()})
++                seen.add((relative, number))
++            else:
++                output.append(section[hunk.start():stop])
++    expected = {(relative, number) for relative, values in REPLACED.items() for number in values}
++    if seen != expected:
++        raise ValueError(f'compatibility hunk inventory drift: {seen ^ expected}')
++    return ''.join(output).encode(), replaced
++
++
++def reject_fuzzy_log(log):
++    if re.search(r'\bwith fuzz\s+[1-9]\d*\b', log, re.I):
++        raise ValueError('fuzzy source patching is forbidden')
+diff --git a/scripts/test_config_policy.py b/scripts/test_config_policy.py
+--- a/scripts/test_config_policy.py
++++ b/scripts/test_config_policy.py
+@@ -32,7 +32,7 @@
+         self.assertIn('CONFIG_KSU', bad)
+ 
+     def test_feature_phase_requires_exact_additions(self):
+-        additions = config(Path('baselines/PLK110_16.0.8.302_expected_sukisu_susfs.config.additions').read_text())
++        additions = config(Path('baselines/PLK110_A67_official.config.additions').read_text())
+         actual = self.actual | additions
+         _, bad, unmet = compare(self.stock, actual, additions)
+         self.assertFalse(bad or unmet)
+diff --git a/scripts/test_patch_policy.py b/scripts/test_patch_policy.py
+--- /dev/null
++++ b/scripts/test_patch_policy.py
+@@ -0,0 +1,30 @@
++"""Ensure fuzzy success and misleading function text cannot satisfy source gates."""
++import unittest
++from c_source_checks import function_body
++from susfs_patch_policy import reject_fuzzy_log
++
++
++class PatchPolicyTests(unittest.TestCase):
++    def test_offset_without_fuzz_is_allowed(self):
++        reject_fuzzy_log('Hunk #4 succeeded at 1200 (offset -228 lines).')
++
++    def test_every_nonzero_fuzz_is_rejected(self):
++        for fuzz in (1, 2, 3, 20):
++            with self.subTest(fuzz=fuzz), self.assertRaises(ValueError):
++                reject_fuzzy_log(f'Hunk #4 succeeded at 1512 with fuzz {fuzz}.')
++
++    def test_comments_strings_and_calls_do_not_define_a_function(self):
++        source = ('/* int target(int v) { bad(); } */\n'
++                  'int caller(void) { target(1); return 0; }\n'
++                  'static int target(int v)\n{\n const char *s = "}"; /* { */ return v;\n}\n')
++        body = function_body(source, 'target')
++        self.assertIn('return v;', body)
++        self.assertNotIn('bad()', body)
++
++    def test_duplicate_definitions_are_rejected(self):
++        with self.assertRaises(ValueError):
++            function_body('int target(void) { return 1; }\nint target(void) { return 2; }', 'target')
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/scripts/test_preinit_gate.py b/scripts/test_preinit_gate.py
+--- /dev/null
++++ b/scripts/test_preinit_gate.py
+@@ -0,0 +1,41 @@
++"""Regression tests for silent preinit fallback in an otherwise successful build."""
++import unittest
++from preinit_gate import verify_preinit
++
++
++class PreinitTests(unittest.TestCase):
++    def setUp(self):
++        self.symbols = ('1000 T ksu_preinit_init\n1100 T ksu_preinit_handle_post_execveat\n'
++                        '2000 R ksu_preinit_runner_start\n2800 R ksu_preinit_runner_end\n')
++        self.logs = {'preflight.log': 'configuration complete', 'build.log': 'link complete'}
++
++    def test_runner_and_functions_are_required(self):
++        self.assertEqual(verify_preinit(b'Image', self.symbols, self.logs)['runner_bytes'], 2048)
++
++    def test_warning_in_successful_build_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'silently disabled'):
++            verify_preinit(b'Image', self.symbols, self.logs | {'build.log': 'warning: preinit disabled\nBUILD SUCCESS'})
++
++    def test_warning_in_configuration_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'silently disabled'):
++            verify_preinit(b'Image', self.symbols, self.logs | {'preflight.log': 'KernelSU: preinit disabled'})
++
++    def test_compiled_fallback_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'fallback'):
++            verify_preinit(b'ksu_preinit_init: KSU_NO_PREINIT flag is defined', self.symbols, self.logs)
++
++    def test_missing_handler_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'function missing'):
++            verify_preinit(b'Image', self.symbols.replace('1100 T ksu_preinit_handle_post_execveat\n', ''), self.logs)
++
++    def test_empty_runner_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'empty'):
++            verify_preinit(b'Image', self.symbols.replace('2800 R', '2000 R'), self.logs)
++
++    def test_missing_log_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'missing compiler log'):
++            verify_preinit(b'Image', self.symbols, {'build.log': 'OK'})
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/scripts/verify_gki.py b/scripts/verify_gki.py
+--- a/scripts/verify_gki.py
++++ b/scripts/verify_gki.py
+@@ -1,4 +1,4 @@
+-"""Validate the actual Image, never a config from a different Bazel target."""
++"""Validate compiled A67 invariants while allowing the Image to publish exact stock IKCONFIG."""
+ import argparse
+ import gzip
+ import hashlib
+@@ -17,6 +17,7 @@
+ parser.add_argument('--preflight', action='store_true')
+ parser.add_argument('--additions', type=Path)
+ parser.add_argument('--certificate', type=Path, default=Path('baselines/PLK110_A67_stock_module_signer.pem'))
++parser.add_argument('--banner', type=Path, default=Path('baselines/PLK110_A67_stock.banner'))
+ args = parser.parse_args()
+ out = args.artifacts
+ 
+@@ -34,17 +35,35 @@
+ data = (out / 'Image').read_bytes()
+ start, end = data.find(b'IKCFG_ST'), data.find(b'IKCFG_ED')
+ if start < 0 or end <= start:
+-    raise SystemExit('Image has no extractable IKCONFIG; cannot verify it')
+-actual_bytes = gzip.decompress(data[start + 8:end])
+-(out / 'image.config').write_bytes(actual_bytes)
+-actual = config(actual_bytes.decode())
++    raise SystemExit('Image has no extractable IKCONFIG; cannot verify public /proc/config.gz payload')
++public_bytes = gzip.decompress(data[start + 8:end])
++(out / 'image.public.config').write_bytes(public_bytes)
++public_exact = public_bytes == args.baseline.read_bytes()
++public_sha256 = hashlib.sha256(public_bytes).hexdigest()
++stock_sha256 = hashlib.sha256(args.baseline.read_bytes()).hexdigest()
++if not public_exact:
++    raise SystemExit(
++        f'public IKCONFIG drift: extracted={public_sha256} stock={stock_sha256}'
++    )
++
++# The embedded IKCONFIG is deliberately stock. The real build configuration is
++# the exact Bazel kernel_aarch64_config result captured immediately before the
++# kernel_aarch64 build, with no source mutation between the two targets.
++actual = preflight
++(out / 'image.config').write_text((out / 'gki_preflight.config').read_text())
++
++# Unlike other generated metadata, the C compiler identity is part of the
++# PLK110 A67 stock-reproduction target. It must match the captured stock config
++# exactly; a different Android clang build number is a failed reproduction.
++stock_cc = stock.get('CONFIG_CC_VERSION_TEXT')
++actual_cc = actual.get('CONFIG_CC_VERSION_TEXT')
++cc_exact = stock_cc == actual_cc and stock_cc is not None
+ delta, functional, unmet = compare(stock, actual, additions)
+ (out / 'config_delta.json').write_text(json.dumps(delta, indent=2) + '\n')
+-preflight_delta = {k: [preflight.get(k, 'n'), actual.get(k, 'n')]
+-                   for k in sorted(preflight.keys() | actual.keys())
+-                   if preflight.get(k, 'n') != actual.get(k, 'n')}
+ banner_match = re.search(rb'Linux version [^\x00\n]+', data)
+ banner = banner_match[0].decode(errors='replace') if banner_match else ''
++expected_banner = args.banner.read_text().strip()
++banner_exact = banner == expected_banner
+ (out / 'KERNEL_BANNER.txt').write_text(banner + '\n')
+ release = banner.split(' ')[2] if banner else ''
+ abi = json.loads(args.abi.read_text())
+@@ -91,16 +110,23 @@
+ trusted = der in data[cert_offset:cert_offset + cert_size]
+ trust_report = {'original_signer_sha256': STOCK_CERT_SHA256, 'present_in_builtin_trust_table': trusted,
+                 'table_offset': cert_offset, 'table_size': cert_size}
+-passed = (not functional and not unmet and not preflight_delta and not missing and not mismatches
+-          and not unexpected_root and trusted and release == args.release)
+-report = {'passed': passed, 'scope': 'Offline Image config, stock module CRC and signer trust verification; boot untested.',
++passed = (not functional and not unmet and public_exact and not missing and not mismatches
++          and not unexpected_root and trusted and release == args.release and cc_exact and banner_exact)
++report = {'passed': passed, 'scope': 'Internal Bazel config + exact stock public IKCONFIG + stock module CRC and signer trust verification; boot untested.',
+           'release': release, 'expected_release': args.release,
++          'banner': banner, 'expected_banner': expected_banner, 'exact_stock_banner_match': banner_exact,
+           'image_sha256': hashlib.sha256(data).hexdigest(),
+           'functional_config_differences': functional,
+           'all_config_differences': delta, 'unmet_required_config': unmet,
+-          'preflight_vs_image_config_differences': preflight_delta,
++          'public_ikconfig': {
++              'exact_stock_match': public_exact,
++              'extracted_sha256': public_sha256,
++              'stock_sha256': stock_sha256,
++          },
+           'root_symbols': root_symbols, 'module_abi': abi_report, 'stock_signer_trust': trust_report,
+-          'toolchain': {k: actual.get(k) for k in sorted(GENERATED)}}
++          'toolchain': {k: actual.get(k) for k in sorted(GENERATED)},
++          'stock_cc_version_text': stock_cc, 'actual_cc_version_text': actual_cc,
++          'cc_version_exact_stock_match': cc_exact}
+ (out / 'VERDICT.json').write_text(json.dumps(report, indent=2) + '\n')
+ print(json.dumps(report, indent=2))
+ raise SystemExit(0 if passed else 1)
+diff --git a/scripts/verify_manager_certificate.py b/scripts/verify_manager_certificate.py
+--- /dev/null
++++ b/scripts/verify_manager_certificate.py
+@@ -0,0 +1,67 @@
++"""Verify the fixed kernel identity against the public certificate in a V2 APK.
++
++Reads an existing signed APK only. Does not read keys, sign, build or install.
++"""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import struct
++
++
++def take(data, offset):
++    if offset + 4 > len(data):
++        raise ValueError('truncated length')
++    length = struct.unpack_from('<I', data, offset)[0]
++    end = offset + 4 + length
++    if end > len(data):
++        raise ValueError('truncated value')
++    return data[offset + 4:end], end
++
++
++def main():
++    cli = argparse.ArgumentParser(description=__doc__)
++    cli.add_argument('--apk', type=Path, required=True)
++    cli.add_argument('--report', type=Path)
++    args = cli.parse_args()
++    data = args.apk.read_bytes()
++    eocd = data.rfind(b'PK\x05\x06')
++    assert eocd >= 0
++    central = struct.unpack_from('<I', data, eocd + 16)[0]
++    assert data[central-16:central] == b'APK Sig Block 42'
++    length = struct.unpack_from('<Q', data, central - 24)[0]
++    start = central - length - 8
++    assert struct.unpack_from('<Q', data, start)[0] == length
++    position = start + 8
++    values = []
++    while position < central - 24:
++        size, identifier = struct.unpack_from('<QI', data, position)
++        assert size >= 4 and position + 8 + size <= central - 24
++        if identifier == 0x7109871a:
++            values.append(data[position+12:position+8+size])
++        position += 8 + size
++    assert len(values) == 1
++    signers, end = take(values[0], 0)
++    assert end == len(values[0])
++    signer, end = take(signers, 0)
++    assert end == len(signers), 'multiple signers require a separate gate review'
++    signed, _ = take(signer, 0)
++    _, offset = take(signed, 0)  # Digests.
++    certificates, _ = take(signed, offset)
++    certificate, end = take(certificates, 0)
++    assert end == len(certificates), 'unexpected certificate chain'
++    identity = json.loads(Path('inputs.lock.json').read_text())['manager']
++    digest = hashlib.sha256(certificate).hexdigest()
++    assert len(certificate) == identity['certificate_size'], 'kernel certificate size mismatch'
++    assert digest == identity['certificate_sha256'], 'kernel certificate SHA256 mismatch'
++    result = {'passed': True, 'certificate_size': len(certificate), 'certificate_sha256': digest,
++              'apk_sha256': hashlib.sha256(data).hexdigest(),
++              'scope': 'Public certificate extraction; this does not replace apksigner signature verification.'}
++    if args.report:
++        args.report.parent.mkdir(parents=True, exist_ok=True)
++        args.report.write_text(json.dumps(result, indent=2) + '\n')
++    print('PASS: existing manager V2 certificate matches the kernel size/hash parameters.')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/verify_official_image.py b/scripts/verify_official_image.py
+--- /dev/null
++++ b/scripts/verify_official_image.py
+@@ -0,0 +1,32 @@
++"""Additional official-route artifact gates, after generic stock ABI verification."""
++import json
++from pathlib import Path
++import re
++from preinit_gate import verify_preinit
++
++lock = json.loads(Path('inputs.lock.json').read_text())
++out = Path('artifacts')
++verdict = json.loads((out / 'VERDICT.json').read_text())
++assert verdict['passed'] is True and verdict['exact_stock_banner_match'] is True
++image = (out / 'Image').read_bytes()
++symbols = (out / 'System.map').read_text()
++config = (out / 'image.config').read_text()
++preinit = verify_preinit(image, symbols, {name: (out / name).read_text(errors='replace')
++                                        for name in ('preflight.log', 'build.log')})
++for symbol in ('kernelsu_init', 'susfs_init', 'ksu_install_fd', 'ksu_install_su_fd'):
++    assert re.search(r' [Tt] ' + symbol + r'$', symbols, re.M), symbol
++for setting in ('CONFIG_KSU=y', 'CONFIG_KSU_SUSFS=y', 'CONFIG_SCHED_CLASS_EXT=y', 'CONFIG_MODVERSIONS=y'):
++    assert setting in config.splitlines(), setting
++assert not re.search(r'(?m)^CONFIG_(?:PLK110_PARTITION_GUARD|KPM)=y$', config)
++assert 'plk110_pguard_' not in symbols and b'PLK110-PGuard' not in image
++assert lock['manager']['package'].encode() in image
++assert lock['manager']['certificate_sha256'].encode() in image
++for wrong in (b'ReSukiSU-', b'BakaSU-', b'c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6'):
++    assert wrong not in image, 'foreign manager/fork identity in Image'
++assert re.search(r'__trace(?:iter|point)_android_vh_scx_restore_flags', (out / 'Module.symvers').read_text())
++report = {'passed': True, 'kernelsu': lock['kernelsu'], 'susfs': lock['susfs'],
++          'preinit': preinit,
++          'pguard': False, 'embedded_k_number': False,
++          'device_boot_and_module_loading': 'UNTESTED'}
++(out / 'OFFICIAL_IMAGE_GATE.json').write_text(json.dumps(report, indent=2) + '\n')
++print('PASS: official compiled symbols, private manager gate, stock ABI/banner and no PGuard.')
+diff --git a/scripts/verify_official_sources.py b/scripts/verify_official_sources.py
+--- /dev/null
++++ b/scripts/verify_official_sources.py
+@@ -0,0 +1,102 @@
++"""Fail-closed source invariants before entering the compiler."""
++import hashlib
++import json
++from pathlib import Path
++import re
++from c_source_checks import function_body, verify_smaps_hooks
++
++
++def read(root, relative):
++    return (root / relative).read_text()
++
++
++def main():
++    lock = json.loads(Path('inputs.lock.json').read_text())
++    common = Path('kernel_workspace/kernel_platform/common')
++    ksu = Path('kernel_workspace/kernel_platform/KernelSU/kernel')
++    susfs = Path('kernel_workspace/susfs4ksu')
++    driver = common / 'drivers/kernelsu'
++    assert driver.is_symlink() and driver.is_dir() and driver.resolve() == ksu.resolve(), 'wrong driver source linkage'
++    assert read(common, 'drivers/Makefile').count('obj-$(CONFIG_KSU) += kernelsu/') == 1
++    assert read(common, 'drivers/Kconfig').count('source "drivers/kernelsu/Kconfig"') == 1
++    supercall = read(ksu, 'supercall/supercall.c')
++    install = supercall.split('int ksu_install_fd(void)\n{', 1)[1].split('\n}', 1)[0]
++    entry = supercall.split('int ksu_supercall_reboot_handler(void __user **arg)\n{', 1)[1].split('\n}', 1)[0]
++    assert 'if (!manager_or_root())' in install and 'return -EPERM;' in install
++    assert entry.index('if (!manager_or_root())') < entry.index('kzalloc')
++    assert 'if (!manager_or_root())\n        return -EPERM;' in entry
++    assert entry.index('return -EPERM;') < entry.index('kzalloc')
++    reboot = function_body(read(common, 'kernel/reboot.c'), 'SYSCALL_DEFINE4')
++    assert 'ret = ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);' in reboot
++    assert 'if (ret) {\n\t\tgoto orig_flow;\n\t}' in reboot
++    assert 'if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))\n\t\treturn -EPERM;' in reboot
++    smaps = verify_smaps_hooks(read(common, 'fs/proc/task_mmu.c'))
++    su = supercall.split('int ksu_install_su_fd(void)\n{', 1)[1].split('\n}', 1)[0]
++    assert 'KSU_DRIVER_PERMISSION_SU_SESSION' in su and 'manager_or_root' not in su
++    assert 'if (fd >= 0)\n            ksu_close_fd(fd);' in supercall
++    dispatch = read(ksu, 'supercall/dispatch.c')
++    for cmd in ('GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'):
++        block = dispatch.split(f'.cmd = KSU_IOCTL_{cmd},', 1)[1].split('    },', 1)[0]
++        assert '.perm_check = manager_or_root' in block and 'always_allow' not in block
++        assert 'allow_su_session' not in block
++    assert 'KSU_IOCTL_GET_FULL_VERSION' not in dispatch, 'new version ioctl requires an explicit access review'
++    assert '.allow_su_session = true' in dispatch, 'official SU-session support was lost'
++    kbuild = read(ksu, 'Kbuild')
++    for setting in (
++        f"KSU_PACKAGE_NAME := {lock['manager']['package']}",
++        f"KSU_EXPECTED_SIZE := {lock['manager']['certificate_size']}",
++        f"KSU_EXPECTED_HASH := {lock['manager']['certificate_sha256']}",
++        f"KSU_GIT_VERSION := {lock['kernelsu']['git_count']}",
++        'KSU_KERNEL_DIR := $(srctree)/drivers/kernelsu',
++        'ccflags-y += -DEXPECTED_SIZE=$(KSU_EXPECTED_SIZE)',
++        'ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"',
++    ):
++        assert setting in kbuild, setting
++    assert not re.search(r'(?m)^GIT\s*[:?]?=', kbuild), 'Git version probing remains inside Bazel'
++    assert 'KSU_VERSION_FULL' not in kbuild and 'ReSukiSU' not in kbuild and 'PGuard' not in kbuild
++    assert 'kernelsu-objs += hook/arm64/syscall_hook.o' not in kbuild
++
++    hooks = {
++        'fs/exec.c': 'ksu_handle_execveat_sucompat',
++        'fs/open.c': 'ksu_handle_faccessat',
++        'fs/stat.c': 'ksu_handle_stat',
++        'kernel/reboot.c': 'ksu_handle_sys_reboot',
++        'kernel/sys.c': 'ksu_handle_setresuid',
++        'drivers/input/input.c': 'ksu_handle_input_handle_event',
++        'security/selinux/selinuxfs.c': 'ksu_selinux_hide_running',
++    }
++    for file, hook in hooks.items():
++        assert hook in read(common, file), f'missing manual hook {file}: {hook}'
++    observer = read(ksu, 'manager/pkg_observer.c')
++    callback = observer.split('static void ksu_track_throne_tw_func', 1)[1].split('\n}', 1)[0]
++    assert callback.index('track_throne(false);') < callback.index('susfs_parse_priority_app_strings();')
++    source_hashes = {}
++    for directory in ('fs', 'include/linux'):
++        for source in (susfs / 'kernel_patches' / directory).iterdir():
++            if source.is_file():
++                target = common / directory / source.name
++                assert source.read_bytes() == target.read_bytes(), f'official source changed: {target}'
++                source_hashes[str(target.relative_to(common))] = hashlib.sha256(target.read_bytes()).hexdigest()
++    priority = read(common, 'fs/susfs.c')
++    assert priority.count('synchronize_rcu();') >= 2, 'SUSFS 519 UID filter fix missing'
++    fragment = read(common, 'arch/arm64/configs/plk110_official.fragment')
++    assert fragment == Path('baselines/PLK110_A67_official.config.additions').read_text()
++    kconfig_symbols = set(re.findall(r'^config (\w+)', read(ksu, 'Kconfig'), re.M))
++    for name in re.findall(r'(?:^|# )CONFIG_(\w+)', fragment, re.M):
++        assert name in kconfig_symbols, f'obsolete fork Kconfig option: {name}'
++    assert 'PLK110_PARTITION_GUARD' not in fragment
++    assert not (common / 'block/plk110_partition_guard.c').exists()
++    public = common / 'arch/arm64/configs/plk110_a67_stock_ikconfig'
++    assert public.read_bytes() == Path('baselines/PLK110_16.0.8.302_stock.config').read_bytes()
++    assert hashlib.sha256(public.read_bytes()).hexdigest() == lock['stock_config_sha256']
++    report = {'passed': True, 'scope': 'Source checks only; compile and device checks pending.',
++              'official_added_source_hashes': source_hashes, 'manual_hooks': hooks,
++              'manager_info_access': 'manager_or_root', 'su_session_preserved': True,
++              'unprivileged_reboot_magic': 'falls back to stock validation', 'smaps_hooks': smaps,
++              'pguard': False, 'embedded_k_number': False}
++    Path('artifacts/SOURCE_INVARIANTS.json').write_text(json.dumps(report, indent=2) + '\n')
++    print('PASS: official pins/hooks, K32 gates, SU session, stock public config, no PGuard/K suffix.')
++
++
++if __name__ == '__main__':
++    main()

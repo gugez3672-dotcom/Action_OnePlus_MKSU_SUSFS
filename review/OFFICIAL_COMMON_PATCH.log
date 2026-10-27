@@ -1,0 +1,213 @@
+Retained official hunks: strict git apply (no fuzz)
+Checking patch block/ioprio.c...
+Checking patch drivers/input/input.c...
+Checking patch fs/Makefile...
+Checking patch fs/exec.c...
+Hunk #1 succeeded at 1910 (offset -25 lines).
+Hunk #2 succeeded at 1934 (offset -25 lines).
+Hunk #3 succeeded at 2036 (offset -25 lines).
+Checking patch fs/namei.c...
+Hunk #2 succeeded at 1612 (offset -8 lines).
+Hunk #3 succeeded at 1637 (offset -8 lines).
+Hunk #4 succeeded at 1649 (offset -8 lines).
+Hunk #5 succeeded at 1660 (offset -8 lines).
+Hunk #6 succeeded at 1693 (offset -8 lines).
+Hunk #7 succeeded at 1704 (offset -8 lines).
+Hunk #8 succeeded at 1737 (offset -8 lines).
+Hunk #9 succeeded at 1768 (offset -8 lines).
+Hunk #10 succeeded at 1789 (offset -8 lines).
+Hunk #11 succeeded at 1808 (offset -8 lines).
+Hunk #12 succeeded at 2135 (offset -8 lines).
+Hunk #13 succeeded at 2451 (offset -8 lines).
+Hunk #14 succeeded at 2651 (offset -8 lines).
+Hunk #15 succeeded at 3608 (offset -8 lines).
+Hunk #16 succeeded at 3778 (offset -8 lines).
+Hunk #17 succeeded at 4008 (offset -8 lines).
+Hunk #18 succeeded at 4047 (offset -8 lines).
+Hunk #19 succeeded at 4118 (offset -8 lines).
+Hunk #20 succeeded at 5455 (offset -8 lines).
+Hunk #21 succeeded at 5469 (offset -8 lines).
+Hunk #22 succeeded at 5496 (offset -8 lines).
+Checking patch fs/namespace.c...
+Hunk #2 succeeded at 83 (offset -9 lines).
+Hunk #3 succeeded at 261 (offset -10 lines).
+Hunk #4 succeeded at 273 (offset -10 lines).
+Hunk #5 succeeded at 341 (offset -10 lines).
+Hunk #6 succeeded at 965 (offset -6 lines).
+Hunk #7 succeeded at 1381 (offset -6 lines).
+Hunk #8 succeeded at 1477 (offset -6 lines).
+Hunk #9 succeeded at 1530 (offset -6 lines).
+Hunk #10 succeeded at 1779 (offset -6 lines).
+Hunk #11 succeeded at 4181 (offset -53 lines).
+Hunk #12 succeeded at 5670 (offset -61 lines).
+Hunk #13 succeeded at 6082 (offset -82 lines).
+Checking patch fs/notify/fdinfo.c...
+Hunk #2 succeeded at 25 (offset -1 lines).
+Hunk #3 succeeded at 86 (offset -6 lines).
+Hunk #4 succeeded at 101 (offset -6 lines).
+Checking patch fs/open.c...
+Hunk #2 succeeded at 468 (offset 2 lines).
+Hunk #3 succeeded at 481 (offset 2 lines).
+Hunk #4 succeeded at 503 (offset 2 lines).
+Checking patch fs/proc/base.c...
+Hunk #1 succeeded at 1829 (offset -11 lines).
+Hunk #2 succeeded at 1842 (offset -11 lines).
+Hunk #3 succeeded at 2476 (offset -11 lines).
+Checking patch fs/proc/bootconfig.c...
+Checking patch fs/proc/fd.c...
+Checking patch fs/proc/task_mmu.c...
+Hunk #1 succeeded at 26 (offset -1 lines).
+Hunk #2 succeeded at 455 (offset -79 lines).
+Hunk #3 succeeded at 476 (offset -79 lines).
+Hunk #4 succeeded at 2263 (offset -243 lines).
+Hunk #5 succeeded at 2275 (offset -243 lines).
+Checking patch fs/proc_namespace.c...
+Checking patch fs/read_write.c...
+Checking patch fs/readdir.c...
+Checking patch fs/stat.c...
+Checking patch fs/statfs.c...
+Checking patch fs/super.c...
+Hunk #2 succeeded at 1194 (offset -3 lines).
+Hunk #3 succeeded at 1214 (offset -3 lines).
+Checking patch kernel/kallsyms.c...
+Hunk #2 succeeded at 751 (offset -3 lines).
+Checking patch kernel/reboot.c...
+Hunk #1 succeeded at 707 (offset -1 lines).
+Hunk #2 succeeded at 725 (offset -1 lines).
+Checking patch kernel/sys.c...
+Checking patch mm/memory.c...
+Hunk #1 succeeded at 79 (offset -1 lines).
+Hunk #2 succeeded at 6830 (offset -121 lines).
+Checking patch security/selinux/avc.c...
+Checking patch security/selinux/hooks.c...
+Hunk #1 succeeded at 6594 (offset -34 lines).
+Hunk #2 succeeded at 7235 (offset -34 lines).
+Checking patch security/selinux/selinuxfs.c...
+Hunk #3 succeeded at 692 (offset 24 lines).
+Hunk #4 succeeded at 841 (offset 24 lines).
+Hunk #5 succeeded at 948 (offset 24 lines).
+Checking patch block/ioprio.c...
+Checking patch drivers/input/input.c...
+Checking patch fs/Makefile...
+Checking patch fs/exec.c...
+Hunk #1 succeeded at 1910 (offset -25 lines).
+Hunk #2 succeeded at 1934 (offset -25 lines).
+Hunk #3 succeeded at 2036 (offset -25 lines).
+Checking patch fs/namei.c...
+Hunk #2 succeeded at 1612 (offset -8 lines).
+Hunk #3 succeeded at 1637 (offset -8 lines).
+Hunk #4 succeeded at 1649 (offset -8 lines).
+Hunk #5 succeeded at 1660 (offset -8 lines).
+Hunk #6 succeeded at 1693 (offset -8 lines).
+Hunk #7 succeeded at 1704 (offset -8 lines).
+Hunk #8 succeeded at 1737 (offset -8 lines).
+Hunk #9 succeeded at 1768 (offset -8 lines).
+Hunk #10 succeeded at 1789 (offset -8 lines).
+Hunk #11 succeeded at 1808 (offset -8 lines).
+Hunk #12 succeeded at 2135 (offset -8 lines).
+Hunk #13 succeeded at 2451 (offset -8 lines).
+Hunk #14 succeeded at 2651 (offset -8 lines).
+Hunk #15 succeeded at 3608 (offset -8 lines).
+Hunk #16 succeeded at 3778 (offset -8 lines).
+Hunk #17 succeeded at 4008 (offset -8 lines).
+Hunk #18 succeeded at 4047 (offset -8 lines).
+Hunk #19 succeeded at 4118 (offset -8 lines).
+Hunk #20 succeeded at 5455 (offset -8 lines).
+Hunk #21 succeeded at 5469 (offset -8 lines).
+Hunk #22 succeeded at 5496 (offset -8 lines).
+Checking patch fs/namespace.c...
+Hunk #2 succeeded at 83 (offset -9 lines).
+Hunk #3 succeeded at 261 (offset -10 lines).
+Hunk #4 succeeded at 273 (offset -10 lines).
+Hunk #5 succeeded at 341 (offset -10 lines).
+Hunk #6 succeeded at 965 (offset -6 lines).
+Hunk #7 succeeded at 1381 (offset -6 lines).
+Hunk #8 succeeded at 1477 (offset -6 lines).
+Hunk #9 succeeded at 1530 (offset -6 lines).
+Hunk #10 succeeded at 1779 (offset -6 lines).
+Hunk #11 succeeded at 4181 (offset -53 lines).
+Hunk #12 succeeded at 5670 (offset -61 lines).
+Hunk #13 succeeded at 6082 (offset -82 lines).
+Checking patch fs/notify/fdinfo.c...
+Hunk #2 succeeded at 25 (offset -1 lines).
+Hunk #3 succeeded at 86 (offset -6 lines).
+Hunk #4 succeeded at 101 (offset -6 lines).
+Checking patch fs/open.c...
+Hunk #2 succeeded at 468 (offset 2 lines).
+Hunk #3 succeeded at 481 (offset 2 lines).
+Hunk #4 succeeded at 503 (offset 2 lines).
+Checking patch fs/proc/base.c...
+Hunk #1 succeeded at 1829 (offset -11 lines).
+Hunk #2 succeeded at 1842 (offset -11 lines).
+Hunk #3 succeeded at 2476 (offset -11 lines).
+Checking patch fs/proc/bootconfig.c...
+Checking patch fs/proc/fd.c...
+Checking patch fs/proc/task_mmu.c...
+Hunk #1 succeeded at 26 (offset -1 lines).
+Hunk #2 succeeded at 455 (offset -79 lines).
+Hunk #3 succeeded at 476 (offset -79 lines).
+Hunk #4 succeeded at 2263 (offset -243 lines).
+Hunk #5 succeeded at 2275 (offset -243 lines).
+Checking patch fs/proc_namespace.c...
+Checking patch fs/read_write.c...
+Checking patch fs/readdir.c...
+Checking patch fs/stat.c...
+Checking patch fs/statfs.c...
+Checking patch fs/super.c...
+Hunk #2 succeeded at 1194 (offset -3 lines).
+Hunk #3 succeeded at 1214 (offset -3 lines).
+Checking patch kernel/kallsyms.c...
+Hunk #2 succeeded at 751 (offset -3 lines).
+Checking patch kernel/reboot.c...
+Hunk #1 succeeded at 707 (offset -1 lines).
+Hunk #2 succeeded at 725 (offset -1 lines).
+Checking patch kernel/sys.c...
+Checking patch mm/memory.c...
+Hunk #1 succeeded at 79 (offset -1 lines).
+Hunk #2 succeeded at 6830 (offset -121 lines).
+Checking patch security/selinux/avc.c...
+Checking patch security/selinux/hooks.c...
+Hunk #1 succeeded at 6594 (offset -34 lines).
+Hunk #2 succeeded at 7235 (offset -34 lines).
+Checking patch security/selinux/selinuxfs.c...
+Hunk #3 succeeded at 692 (offset 24 lines).
+Hunk #4 succeeded at 841 (offset 24 lines).
+Hunk #5 succeeded at 948 (offset 24 lines).
+Applied patch block/ioprio.c cleanly.
+Applied patch drivers/input/input.c cleanly.
+Applied patch fs/Makefile cleanly.
+Applied patch fs/exec.c cleanly.
+Applied patch fs/namei.c cleanly.
+Applied patch fs/namespace.c cleanly.
+Applied patch fs/notify/fdinfo.c cleanly.
+Applied patch fs/open.c cleanly.
+Applied patch fs/proc/base.c cleanly.
+Applied patch fs/proc/bootconfig.c cleanly.
+Applied patch fs/proc/fd.c cleanly.
+Applied patch fs/proc/task_mmu.c cleanly.
+Applied patch fs/proc_namespace.c cleanly.
+Applied patch fs/read_write.c cleanly.
+Applied patch fs/readdir.c cleanly.
+Applied patch fs/stat.c cleanly.
+Applied patch fs/statfs.c cleanly.
+Applied patch fs/super.c cleanly.
+Applied patch kernel/kallsyms.c cleanly.
+Applied patch kernel/reboot.c cleanly.
+Applied patch kernel/sys.c cleanly.
+Applied patch mm/memory.c cleanly.
+Applied patch security/selinux/avc.c cleanly.
+Applied patch security/selinux/hooks.c cleanly.
+Applied patch security/selinux/selinuxfs.c cleanly.
+A67 compatibility hunks: strict git apply (no fuzz)
+Checking patch fs/exec.c...
+Checking patch fs/proc/base.c...
+Checking patch security/selinux/hooks.c...
+Checking patch fs/proc/task_mmu.c...
+Checking patch fs/exec.c...
+Checking patch fs/proc/base.c...
+Checking patch security/selinux/hooks.c...
+Checking patch fs/proc/task_mmu.c...
+Applied patch fs/exec.c cleanly.
+Applied patch fs/proc/base.c cleanly.
+Applied patch security/selinux/hooks.c cleanly.
+Applied patch fs/proc/task_mmu.c cleanly.

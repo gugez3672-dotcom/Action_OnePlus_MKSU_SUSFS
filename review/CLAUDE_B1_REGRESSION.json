@@ -1,0 +1,13 @@
+{
+  "old_incorrect_fixture_rejected": true,
+  "reason": "show_smap: exactly one SUS_MAP predicate is required",
+  "compiled": false,
+  "corrected_function_checks": {
+    "show_smap": "early hidden-VMA return",
+    "show_smaps_rollup": "3 guarded gather paths; cursor always advances",
+    "forbidden_functions": [
+      "smaps_rollup_open",
+      "pte_is_pinned"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "official_version": 32705,
+  "embedded_k_number": false,
+  "official_manager_build_parameters": {
+    "package": "com.daily.notes",
+    "certificate_size": 890,
+    "certificate_sha256": "7b6fcd9e7f440833ee8a5a3860f3ff5b7b367a0dabb36c1d5f0fd52064bf283e",
+    "version_name": "D2.0.0",
+    "version_code": 36200
+  },
+  "apk_signature_parser_unchanged": true,
+  "manager_fd_permission": "manager_or_root at entry and actual installation",
+  "info_ioctl_permissions": [
+    "GET_INFO",
+    "GET_INFO_LEGACY",
+    "CHECK_SAFEMODE"
+  ],
+  "su_session_fd_path_unchanged": true,
+  "pguard": false,
+  "compiled": false,
+  "device_tested": false
+}
