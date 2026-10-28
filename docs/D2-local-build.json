@@ -72,7 +72,8 @@
     "blocked": 0,
     "unknown": 0,
     "exact_exceptions": 140,
-    "passed": true
+    "passed": true,
+    "policy_entries_including_platform_variants": 142
   },
   "native_sha256": {
     "lib/arm64-v8a/libandroid-support.so": "739cf829511d71dafd6c67fdbb70f3f0c6048642ea2e1967790ee961fde14430",
@@ -90,6 +91,29 @@
   },
   "boundary": "Local build used explicitly generated AIDL/protobuf outputs due Windows Chinese paths; clean Linux CI separate. Not installed, booted or device-tested.",
   "built_source_commit": "ab1b2cf07326c4d1aad20e2e3a53f01781242db6",
-  "linux_ci_run": 40614208952,
-  "linux_ci_status": "in_progress"
+  "linux_ci_run": 40615735824,
+  "linux_ci_status": "success",
+  "linux_previous_run": {
+    "run": 40614208952,
+    "clean_assembly": "passed",
+    "unit_tests": 111,
+    "unit_failures": 0,
+    "unit_skipped": 0,
+    "lint_errors": 0,
+    "audit": "blocked 6 unmapped fresh-checkout paths and 2 linker string variants; fixed by 5341222"
+  },
+  "linux_ci_source_commit": "5341222d27f5d357769df07376cabe8ce52b8cae",
+  "linux_ci_artifact": {
+    "id": 12786015434,
+    "bytes": 8639018,
+    "zip_sha256": "db61e97c42f9c28f57df5d81bacf4cbb2b0114c1a741d082da884cc7b0329d3c",
+    "unsigned_apk_sha256": "ae89a56f7d63846c68e09a98212ed07dd983e5b76ebb926f213b2b76cb2a8a20",
+    "unit_tests": 111,
+    "unit_failures": 0,
+    "unit_skipped": 0,
+    "static_audit_passed": true,
+    "identity_entries": 140,
+    "all_native_payload_hashes_verified": true,
+    "fresh_dependency_path_leaks": 0
+  }
 }

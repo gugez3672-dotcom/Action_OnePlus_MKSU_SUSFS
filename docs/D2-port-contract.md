@@ -1,6 +1,6 @@
 # Daily Notes 2 移植与静态特征审计约束
 
-状态：D2 本地候选包已构建、测试、审计并签名；Linux 干净构建单独验证。实现记录见 `D2-port-progress.md` / `D2-local-build.json`，未上机验收。
+状态：D2 本地候选包已构建、测试、审计并签名；Linux 干净构建、测试、lint 与最终审计全部通过（run 40615735824）。实现记录见 `D2-port-progress.md` / `D2-local-build.json`，未上机验收。
 
 版本 `D2.0.0/36200`，应用包名 `com.daily.notes`。官方管理器、ksud 与内核都固定 `inputs.lock.json` 的 KernelSU 提交；SUSFS 用户态执行端固定同一个 `519c86c`，不使用 fork 后端或 D91 固定二进制。
 
