@@ -88,5 +88,8 @@
     "lib/arm64-v8a/libreadline.so": "7437d5e30e2a326f3000286295cb9ba30a2e45f9ca5a91feba9ec12d0f1a161d",
     "lib/arm64-v8a/libnote_runtime.so": "31f47cafeb435a4486f46fbaaaaa5ce915a9ec35b807d7a6191f97fc17401af4"
   },
-  "boundary": "Local build used explicitly generated AIDL/protobuf outputs due Windows Chinese paths; clean Linux CI separate. Not installed, booted or device-tested."
+  "boundary": "Local build used explicitly generated AIDL/protobuf outputs due Windows Chinese paths; clean Linux CI separate. Not installed, booted or device-tested.",
+  "built_source_commit": "ab1b2cf07326c4d1aad20e2e3a53f01781242db6",
+  "linux_ci_run": 40614208952,
+  "linux_ci_status": "in_progress"
 }

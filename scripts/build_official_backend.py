@@ -72,6 +72,15 @@ def main():
             AR_x86_64_pc_windows_gnu=str(host / 'llvm-ar.exe'))
         paths.insert(1, str(host))
     env['PATH'] = os.pathsep.join(paths + [env['PATH']])
+    # A clean runner has no git dependency checkout when remaps are first assembled.
+    # Fetch before collecting any newly created property-crate paths, otherwise panic
+    # locations leak that upstream checkout name on Linux only.
+    subprocess.run([str(cargo), 'fetch', '--locked', '--target', 'aarch64-linux-android',
+        '--manifest-path', 'userspace/ksud/Cargo.toml'], cwd=source, env=env, check=True)
+    for checkout in (ROOT / '.inputs/cargo-home/git/checkouts').glob('ksu_props-*/*'):
+        remap = (str(checkout), 'notes/properties')
+        if checkout.is_dir() and remap not in remaps:
+            env['CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS'] += f' --remap-path-prefix={remap[0]}={remap[1]}'
     subprocess.run([str(cargo), 'build', '--release', '--locked', '--target', 'aarch64-linux-android',
         '--manifest-path', 'userspace/ksud/Cargo.toml'], cwd=source, env=env, check=True)
     binary = ROOT / '.inputs/backend-target/aarch64-linux-android/release' / ('note_runtime' if branded else 'ksud')
