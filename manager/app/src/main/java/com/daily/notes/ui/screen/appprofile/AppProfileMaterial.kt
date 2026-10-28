@@ -350,6 +350,8 @@ private fun TopBar(
             TopBarBackButton(onClick = onBack)
         },
         actions = {
+            com.daily.notes.ui.screen.notes.AppControlsButton(userId, packageName)
+
             if (!isUidGroup && showActions) {
                 var showDropdown by remember { mutableStateOf(false) }
 

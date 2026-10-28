@@ -7,7 +7,7 @@ import com.daily.notes.ui.util.module.LatestVersionInfo
 @Immutable
 data class HomeUiState(
     val kernelVersion: KernelVersion,
-    val ksuVersion: Int?,
+    val runtimeVersion: Int?,
     val managerUAPIVersion: Int,
     val kernelUAPIVersion: Int?,
     val lkmMode: Boolean?,
@@ -29,13 +29,13 @@ data class HomeUiState(
         get() = systemInfo.selinuxStatus == "Permissive"
 
     val showGkiWarning: Boolean
-        get() = ksuVersion != null && lkmMode == false
+        get() = runtimeVersion != null && lkmMode == false
 
     val showLkmUpdate: Boolean
         get() = isManager &&
                 lkmMode == true &&
                 isLkmBundled &&
-                ksuVersion?.toLong() != currentManagerVersionCode &&
+                runtimeVersion?.toLong() != currentManagerVersionCode &&
                 !requiresNewKernel &&
                 !requiresNewManager
 
@@ -47,7 +47,7 @@ data class HomeUiState(
         get() = lkmMode == true && !isLkmBundled
 
     val showRootWarning: Boolean
-        get() = ksuVersion != null && !isRootAvailable
+        get() = runtimeVersion != null && !isRootAvailable
 
     val showManagerPrBuildWarning: Boolean
         get() = isManager && isManagerPrBuild

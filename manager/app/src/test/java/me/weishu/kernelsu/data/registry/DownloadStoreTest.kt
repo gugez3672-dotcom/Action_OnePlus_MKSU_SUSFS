@@ -28,7 +28,7 @@ class DownloadStoreTest {
 
     /** Everything under [dir], recursively, as relative paths. */
     private fun listing(dir: File): List<String> =
-        dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).path }.sorted().toList()
+        dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).invariantSeparatorsPath }.sorted().toList()
 
     @Test
     fun verifiedDownloadIsStoredUnderItsExpectation() {

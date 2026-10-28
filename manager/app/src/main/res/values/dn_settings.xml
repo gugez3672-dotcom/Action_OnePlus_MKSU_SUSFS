@@ -19,4 +19,6 @@
 
 <string name="dn_connection_settings">Connections and tools</string>
 <string name="dn_alternate_icon">Alternate icon</string>
+<string name="dn_modules_hidden">Tap the title to load modules.</string>
+<string name="dn_home_module_count">Modules: %1$d</string>
 </resources>

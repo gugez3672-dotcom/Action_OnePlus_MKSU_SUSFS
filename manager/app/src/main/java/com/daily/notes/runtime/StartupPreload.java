@@ -11,7 +11,7 @@ import java.io.File;
 public class StartupPreload implements ZygotePreload {
     public static final String TAG = "RuntimeBootstrap";
 
-    private static native void forkAndRunBackend(String ksudPath, String packageName);
+    private static native void forkAndRunBackend(String backendPath, String packageName);
 
     @Override
     public void doPreload(@NonNull ApplicationInfo appInfo) {

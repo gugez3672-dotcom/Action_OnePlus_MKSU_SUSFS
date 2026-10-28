@@ -516,6 +516,8 @@ private fun TopBar(
                 }
             },
             actions = {
+            com.daily.notes.ui.screen.notes.AppControlsButton(userId, packageName)
+
                 if (showActions) {
                     val showTopPopup = remember { mutableStateOf(false) }
                     IconButton(

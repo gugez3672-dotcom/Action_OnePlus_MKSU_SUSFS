@@ -122,7 +122,7 @@ class SuperUserViewModel(
         _uiState.update {
             it.copy(
                 showSystemApps = settingsRepo.superuserShowSystemApps,
-                showOnlyPrimaryUserApps = settingsRepo.superuserShowOnlyPrimaryUserApps,
+                showOnlyPrimaryUserApps = true,
                 sortConfig = AppSortConfig.fromInt(settingsRepo.superuserSortOption),
             )
         }
@@ -156,7 +156,6 @@ class SuperUserViewModel(
 
     fun toggleShowOnlyPrimaryUserApps(): Job {
         val newValue = !_uiState.value.showOnlyPrimaryUserApps
-        settingsRepo.superuserShowOnlyPrimaryUserApps = newValue
         _uiState.update { it.copy(showOnlyPrimaryUserApps = newValue) }
         return refilterVisibleApps()
     }

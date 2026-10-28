@@ -1,15 +1,16 @@
-# D2 migration work in progress
+# D2.0.0 / 36200 integration result
 
-This branch is an integration checkpoint, not a distributable manager.
+Local candidate built and signed; not installed or device-tested. Build details: `D2-local-build.json`.
 
-- Official manager base: KernelSU `75e179d378d7aaa0de8946358a3384444c3e36b0`.
-- DN feature input: final D1.1.1/36111 APK `06b764651d8c14af8f79fe2fd00327023faa6d51119b2742241e6d2ba0083eb3`.
-- Frozen input evidence and verification limits: `D111-inputs.json`.
-- Imported official management pages and JNI/UAPI, migrated namespace, runtime components and AIDL identity.
-- Ported final DN dual-pane files, PTY/ATE sessions, terminal lifecycle, file operations, APK staging and runtime assets.
-- Ported D111 heartbeat helpers and read/toggle error separation; added settings title user switch and two-second traffic clearing.
-- Remaining: all-user authorization and batch controls; hidden module list; full SUSFS configuration against official 519 tool; fresh official backend build; complete static identity audit; final packaging and local signing.
+- Official manager/backend: KernelSU 75e179d; filesystem tool: SUSFS 519c86c. Fresh backend and exact official binary assets compiled, no old DN backend imported.
+- DN input: Claude final D1.1.1/36111, APK SHA256 06b764651d8c14af8f79fe2fd00327023faa6d51119b2742241e6d2ba0083eb3. 524 frozen file hashes and correspondence limits in D111-inputs.json. Original dirty worktree status remains unchanged.
+- Final D111 files, PTY/ATE, lifecycle, assets and heartbeat ported; USB/network reads and heartbeat sync/errors separated. Title user switching, two-second traffic clearing, icon switching, primary-user authorization and single/batch app controls implemented.
+- Home module count and badge 0, no module preload. Module list loads on title tap. Full-root cold launch defaults to Files/Terminal; official non-full-root installation/status fallback remains available.
+- Physical dir_id used for WebUI/actions/config/preinit; declared ID preserved and mismatched-ID automatic updates blocked. Actual Rust listing function passes 7 fixtures / 13 assertions. Patch reproduction from clean official source matches SHA256.
+- Official metamodule single-instance, installer, uninstall and mounting hooks retained. Loaded-list dependency panel does not select or install a metamodule. Script-only classification cannot exclude custom script mounts.
+- Filesystem schema-v2 config validates/imports/exports, publishes immutable root-shared revisions via an atomic pointer, and uses common boot hooks without an extra module. Statistics capture precedes metamodule mounting; update follows mounting. Immediate apply does not fake a pre-mount capture. Unsupported kernel logging is rejected.
+- Own package/components/JNI/libraries/navigation/display identity cleaned. 140 exact location/string/hash exceptions preserve real root paths, third-party WebUI, module variables, SELinux/kernel/bootstrap ABI and service endpoints. Unknown strings or legacy package/library identities block the audit.
+- Kotlin/Java/JNI, 111 unit tests, release assembly and lint passed. Missing translations remain visible as warnings with English fallback, not a claim of full localization. Windows native AIDL/protobuf Chinese-path handling required generated-output reuse; Linux CI checks normal clean generation.
+- Unsigned and final APK pass provenance and exact exception audits. Original DER890 certificate and V2-only signature, 16KiB ZIP alignment, backend/tool hashes and all non-signature entry bytes verified.
 
-The integration workflow compiles code only. It cannot produce a release APK, use a signing credential, install an app, or touch a phone.
-
-Windows native AIDL dependency parsing and protoc do not handle the project's Chinese path consistently. AIDL and protobuf generated correctly in separate checks, but the full local Gradle check remains unpassed. Linux CI is the authoritative integration check. No system settings or aliases were introduced.
+The single manual D2 workflow builds pinned dependencies/backend/tool and an unsigned arm64 APK, tests, lints and audits it. No signing credential, phone installation or device operation in CI. Device JNI/Root/Binder/PTY, app controls, WebUI and effective mounts remain deployment gates; see deployment-gates.md.

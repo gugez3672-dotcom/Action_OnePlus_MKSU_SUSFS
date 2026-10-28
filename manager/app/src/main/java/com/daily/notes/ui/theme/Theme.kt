@@ -101,19 +101,19 @@ object ThemeController {
 }
 
 @Composable
-fun KernelSUTheme(
+fun NotesTheme(
     appSettings: AppSettings = ThemeController.getAppSettings(),
     uiMode: UiMode = LocalUiMode.current,
     content: @Composable () -> Unit
 ) {
 
     when (uiMode) {
-        UiMode.Miuix -> MiuixKernelSUTheme(
+        UiMode.Miuix -> MiuixNotesTheme(
             appSettings = appSettings,
             content = content
         )
 
-        UiMode.Material -> MaterialKernelSUTheme(
+        UiMode.Material -> MaterialNotesTheme(
             appSettings = appSettings,
             content = content
         )

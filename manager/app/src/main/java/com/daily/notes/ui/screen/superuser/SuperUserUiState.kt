@@ -29,7 +29,7 @@ data class SuperUserUiState(
     val searchStatus: SearchStatus = SearchStatus(""),
     val searchResults: List<GroupedApps> = emptyList(),
     val showSystemApps: Boolean = false,
-    val showOnlyPrimaryUserApps: Boolean = false,
+    val showOnlyPrimaryUserApps: Boolean = true,
     val sortConfig: AppSortConfig = AppSortConfig(),
     val error: Throwable? = null
 )

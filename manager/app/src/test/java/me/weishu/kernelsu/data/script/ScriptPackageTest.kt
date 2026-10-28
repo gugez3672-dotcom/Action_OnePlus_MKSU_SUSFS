@@ -127,8 +127,11 @@ class ScriptPackageTest {
         ScriptPackage.extract(z, dest)
         assertEquals("echo hi\n", File(dest, "action.sh").readText())
         assertEquals("payload", File(dest, "data/nested/file.txt").readText())
-        assertTrue(File(dest, "bin/helper").canExecute())
-        assertFalse(File(dest, "data/nested/file.txt").canExecute())
+        // NTFS reports every readable file as executable; enforce permission assertions on POSIX filesystems.
+        if (java.nio.file.Files.getFileStore(dest.toPath()).supportsFileAttributeView("posix")) {
+            assertTrue(File(dest, "bin/helper").canExecute())
+            assertFalse(File(dest, "data/nested/file.txt").canExecute())
+        }
         // No temporary directory is left next to the extraction.
         assertEquals(listOf("abc"), dest.parentFile!!.list()!!.toList())
 

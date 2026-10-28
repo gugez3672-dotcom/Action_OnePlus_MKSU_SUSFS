@@ -47,16 +47,16 @@ class HomeViewModel(
     private fun buildState(): HomeUiState {
         val kernelVersion = getKernelVersion()
         val isManager = NativeApi.isManager
-        val ksuVersion = if (isManager) NativeApi.version else null
+        val runtimeVersion = if (isManager) NativeApi.version else null
         val kernelUAPIVersion = if (isManager) NativeApi.kernelUAPIVersion else null
         val managerUAPIVersion = NativeApi.managerUAPIVersion
-        val lkmMode = ksuVersion?.let { if (kernelVersion.isGKI()) NativeApi.isLkmMode else null }
+        val lkmMode = runtimeVersion?.let { if (kernelVersion.isGKI()) NativeApi.isLkmMode else null }
         val isRootAvailable = rootAvailable()
         val managerVersion = getManagerVersion(noteApp)
 
         return HomeUiState(
             kernelVersion = kernelVersion,
-            ksuVersion = ksuVersion,
+            runtimeVersion = runtimeVersion,
             lkmMode = lkmMode,
             isLkmBundled = lkmMode == true && NativeApi.isLkmBundled,
             isManager = isManager,

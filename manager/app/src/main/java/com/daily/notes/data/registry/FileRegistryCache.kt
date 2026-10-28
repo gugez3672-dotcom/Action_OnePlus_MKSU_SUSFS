@@ -3,6 +3,8 @@ package com.daily.notes.data.registry
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Keeps the last good registry documents on disk. Writes go to a uniquely named temporary
@@ -29,7 +31,7 @@ class FileRegistryCache(private val dir: File) : RegistryCache {
                 out.flush()
                 out.fd.sync()
             }
-            if (!tmp.renameTo(target)) throw IOException("Failed to write registry cache $key")
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } catch (e: Throwable) {
             tmp.delete()
             throw e

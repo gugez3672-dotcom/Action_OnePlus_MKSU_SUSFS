@@ -66,6 +66,7 @@ data class ModuleUiState(
 
 @Immutable
 data class ModuleActions(
+    val onTitleClick: () -> Unit = {},
     val onRefresh: () -> Unit,
     val onSearchStatusChange: (SearchStatus) -> Unit,
     val onSearchTextChange: (String) -> Unit,

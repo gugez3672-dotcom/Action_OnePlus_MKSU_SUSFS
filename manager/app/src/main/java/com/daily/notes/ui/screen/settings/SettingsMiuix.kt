@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daily.notes.R
 import com.daily.notes.ui.UiMode
-import com.daily.notes.ui.component.KsuIsValid
+import com.daily.notes.ui.component.RuntimeIsValid
 import com.daily.notes.ui.component.dialog.rememberLoadingDialog
 import com.daily.notes.ui.component.miuix.SendLogDialog
 import com.daily.notes.ui.component.uninstalldialog.UninstallDialog
@@ -128,7 +128,7 @@ fun SettingPagerMiuix(
                             checked = uiState.checkUpdate,
                             onCheckedChange = actions.onSetCheckUpdate
                         )
-                        KsuIsValid {
+                        RuntimeIsValid {
                             SwitchPreference(
                                 title = stringResource(id = R.string.settings_module_check_update),
                                 summary = stringResource(id = R.string.settings_check_update_summary),
@@ -181,7 +181,7 @@ fun SettingPagerMiuix(
                         )
                     }
 
-                    KsuIsValid {
+                    RuntimeIsValid {
                         Card(
                             modifier = Modifier
                                 .padding(top = 12.dp)
@@ -204,7 +204,7 @@ fun SettingPagerMiuix(
                         }
                     }
 
-                    KsuIsValid {
+                    RuntimeIsValid {
                         Card(
                             modifier = Modifier
                                 .padding(top = 12.dp)

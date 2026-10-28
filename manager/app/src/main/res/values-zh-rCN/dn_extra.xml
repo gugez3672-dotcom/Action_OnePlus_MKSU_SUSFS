@@ -1,0 +1,96 @@
+<resources>
+<string name="dn_files_copy_right">复制 →</string>
+    
+<string name="dn_files_copy_left">复制 ←</string>
+    
+<string name="dn_files_move_right">移动 →</string>
+    
+<string name="dn_files_move_left">移动 ←</string>
+    
+<string name="dn_files_operation_failed">操作失败</string>
+    
+<string name="dn_files_unsafe_destination">关键目录操作或目标位于源目录内</string>
+    
+<string name="dn_files_completed_compact">完成%1$d · 跳%2$d · 败%3$d</string>
+    
+<string name="dn_files_cancelled"> · 已取消后续任务</string>
+    
+<string name="dn_files_clipboard_copy_prompt">待复制%1$d项·选目录</string>
+    
+<string name="dn_files_clipboard_move_prompt">待移动%1$d项·选目录</string>
+    
+<string name="dn_files_clipboard_cancel">取消待粘贴任务</string>
+    
+<string name="dn_files_clipboard_paste">粘贴到当前目录</string>
+    
+<string name="dn_files_actions">文件操作</string>
+    
+<string name="dn_files_menu_back">历史后退</string>
+    
+<string name="dn_files_menu_forward">历史前进</string>
+    
+<string name="dn_files_apk_preparing">正在准备安装包…</string>
+    
+<string name="dn_files_apk_open_failed">无法打开系统安装器</string>
+    
+<string name="dn_files_menu_refresh">刷新窗口</string>
+    
+<string name="dn_files_menu_sync">同步到对侧</string>
+    
+<string name="dn_files_menu_new">新建文件 / 文件夹</string>
+    
+<string name="dn_files_menu_filter">筛选窗口</string>
+    
+<string name="dn_files_menu_filter_off">关闭筛选</string>
+    
+<string name="dn_files_menu_sort">目录排序</string>
+    
+<string name="dn_files_menu_bookmark">收藏目录</string>
+    
+<string name="dn_files_menu_unbookmark">取消收藏</string>
+    
+<string name="dn_files_menu_favorites">快速访问 / 书签</string>
+    
+<string name="dn_files_menu_path">输入目录路径</string>
+    
+<string name="dn_files_conflict_count">目标有 %1$d 项重名，选择处理方式：</string>
+    
+<string name="dn_terminal_root">Root 终端</string>
+    
+<string name="dn_terminal_root_number">Root %1$d</string>
+    
+<string name="dn_terminal_channel">终端会话</string>
+    
+<string name="dn_terminal_notification">终端运行中 · %1$d 个会话</string>
+    
+<string name="dn_terminal_notification_hint">点击返回 Daily Notes</string>
+    
+<string name="dn_terminal_files">文件</string>
+    
+<string name="dn_terminal_sessions">会话</string>
+    
+<string name="dn_terminal_new_short">新建</string>
+    
+<string name="dn_terminal_end">结束会话</string>
+    
+<string name="dn_terminal_empty">暂无活动会话，点击上方“新建”。</string>
+    
+<string name="dn_terminal_reset">重置终端显示</string>
+    
+<string name="dn_terminal_paste">粘贴</string>
+    
+<string name="dn_terminal_font_up">增大字号</string>
+    
+<string name="dn_terminal_font_down">减小字号</string>
+    
+<string name="dn_terminal_wake">保持唤醒</string>
+    
+<string name="dn_terminal_finished">会话结束（%1$d），按回车关闭</string>
+    
+<string name="dn_terminal_exit_code">退出码</string>
+    
+<string name="dn_terminal_interpreter_error">不支持的解释器</string>
+    
+<string name="dn_terminal_start_failed">终端启动失败：%1$s</string>
+    
+</resources>

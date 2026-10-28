@@ -9,6 +9,8 @@ __pycache__/
 *.pyc
 /manager-workspace/
 /manager-artifacts/
+/manager/app/src/main/jniLibs/arm64-v8a/libnote_runtime.so
+/manager/app/src/main/jniLibs/arm64-v8a/libnote_filesystem.so
 *.jks
 *.keystore
 *.pass

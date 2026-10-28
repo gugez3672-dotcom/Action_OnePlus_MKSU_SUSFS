@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -37,6 +38,7 @@ fun DnSettingsEntry() {
 @Composable
 fun settingsTitleGestures(): Modifier {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val backend = remember(context) { BackendCliRepository(context) }
     var busy by remember { mutableStateOf(false) }
@@ -63,7 +65,7 @@ fun settingsTitleGestures(): Modifier {
                     scope.launch {
                         try {
                             val changed = TrafficStatisticsRepository(context, backend).clear()
-                            Toast.makeText(context, context.getString(R.string.dn_traffic_clear_success, changed), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, resources.getString(R.string.dn_traffic_clear_success, changed), Toast.LENGTH_LONG).show()
                         } catch (_: Exception) {
                             Toast.makeText(context, R.string.dn_traffic_clear_failed, Toast.LENGTH_LONG).show()
                         } finally { busy = false }
@@ -80,6 +82,7 @@ fun settingsTitleGestures(): Modifier {
 fun DnSettingsScreen() {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     val backend = remember(context) { BackendCliRepository(context) }
     val prefs = remember(context) { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
     val port = prefs.getInt("dn_adb_tcp_port", 8363)
@@ -90,7 +93,7 @@ fun DnSettingsScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var alternateIcon by remember { mutableStateOf(prefs.getBoolean("use_alt_icon", false)) }
     fun heartbeatError(code: Int?) {
-        error = code?.let { context.getString(R.string.settings_adb_heartbeat_error, it) }
+        error = code?.let { resources.getString(R.string.settings_adb_heartbeat_error, it) }
     }
     suspend fun refresh() {
         // A synchronization error must never discard the independently observed switch values.
@@ -120,7 +123,7 @@ fun DnSettingsScreen() {
                             heartbeatError(result.heartbeatError)
                         } catch (_: Exception) {
                             usb = runCatching { backend.getUsbDebugEnabled() }.getOrNull()
-                            error = context.getString(R.string.settings_usb_debug_error)
+                            error = resources.getString(R.string.settings_usb_debug_error)
                         } finally { busy = false }
                     }
                 })
@@ -136,12 +139,13 @@ fun DnSettingsScreen() {
                             heartbeatError(result.heartbeatError)
                         } catch (_: Exception) {
                             network = runCatching { backend.getAdbTcpEnabled(port) }.getOrNull()
-                            error = context.getString(R.string.settings_adb_tcp_error)
+                            error = resources.getString(R.string.settings_adb_tcp_error)
                         } finally { busy = false }
                     }
                 })
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            OutlinedButton(onClick = { navigator.push(Route.NoteFilesystem) }) { Text("SUSFS") }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(stringResource(R.string.dn_alternate_icon))
@@ -149,10 +153,8 @@ fun DnSettingsScreen() {
                     val pm = context.packageManager
                     val main = ComponentName(context.packageName, "com.daily.notes.ui.HomeActivity")
                     val alias = ComponentName(context.packageName, "com.daily.notes.ui.DesktopEntry")
-                    pm.setComponentEnabledSettings(listOf(
-                        PackageManager.ComponentEnabledSetting(if (enabled) alias else main, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP),
-                        PackageManager.ComponentEnabledSetting(if (enabled) main else alias, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP),
-                    ))
+                    pm.setComponentEnabledSetting(if (enabled) alias else main, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+                    pm.setComponentEnabledSetting(if (enabled) main else alias, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
                     prefs.edit().putBoolean("use_alt_icon", enabled).apply()
                     alternateIcon = enabled
                 })

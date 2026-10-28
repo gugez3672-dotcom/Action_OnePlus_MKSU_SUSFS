@@ -19,4 +19,6 @@
 
 <string name="dn_connection_settings">连接与功能</string>
 <string name="dn_alternate_icon">替换图标</string>
+<string name="dn_modules_hidden">点击标题后读取模块列表。</string>
+<string name="dn_home_module_count">模块：%1$d</string>
 </resources>

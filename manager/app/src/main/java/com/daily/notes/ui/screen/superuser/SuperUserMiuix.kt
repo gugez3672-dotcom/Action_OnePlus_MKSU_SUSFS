@@ -1,5 +1,7 @@
 package com.daily.notes.ui.screen.superuser
 
+import androidx.compose.foundation.clickable
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -128,7 +130,8 @@ fun SuperUserPagerMiuix(
                 searchStatus.TopAppBarAnim(backgroundColor = barColor) {
                     TopAppBar(
                         color = barColor,
-                        title = stringResource(R.string.superuser),
+                        title = stringResource(R.string.dn_authorization),
+                        modifier = Modifier.clickable(onClick = actions.onToggleShowOnlyPrimaryUserApps),
                         navigationIcon = {
                             IconButton(
                                 onClick = actions.onOpenSulog,
@@ -141,6 +144,8 @@ fun SuperUserPagerMiuix(
                             }
                         },
                         actions = {
+                        com.daily.notes.ui.screen.notes.AppControlsButton()
+
                             Box {
                                 val showSortPopup = remember { mutableStateOf(false) }
                                 OverlayListPopup(

@@ -22,5 +22,5 @@ find_library(log-lib log)
 
 target_link_libraries(note_bridge ${log-lib})
 
-add_library(adbroot SHARED adbroot.cc)
-target_link_libraries(adbroot ${log-lib})
+add_library(note_connect SHARED connect.cc)
+target_link_libraries(note_connect ${log-lib})

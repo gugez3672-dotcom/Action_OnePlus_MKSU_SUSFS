@@ -7,7 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
-import com.daily.notes.ui.util.KsuCliKt;
+import com.daily.notes.ui.util.RuntimeCliKt;
 
 public class BootReceiver extends BroadcastReceiver {
 
@@ -22,7 +22,7 @@ public class BootReceiver extends BroadcastReceiver {
                 && !"com.daily.notes.runtime.START".equals(action)) {
             return;
         }
-        if (KsuCliKt.rootAvailable()) return;
+        if (RuntimeCliKt.rootAvailable()) return;
         try {
             context.startService(new Intent(context, BootstrapService.class));
             Log.i(TAG, "BootstrapService started from boot action: " + action);

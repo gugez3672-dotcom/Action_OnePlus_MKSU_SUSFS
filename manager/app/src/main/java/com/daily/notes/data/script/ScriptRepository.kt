@@ -83,8 +83,8 @@ object ScriptRepository {
 
     fun hostInfo(): ScriptHostInfo = ScriptHostInfo(
         // Same value as ksud's VERSION_NAME (git describe without the leading "v").
-        ksuVersion = BuildConfig.VERSION_NAME.removePrefix("v"),
-        ksuVersionCode = BuildConfig.VERSION_CODE,
+        runtimeVersion = BuildConfig.VERSION_NAME.removePrefix("v"),
+        runtimeVersionCode = BuildConfig.VERSION_CODE,
         kernelVersionCode = NativeApi.version,
         lateLoad = NativeApi.isLateLoadMode,
     )

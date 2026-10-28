@@ -1,0 +1,1337 @@
+{
+  "source_commit": "75e179d378d7aaa0de8946358a3384444c3e36b0",
+  "patch_sha256": "e47f881424908dd2b8a5644ac9436a22072790c9032464118e5e389cebf2241e",
+  "rust_files_token_equivalent": [
+    "userspace/ksud/build.rs",
+    "userspace/ksud/src/boot_patch.rs",
+    "userspace/ksud/src/cli.rs",
+    "userspace/ksud/src/cli_non_android.rs",
+    "userspace/ksud/src/debug.rs",
+    "userspace/ksud/src/feature_id.rs",
+    "userspace/ksud/src/hot_install.rs",
+    "userspace/ksud/src/ksucalls.rs",
+    "userspace/ksud/src/late_load.rs",
+    "userspace/ksud/src/lkm_image.rs",
+    "userspace/ksud/src/su.rs",
+    "userspace/ksud/src/unload.rs",
+    "userspace/ksud/src/utils.rs",
+    "userspace/ksuinit/src/init.rs",
+    "userspace/ksuinit/src/lib.rs"
+  ],
+  "package_metadata_only": {
+    "userspace/ksud/Cargo.toml": [
+      [
+        "name = \"ksud\"",
+        "name = \"note_runtime\""
+      ],
+      [
+        "ksuinit = { path = \"../ksuinit\" }",
+        "ksuinit = { package = \"note_startup\", path = \"../ksuinit\" }"
+      ]
+    ],
+    "userspace/ksuinit/Cargo.toml": [
+      [
+        "name = \"ksuinit\"",
+        "name = \"note_startup\""
+      ]
+    ],
+    "Cargo.toml": [
+      [
+        "[profile.release.package.ksud]",
+        "[profile.release.package.note_runtime]"
+      ]
+    ],
+    "Cargo.lock": [
+      [
+        "name = \"ksud\"",
+        "name = \"note_runtime\""
+      ],
+      [
+        "name = \"ksuinit\"",
+        "name = \"note_startup\""
+      ],
+      [
+        " \"ksuinit\",",
+        " \"note_startup\","
+      ]
+    ]
+  },
+  "literal_policy": [
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 43,
+      "before": "src/ksu_uapi.h",
+      "after": "src/ksu_uapi.h",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 51,
+      "before": "ksu_signal_context.h",
+      "after": "ksu_signal_context.h",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 132,
+      "before": "cargo:rerun-if-env-changed=KSU_LKM_BOOTSTRAP_OBJECT",
+      "after": "cargo:rerun-if-env-changed=KSU_LKM_BOOTSTRAP_OBJECT",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 133,
+      "before": "cargo:rerun-if-env-changed=KSU_LKM_BOOTSTRAP_CC",
+      "after": "cargo:rerun-if-env-changed=KSU_LKM_BOOTSTRAP_CC",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 141,
+      "before": "KSU_LKM_BOOTSTRAP_OBJECT",
+      "after": "KSU_LKM_BOOTSTRAP_OBJECT",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 145,
+      "before": "cannot use KSU_LKM_BOOTSTRAP_OBJECT {}: {error}",
+      "after": "cannot use KSU_LKM_BOOTSTRAP_OBJECT {}: {error}",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 167,
+      "before": "KSU_LKM_BOOTSTRAP_CC",
+      "after": "KSU_LKM_BOOTSTRAP_CC",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 218,
+      "before": "cannot assemble the AArch64 LKM bootstrap; install an AArch64 GNU compiler, clang, or llvm-mc, or set KSU_LKM_BOOTSTRAP_OBJECT:\n{}",
+      "after": "cannot assemble the AArch64 LKM bootstrap; install an AArch64 GNU compiler, clang, or llvm-mc, or set KSU_LKM_BOOTSTRAP_OBJECT:\n{}",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 236,
+      "before": "KSU_PACKAGE_NAME",
+      "after": "KSU_PACKAGE_NAME",
+      "reason": "Build-time environment/header interface; not part of the Android payload."
+    },
+    {
+      "file": "userspace/ksud/build.rs",
+      "line": 237,
+      "before": "cargo:rustc-env=KSU_PACKAGE_NAME=me.weishu.kernelsu",
+      "after": "cargo:rustc-env=KSU_PACKAGE_NAME=com.daily.notes",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/assets.rs",
+      "line": 17,
+      "before": "ksuinit",
+      "after": "ksuinit",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/assets.rs",
+      "line": 29,
+      "before": "/data/adb/ksud",
+      "after": "/data/adb/ksud",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/assets.rs",
+      "line": 74,
+      "before": "_kernelsu.ko",
+      "after": "_kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 127,
+      "before": "{KSU_BACKUP_FILE_PREFIX}{sha1}",
+      "after": "{KSU_BACKUP_FILE_PREFIX}{sha1}",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 128,
+      "before": "{KSU_BACKUP_DIR}{filename}",
+      "after": "{KSU_BACKUP_DIR}{filename}",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 143,
+      "before": "/data/user_de/{user_id}/{DEFAULT_PACKAGE_NAME}/{KSU_TEMP_BACKUP_DIR_NAME}",
+      "after": "/data/user_de/{user_id}/{DEFAULT_PACKAGE_NAME}/{KSU_TEMP_BACKUP_DIR_NAME}",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 156,
+      "before": "Both /data/adb/ksu and {backup_dir} are not accessible!",
+      "after": "Both /data/adb/ksu and {backup_dir} are not accessible!",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 183,
+      "before": "{KSU_BACKUP_FILE_PREFIX}{sha1}",
+      "after": "{KSU_BACKUP_FILE_PREFIX}{sha1}",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 500,
+      "before": " Do not (re-)install kernelsu, only modify configs (allow_shell, etc.)",
+      "after": " Do not (re-)install kernelsu, only modify configs (allow_shell, etc.)",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 513,
+      "before": " KernelSU module params, stored in ramdisk `/ksu_config` (boot-patch) or the",
+      "after": " KernelSU module params, stored in ramdisk `/ksu_config` (boot-patch) or the",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 781,
+      "before": "{kmi}_kernelsu.ko",
+      "after": "{kmi}_kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 788,
+      "before": "{arch}/{kmi}_kernelsu.ko",
+      "after": "{arch}/{kmi}_kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 800,
+      "before": "{arch}/ksuinit",
+      "after": "{arch}/ksuinit",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 800,
+      "before": "Failed to load ksuinit",
+      "after": "Failed to load startup helper",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 804,
+      "before": "ksuinit",
+      "after": "ksuinit",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 804,
+      "before": "Failed to load ksuinit",
+      "after": "Failed to load startup helper",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 822,
+      "before": "- Adding KernelSU LKM",
+      "after": "- Adding Daily Notes LKM",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 823,
+      "before": "kernelsu.ko",
+      "after": "kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 830,
+      "before": "kernelsu.ko",
+      "after": "kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 841,
+      "before": "ksu_config",
+      "after": "ksu_config",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 854,
+      "before": "ksu_config",
+      "after": "ksu_config",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 857,
+      "before": "ksu_config",
+      "after": "ksu_config",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 931,
+      "before": "kernelsu_patched_{}.img",
+      "after": "notes_patched_{}.img",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1030,
+      "before": "kernelsu.ko",
+      "after": "kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1031,
+      "before": "boot image is not patched by KernelSU",
+      "after": "boot image is not patched by Daily Notes",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1042,
+      "before": "{KSU_BACKUP_FILE_PREFIX}{sha}",
+      "after": "{KSU_BACKUP_FILE_PREFIX}{sha}",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1100,
+      "before": "kernelsu_restore_{}.img",
+      "after": "notes_restore_{}.img",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1117,
+      "before": "- Removing KernelSU from boot image",
+      "after": "- Removing Daily Notes from boot image",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/boot_patch.rs",
+      "line": 1118,
+      "before": "kernelsu.ko",
+      "after": "kernelsu.ko",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 16,
+      "before": " KernelSU userspace cli",
+      "after": " KernelSU userspace cli",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 26,
+      "before": " Manage KernelSU modules",
+      "after": " Manage KernelSU modules",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 38,
+      "before": " Run sulog reader daemon. Not for user. Use `ksud debug sulogd` to launch daemon.",
+      "after": " Run sulog reader daemon. Not for user. Use `ksud debug sulogd` to launch daemon.",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 45,
+      "before": " Load kernelsu.ko and execute late-load stage scripts",
+      "after": " Load kernelsu.ko and execute late-load stage scripts",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 51,
+      "before": " Pass allow_shell=1 when loading kernelsu.ko",
+      "after": " Pass allow_shell=1 when loading kernelsu.ko",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 80,
+      "before": " Install KernelSU userspace component to system",
+      "after": " Install KernelSU userspace component to system",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 89,
+      "before": " Unload KernelSU kernel module (LKM Only)",
+      "after": " Unload KernelSU kernel module (LKM Only)",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 92,
+      "before": " Uninstall KernelSU modules and itself(LKM Only)",
+      "after": " Uninstall KernelSU modules and itself(LKM Only)",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 116,
+      "before": " Patch boot or init_boot images to apply KernelSU",
+      "after": " Patch boot or init_boot images to apply KernelSU",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 119,
+      "before": " Restore boot or init_boot images patched by KernelSU",
+      "after": " Restore boot or init_boot images patched by KernelSU",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 122,
+      "before": " Patch KernelSU into a boot image",
+      "after": " Patch KernelSU into a boot image",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 185,
+      "before": " Set the manager app, kernel CONFIG_KSU_DEBUG should be enabled.",
+      "after": " Set the manager app, kernel CONFIG_KSU_DEBUG should be enabled.",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 510,
+      "before": "KernelSU",
+      "after": "Daily Notes",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 561,
+      "before": "KSU_MODULE",
+      "after": "KSU_MODULE",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksud/src/cli.rs",
+      "line": 685,
+      "before": "KernelSU not available, exiting services",
+      "after": "Daily Notes not available, exiting services",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli_non_android.rs",
+      "line": 8,
+      "before": " KernelSU cli for non-android",
+      "after": " KernelSU cli for non-android",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli_non_android.rs",
+      "line": 18,
+      "before": " Patch boot or init_boot images to apply KernelSU",
+      "after": " Patch boot or init_boot images to apply KernelSU",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli_non_android.rs",
+      "line": 21,
+      "before": " Restore boot or init_boot images patched by KernelSU",
+      "after": " Restore boot or init_boot images patched by KernelSU",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/cli_non_android.rs",
+      "line": 24,
+      "before": " Patch KernelSU into a boot image",
+      "after": " Patch KernelSU into a boot image",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/debug.rs",
+      "line": 11,
+      "before": "/sys/module/kernelsu",
+      "after": "/sys/module/kernelsu",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/debug.rs",
+      "line": 23,
+      "before": "ksu_debug_manager_appid",
+      "after": "ksu_debug_manager_appid",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/debug.rs",
+      "line": 44,
+      "before": "CONFIG_KSU_DEBUG is not enabled",
+      "after": "Debug support is not enabled",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 14,
+      "before": "ksu/",
+      "after": "ksu/",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 24,
+      "before": ".ksurc",
+      "after": ".ksurc",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 25,
+      "before": "ksud",
+      "after": "ksud",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 28,
+      "before": "ksud",
+      "after": "ksud",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 38,
+      "before": "/metadata/vold/ksu/",
+      "after": "/metadata/vold/ksu/",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 39,
+      "before": "/metadata/watchdog/ksu/",
+      "after": "/metadata/watchdog/ksu/",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 40,
+      "before": "/metadata/ksu/",
+      "after": "/metadata/ksu/",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 60,
+      "before": ".ksu_hot_install",
+      "after": ".ksu_hot_install",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 73,
+      "before": "ksu_backup_",
+      "after": "ksu_backup_",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/defs.rs",
+      "line": 77,
+      "before": "KSU_PACKAGE_NAME",
+      "after": "KSU_PACKAGE_NAME",
+      "reason": "Exact installed root path, boot ramdisk field, asset suffix or backup format shared with the official runtime."
+    },
+    {
+      "file": "userspace/ksud/src/feature.rs",
+      "line": 232,
+      "before": "KSU_MODULE",
+      "after": "KSU_MODULE",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/feature_id.rs",
+      "line": 68,
+      "before": "Shell SU ADB Only - when shell is granted root, additionally require the process to be spawned by adbd or a KernelSU root process (ksu domain)",
+      "after": "Shell SU ADB Only - require adbd or a trusted root process when shell is granted root",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/hot_install.rs",
+      "line": 5,
+      "before": " the staged module dir; after the install script succeeds ksud moves the staged dir over the",
+      "after": " the staged module dir; after the install script succeeds ksud moves the staged dir over the",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 81,
+      "before": "anon_inode:[ksu_driver]",
+      "after": "anon_inode:[ksu_driver]",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 82,
+      "before": "anon_inode:[ksu_driver_su]",
+      "after": "anon_inode:[ksu_driver_su]",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 134,
+      "before": "KernelSU driver install syscall was blocked by seccomp",
+      "after": "Daily Notes driver install syscall was blocked by seccomp",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 135,
+      "before": "KernelSU driver install syscall was blocked by seccomp",
+      "after": "Daily Notes driver install syscall was blocked by seccomp",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 147,
+      "before": "could not retrieve kernelsu driver fd",
+      "after": "could not retrieve kernelsu driver fd",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 152,
+      "before": "ksuctl failed: {}",
+      "after": "runtime ioctl failed: {}",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 210,
+      "before": "UAPI version mismatch: kernel={kernel_uapi}, ksud={userspace_uapi}. Please update KernelSU!",
+      "after": "UAPI version mismatch: kernel={kernel_uapi}, runtime={userspace_uapi}. Please update Daily Notes!",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/ksucalls.rs",
+      "line": 264,
+      "before": " Forced by boot config (ksu_config), the kernel refuses to change it",
+      "after": " Forced by boot config (ksu_config), the kernel refuses to change it",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 45,
+      "before": "KernelSU already loaded, skip loading ko",
+      "after": "Daily Notes already loaded, skip loading ko",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 55,
+      "before": "{kmi}_kernelsu.ko",
+      "after": "{kmi}_kernelsu.ko",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 60,
+      "before": "Loading kernelsu.ko for KMI {kmi}...",
+      "after": "Loading kernelsu.ko for KMI {kmi}...",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 67,
+      "before": "Failed to load kernelsu.ko",
+      "after": "Failed to load kernelsu.ko",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 68,
+      "before": "kernelsu.ko loaded successfully!",
+      "after": "kernelsu.ko loaded successfully!",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 82,
+      "before": "Failed to install ksud",
+      "after": "Failed to install runtime",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 138,
+      "before": "Restarting KernelSU Manager {package_name}...",
+      "after": "Restarting Daily Notes Manager {package_name}...",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/late_load.rs",
+      "line": 146,
+      "before": "{package_name}/me.weishu.kernelsu.ui.MainActivity",
+      "after": "{package_name}/com.daily.notes.ui.MainActivity",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 26,
+      "before": "KSULKM1\u0000",
+      "after": "KSULKM1\u0000",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 77,
+      "before": " Exact kernelsu.ko; auto-select the embedded KMI build when omitted",
+      "after": " Exact kernelsu.ko; auto-select the embedded KMI build when omitted",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 1963,
+      "before": ".text.ksu_bootstrap",
+      "after": ".text.ksu_bootstrap",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 1964,
+      "before": "bootstrap must contain exactly one .text.ksu_bootstrap section",
+      "after": "bootstrap must contain exactly one .text.ksu_bootstrap section",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 1966,
+      "before": ".rodata.ksu_bootstrap",
+      "after": ".rodata.ksu_bootstrap",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2276,
+      "before": "ksu_bootstrap",
+      "after": "ksu_bootstrap",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2278,
+      "before": "ksu_memblock_reserve_wrapper",
+      "after": "ksu_memblock_reserve_wrapper",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2283,
+      "before": "ksu_strndup_user_adapter",
+      "after": "ksu_strndup_user_adapter",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2429,
+      "before": "ksu_ext_memblock_reserve",
+      "after": "ksu_ext_memblock_reserve",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2432,
+      "before": "ksu_ext_memstart_addr",
+      "after": "ksu_ext_memstart_addr",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2433,
+      "before": "ksu_ext_kimage_voffset",
+      "after": "ksu_ext_kimage_voffset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2434,
+      "before": "ksu_ext_async_synchronize_full",
+      "after": "ksu_ext_async_synchronize_full",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2435,
+      "before": "ksu_ext_vmalloc",
+      "after": "ksu_ext_vmalloc",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2436,
+      "before": "ksu_ext_memcpy",
+      "after": "ksu_ext_memcpy",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2437,
+      "before": "ksu_ext_load_module",
+      "after": "ksu_ext_load_module",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2438,
+      "before": "ksu_ext_kstrdup",
+      "after": "ksu_ext_kstrdup",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2439,
+      "before": "ksu_ext_strndup_user",
+      "after": "ksu_ext_strndup_user",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2440,
+      "before": "ksu_image_base",
+      "after": "ksu_image_base",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2441,
+      "before": "ksu_capsule_magic",
+      "after": "ksu_capsule_magic",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2442,
+      "before": "ksu_capsule_version",
+      "after": "ksu_capsule_version",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2443,
+      "before": "ksu_capsule_header_size",
+      "after": "ksu_capsule_header_size",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2444,
+      "before": "ksu_capsule_image_offset",
+      "after": "ksu_capsule_image_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2445,
+      "before": "ksu_capsule_size",
+      "after": "ksu_capsule_size",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2447,
+      "before": "ksu_module_capsule_offset",
+      "after": "ksu_module_capsule_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2451,
+      "before": "ksu_fixup_capsule_offset",
+      "after": "ksu_fixup_capsule_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2455,
+      "before": "ksu_args_capsule_offset",
+      "after": "ksu_args_capsule_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2458,
+      "before": "ksu_args_size",
+      "after": "ksu_args_size",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2459,
+      "before": "ksu_reserve_extension",
+      "after": "ksu_reserve_extension",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2460,
+      "before": "ksu_page_offset",
+      "after": "ksu_page_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2461,
+      "before": "ksu_module_size",
+      "after": "ksu_module_size",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2462,
+      "before": "ksu_fixup_count",
+      "after": "ksu_fixup_count",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2463,
+      "before": "ksu_load_info_size",
+      "after": "ksu_load_info_size",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2464,
+      "before": "ksu_load_info_hdr_offset",
+      "after": "ksu_load_info_hdr_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2465,
+      "before": "ksu_load_info_len_offset",
+      "after": "ksu_load_info_len_offset",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2466,
+      "before": "ksu_gfp_kernel",
+      "after": "ksu_gfp_kernel",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2576,
+      "before": "{kmi}_kernelsu.ko",
+      "after": "{kmi}_kernelsu.ko",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2580,
+      "before": "aarch64/{kmi}_kernelsu.ko",
+      "after": "aarch64/{kmi}_kernelsu.ko",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2641,
+      "before": "no embedded KernelSU module for KMI {kmi}: {name}",
+      "after": "no embedded Daily Notes module for KMI {kmi}: {name}",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2770,
+      "before": "ksu_ext_",
+      "after": "ksu_ext_",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 2770,
+      "before": "ksu_image_base",
+      "after": "ksu_image_base",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 3024,
+      "before": "android12-5.10_kernelsu.ko",
+      "after": "android12-5.10_kernelsu.ko",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/lkm_image.rs",
+      "line": 3026,
+      "before": "aarch64/android12-5.10_kernelsu.ko",
+      "after": "aarch64/android12-5.10_kernelsu.ko",
+      "reason": "Exact LKM capsule/ELF bootstrap ABI or its diagnostic; paired with the unmodified official bootstrap object."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 66,
+      "before": "KSU",
+      "after": "KSU",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 67,
+      "before": "KSU_KERNEL_VER_CODE",
+      "after": "KSU_KERNEL_VER_CODE",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 68,
+      "before": "KSU_VER_CODE",
+      "after": "KSU_VER_CODE",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 69,
+      "before": "KSU_VER",
+      "after": "KSU_VER",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 70,
+      "before": "KSU_UAPI_VER",
+      "after": "KSU_UAPI_VER",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 71,
+      "before": "KSU_RUNTIME_MODE",
+      "after": "KSU_RUNTIME_MODE",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 84,
+      "before": "KSU_MODULE",
+      "after": "KSU_MODULE",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 91,
+      "before": "KSU_LATE_LOAD",
+      "after": "KSU_LATE_LOAD",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "line": 317,
+      "before": "Failed to extract module_id from script path '{}'. Script will run without KSU_MODULE environment variable.",
+      "after": "Failed to extract module_id from script path '{}'. Script will run without KSU_MODULE environment variable.",
+      "reason": "Exact module/metamodule environment interface consumed by third-party modules."
+    },
+    {
+      "file": "userspace/ksud/src/preinit.rs",
+      "line": 264,
+      "before": " Make `<ksu_dir>/preinit/` mirror the `preinit/` dirs of `modules` (id -> module dir, enabled",
+      "after": " Make `<ksu_dir>/preinit/` mirror the `preinit/` dirs of `modules` (id -> module dir, enabled",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/preinit.rs",
+      "line": 490,
+      "before": "preinit was disabled after {BOOTCOUNT_LIMIT} failed boots, run `ksud module preinit reset` to retry",
+      "after": "preinit was disabled after {BOOTCOUNT_LIMIT} failed boots, run `ksud module preinit reset` to retry",
+      "reason": "Recovery message documents the real installed daemon command; preserve usable recovery instructions."
+    },
+    {
+      "file": "userspace/ksud/src/preinit.rs",
+      "line": 546,
+      "before": "preinit: disabled after {BOOTCOUNT_LIMIT} failed boots (reset with `ksud module preinit reset`)",
+      "after": "preinit: disabled after {BOOTCOUNT_LIMIT} failed boots (reset with `ksud module preinit reset`)",
+      "reason": "Recovery message documents the real installed daemon command; preserve usable recovery instructions."
+    },
+    {
+      "file": "userspace/ksud/src/restorecon.rs",
+      "line": 10,
+      "before": "u:object_r:ksu_file:s0",
+      "after": "u:object_r:ksu_file:s0",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/soft_reboot.rs",
+      "line": 29,
+      "before": "KSU_WAITSYS_FD",
+      "after": "KSU_WAITSYS_FD",
+      "reason": "Inherited waitsys descriptor environment interface."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 41,
+      "before": "KernelSU\n\nUsage: {program} [options] [-] [user [argument...]]",
+      "after": "Daily Notes\n\nUsage: {program} [options] [-] [user [argument...]]",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 116,
+      "before": "claim inherited KernelSU driver fd",
+      "after": "claim inherited Daily Notes driver fd",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 193,
+      "before": "don't use ksu fd wrapper",
+      "after": "don't use the restricted descriptor wrapper",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 196,
+      "before": "ksu-no-new-privs",
+      "after": "ksu-no-new-privs",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 197,
+      "before": "Prevent this process (and its children) from privilege re-escalation via KernelSU",
+      "after": "Prevent this process (and its children) from privilege re-escalation via Daily Notes",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 230,
+      "before": "{}:KernelSU",
+      "after": "{}:Daily Notes",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 246,
+      "before": "ksu-no-new-privs",
+      "after": "ksu-no-new-privs",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/su.rs",
+      "line": 327,
+      "before": "set KSU_NO_NEW_PRIVS",
+      "after": "set restricted privilege mode",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/sulog.rs",
+      "line": 24,
+      "before": "internal.ksud.sulogd",
+      "after": "internal.ksud.sulogd",
+      "reason": "Exact log-daemon property interface; must match the official manager log reader."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 8,
+      "before": " Find PIDs of processes running in the KernelSU su domain (u:r:ksu:s0).",
+      "after": " Find PIDs of processes running in the KernelSU su domain (u:r:ksu:s0).",
+      "reason": "Clap/help documentation presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 30,
+      "before": "u:r:ksu:s0",
+      "after": "u:r:ksu:s0",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 39,
+      "before": " Find PIDs of processes holding ksu_driver or ksu_fdwrapper file descriptors.",
+      "after": " Find PIDs of processes holding ksu_driver or ksu_fdwrapper file descriptors.",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 67,
+      "before": "[ksu_driver",
+      "after": "[ksu_driver",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 67,
+      "before": "[ksu_fdwrapper]",
+      "after": "[ksu_fdwrapper]",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 86,
+      "before": " Close all ksu_driver and ksu_fdwrapper fds held by the current process.",
+      "after": " Close all ksu_driver and ksu_fdwrapper fds held by the current process.",
+      "reason": "Documentation of an exact upstream protocol identifier."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 98,
+      "before": "[ksu_driver",
+      "after": "[ksu_driver",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 98,
+      "before": "[ksu_fdwrapper]",
+      "after": "[ksu_fdwrapper]",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 109,
+      "before": "unload: starting KernelSU unload sequence",
+      "after": "unload: starting Daily Notes unload sequence",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 129,
+      "before": "unload: killing processes holding ksu fds...",
+      "after": "unload: killing processes holding runtime fds...",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 133,
+      "before": "unload: found {} processes holding ksu fds, sending SIGKILL",
+      "after": "unload: found {} processes holding runtime fds, sending SIGKILL",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 140,
+      "before": "unload: closing all ksu fds...",
+      "after": "unload: closing all runtime fds...",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 144,
+      "before": "unload: removing kernelsu module...",
+      "after": "unload: removing kernelsu module...",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 145,
+      "before": "kernelsu",
+      "after": "kernelsu",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 146,
+      "before": "unload: delete_module kernelsu failed: {e}",
+      "after": "unload: delete_module kernelsu failed: {e}",
+      "reason": "Exact kernel descriptor, SELinux context, debug parameter or documented command option."
+    },
+    {
+      "file": "userspace/ksud/src/unload.rs",
+      "line": 154,
+      "before": "unload: done, exiting ksud",
+      "after": "unload: done, exiting runtime",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksud/src/utils.rs",
+      "line": 299,
+      "before": "- Uninstall KernelSU manager..",
+      "after": "- Uninstall Daily Notes manager..",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 98,
+      "before": "Hello, KernelSU!",
+      "after": "Hello, Daily Notes!",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 107,
+      "before": "KernelSU may be already loaded in kernel, skip!",
+      "after": "Daily Notes may be already loaded in kernel, skip!",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 109,
+      "before": "Loading kernelsu.ko..",
+      "after": "Loading kernelsu.ko..",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 110,
+      "before": "/kernelsu.ko",
+      "after": "/kernelsu.ko",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 111,
+      "before": "Cannot load kernelsu.ko: {:?}",
+      "after": "Cannot load kernelsu.ko: {:?}",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 132,
+      "before": "/ksu_config",
+      "after": "/ksu_config",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksuinit/src/init.rs",
+      "line": 134,
+      "before": "load kernelsu with params {params:?}",
+      "after": "load kernelsu with params {params:?}",
+      "reason": "Exact upstream runtime interface; retain this literal at this source location."
+    },
+    {
+      "file": "userspace/ksuinit/src/lib.rs",
+      "line": 470,
+      "before": "KernelSU version: {}",
+      "after": "Daily Notes version: {}",
+      "reason": "Application identity or diagnostic/help presentation only."
+    },
+    {
+      "file": "userspace/ksuinit/src/lib.rs",
+      "line": 543,
+      "before": "KernelSU version: {}",
+      "after": "Daily Notes version: {}",
+      "reason": "Application identity or diagnostic/help presentation only."
+    }
+  ],
+  "scope": "Exact source/literal entries, not a blanket allowance for ksu strings. Final ELF/APK audit remains required.",
+  "installer_comments": "Only installer presentation banner comments renamed; module environment/hook interfaces unchanged.",
+  "functional_adaptations": [
+    {
+      "file": "userspace/ksud/src/module.rs",
+      "change": "Export physical dir_id; preinit/config lookup uses the same physical ID; declared module.prop id is preserved.",
+      "boundary": "No kernel UAPI, permission, mount or installer implementation changes."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+<resources>
+    <string name="dn_mount_title">Module mounting dependencies</string>
+    <string name="dn_mount_summary">Enabled metamodules: %1$d · System mount modules: %2$d · View dependencies</string>
+    <string name="dn_mount_meta">Metamodule</string>
+    <string name="dn_mount_required">Needs system mounting</string>
+    <string name="dn_mount_other">No system mount request; scripts may have other dependencies</string>
+    <string name="dn_mount_enabled">Enabled</string>
+    <string name="dn_mount_disabled">Disabled</string>
+    <string name="dn_mount_pending">Update pending; verify after reboot</string>
+    <string name="dn_mount_removed">Removal pending</string>
+    <string name="dn_mount_explanation">System overlays need one compatible metamodule. This manager does not select or install one automatically. Removing, disabling or replacing it can affect all module mounts. The backend enforces a single metamodule. Status below describes installed files; reboot and device checks are needed to confirm effective mounts. A module with no system mount request can still mount files in its own scripts. Filesystem statistics are captured before metamodule mounting and updated in post-mount.</string>
+</resources>

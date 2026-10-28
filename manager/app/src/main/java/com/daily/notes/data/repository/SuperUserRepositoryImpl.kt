@@ -22,7 +22,7 @@ import com.daily.notes.data.model.WEBVIEW_ZYGOTE_PROFILE_KEY
 import com.daily.notes.data.model.WEBVIEW_ZYGOTE_UID
 import com.daily.notes.runtime.noteApp
 import com.daily.notes.data.packageinfo.PackageCatalogService
-import com.daily.notes.ui.util.KsuCli
+import com.daily.notes.ui.util.RuntimeCli
 import kotlin.coroutines.resume
 
 class SuperUserRepositoryImpl : SuperUserRepository {
@@ -33,7 +33,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
 
     override suspend fun getAppList(): Result<Pair<List<AppInfo>, List<Int>>> = withContext(Dispatchers.IO) {
         runCatching {
-            if (!KsuCli.SHELL.isRoot) {
+            if (!RuntimeCli.SHELL.isRoot) {
                 return@withContext Result.failure(
                     IllegalStateException("Root access is required")
                 )
@@ -160,7 +160,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
                 Shell.EXECUTOR,
                 connection,
             )
-            val shell = KsuCli.SHELL
+            val shell = RuntimeCli.SHELL
             task?.let { shell.execTask(it) }
         }
     }

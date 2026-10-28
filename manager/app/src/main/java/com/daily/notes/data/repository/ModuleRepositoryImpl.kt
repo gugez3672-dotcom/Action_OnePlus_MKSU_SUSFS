@@ -27,7 +27,12 @@ class ModuleRepositoryImpl : ModuleRepository {
                 .map { array.getJSONObject(it) }
                 .map { obj ->
                     Module(
-                        id = obj.getString("id"),
+                        id = obj.getString("dir_id").also {
+                            require(it.isNotEmpty() && it != "." && it != ".." &&
+                                '/' !in it && '\\' !in it && '\u0000' !in it)
+                        },
+                        declaredId = obj.getString("id"),
+                        needsMount = obj.optBoolean("mount"),
                         name = obj.optString("name"),
                         author = obj.optString("author", "Unknown"),
                         version = obj.optString("version", "Unknown"),
@@ -53,7 +58,7 @@ class ModuleRepositoryImpl : ModuleRepository {
             if (!isNetworkAvailable(noteApp)) {
                 return@runCatching ModuleUpdateInfo.Empty
             }
-            if (module.updateJson.isEmpty() || module.remove || module.update || !module.enabled) {
+            if (module.declaredId != module.id || module.updateJson.isEmpty() || module.remove || module.update || !module.enabled) {
                 return@runCatching ModuleUpdateInfo.Empty
             }
 

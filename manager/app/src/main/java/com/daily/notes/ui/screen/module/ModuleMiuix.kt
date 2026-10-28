@@ -1,5 +1,7 @@
 package com.daily.notes.ui.screen.module
 
+import androidx.compose.foundation.clickable
+
 import android.annotation.SuppressLint
 import android.app.Activity.RESULT_OK
 import android.content.ClipData
@@ -266,6 +268,7 @@ fun ModulePagerMiuix(
                     TopAppBar(
                         color = barColor,
                         title = stringResource(R.string.module),
+                        modifier = Modifier.clickable(onClick = actions.onTitleClick),
                         actions = {
                             Box {
                                 val showTopPopup = remember { mutableStateOf(false) }
@@ -427,6 +430,7 @@ fun ModulePagerMiuix(
             ) {
                 val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
                 ModuleList(
+                allModules = uiState.modules,
                     modifier = Modifier
                         .fillMaxSize()
                         .overScrollVertical(),
@@ -529,6 +533,7 @@ fun ModulePagerMiuix(
                     ) { latestModules.value }
                     Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
                         ModuleList(
+                allModules = uiState.modules,
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .scrollEndHaptic()
@@ -579,7 +584,7 @@ private fun ModuleShortcutDialog(
     fun copyShortcutUrl() {
         val url = shortcutState.buildShortcutUrl() ?: return
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("KernelSU deep link", url))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Module deep link", url))
         Toast.makeText(context, resources.getString(R.string.module_shortcut_scheme_copied), Toast.LENGTH_SHORT).show()
     }
 
@@ -688,6 +693,7 @@ private fun ModuleShortcutDialog(
 
 @Composable
 private fun ModuleList(
+    allModules: List<Module>,
     modifier: Modifier = Modifier,
     modules: List<Module>,
     updateInfoMap: Map<String, ModuleUpdateInfo>,
@@ -704,6 +710,7 @@ private fun ModuleList(
         contentPadding = contentPadding,
         overscrollEffect = null,
     ) {
+        item(key = "dn_mount_dependencies") { ModuleMountSummary(allModules) }
         items(
             items = modules,
             key = { it.id },

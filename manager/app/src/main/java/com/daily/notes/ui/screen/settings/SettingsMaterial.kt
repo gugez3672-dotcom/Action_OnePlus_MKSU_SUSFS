@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.daily.notes.R
 import com.daily.notes.ui.UiMode
-import com.daily.notes.ui.component.KsuIsValid
+import com.daily.notes.ui.component.RuntimeIsValid
 import com.daily.notes.ui.component.material.ExpressiveScaffold
 import com.daily.notes.ui.component.material.SegmentedColumn
 import com.daily.notes.ui.component.material.SegmentedDropdownItem
@@ -95,7 +95,7 @@ fun SettingPagerMaterial(
                 .verticalScroll(rememberScrollState())
         ) {
             com.daily.notes.ui.screen.notes.DnSettingsEntry()
-            KsuIsValid {
+            RuntimeIsValid {
                 SegmentedColumn(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 13.dp),
                     content = listOf(
@@ -152,7 +152,7 @@ fun SettingPagerMaterial(
             )
 
             val profileTemplate = stringResource(id = R.string.settings_profile_template)
-            KsuIsValid {
+            RuntimeIsValid {
                 SegmentedColumn(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 13.dp),
                     content = listOf {
@@ -172,7 +172,7 @@ fun SettingPagerMaterial(
                 )
             }
 
-            KsuIsValid {
+            RuntimeIsValid {
                 val suCompatModeItems = listOf(
                     stringResource(id = R.string.settings_mode_enable_by_default),
                     stringResource(id = R.string.settings_mode_disable_until_reboot),

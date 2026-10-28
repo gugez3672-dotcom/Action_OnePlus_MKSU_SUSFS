@@ -16,7 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.daily.notes.R
-import com.daily.notes.ui.component.KsuIsValid
+import com.daily.notes.ui.component.RuntimeIsValid
 
 @Composable
 fun RebootDropdownItems(onItemClick: (String) -> Unit) {
@@ -35,7 +35,7 @@ fun RebootDropdownItems(onItemClick: (String) -> Unit) {
 fun RebootListPopupMaterial() {
     var expanded by remember { mutableStateOf(false) }
 
-    KsuIsValid {
+    RuntimeIsValid {
         val onReboot = rememberRebootAction()
 
         IconButton(onClick = { expanded = true }) {

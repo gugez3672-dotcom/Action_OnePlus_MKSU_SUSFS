@@ -273,13 +273,13 @@ class SettingsViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             when (mode) {
                 0 -> if (repo.setSuEnabled(true)) {
-                    repo.execKsudFeatureSave()
+                    repo.saveRuntimeFeature()
                     repo.setSuCompatModePref(0)
                     _uiState.update { it.copy(suCompatMode = 0, isSuEnabled = true) }
                 }
 
                 1 -> if (repo.setSuEnabled(true)) {
-                    repo.execKsudFeatureSave()
+                    repo.saveRuntimeFeature()
                     if (repo.setSuEnabled(false)) {
                         // "Disable until reboot" implies it should be enabled on next boot.
                         // We set the preference to 0 (Enabled) to match the persistent state.
@@ -289,7 +289,7 @@ class SettingsViewModel(
                 }
 
                 2 -> if (repo.setSuEnabled(false)) {
-                    repo.execKsudFeatureSave()
+                    repo.saveRuntimeFeature()
                     repo.setSuCompatModePref(2)
                     _uiState.update { it.copy(suCompatMode = 2, isSuEnabled = false) }
                 }
@@ -300,7 +300,7 @@ class SettingsViewModel(
     fun setKernelUmountEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setKernelUmountEnabled(enabled)) {
-                repo.execKsudFeatureSave()
+                repo.saveRuntimeFeature()
                 _uiState.update { it.copy(isKernelUmountEnabled = enabled) }
             }
         }
@@ -309,7 +309,7 @@ class SettingsViewModel(
     fun setSelinuxHideEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val status = repo.setSelinuxHideEnabled(enabled)
-            repo.execKsudFeatureSave()
+            repo.saveRuntimeFeature()
             _uiState.update { it.copy(isSelinuxHideEnabled = enabled) }
             when (status) {
                 0 -> {}
@@ -342,7 +342,7 @@ class SettingsViewModel(
     fun setSulogEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setSulogEnabled(enabled)) {
-                repo.execKsudFeatureSave()
+                repo.saveRuntimeFeature()
                 _uiState.update { it.copy(isSulogEnabled = enabled) }
             }
         }
@@ -351,7 +351,7 @@ class SettingsViewModel(
     fun setShellSuAdbOnlyEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setShellSuAdbOnlyEnabled(enabled)) {
-                repo.execKsudFeatureSave()
+                repo.saveRuntimeFeature()
                 _uiState.update { it.copy(isShellSuAdbOnlyEnabled = enabled) }
             }
         }
@@ -360,7 +360,7 @@ class SettingsViewModel(
     fun setAdbRootEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             if (repo.setAdbRootEnabled(enabled)) {
-                repo.execKsudFeatureSave()
+                repo.saveRuntimeFeature()
                 _uiState.update { it.copy(isAdbRootEnabled = enabled) }
             }
         }

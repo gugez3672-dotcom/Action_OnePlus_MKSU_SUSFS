@@ -95,7 +95,7 @@ fun ExecuteModuleActionEffect(
 fun saveLog(
     logContent: StringBuilder,
     scope: CoroutineScope,
-    fileNamePrefix: String = "KernelSU_module_action_log",
+    fileNamePrefix: String = "Notes_module_action_log",
     showMessage: (String) -> Unit
 ): () -> Unit {
     return {

@@ -148,7 +148,7 @@ private fun isTextLike(name: String): Boolean {
 @Composable
 fun ToolsPage(bottomPadding: Dp) {
     val backendContext = LocalContext.current
-    val ksuCli = remember(backendContext) { BackendCliRepository(backendContext) }
+    val backendCli = remember(backendContext) { BackendCliRepository(backendContext) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val toolPrefs = remember(context) {
@@ -202,7 +202,7 @@ fun ToolsPage(bottomPadding: Dp) {
 
     val terminalModel: DnTerminalViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
         viewModelStoreOwner = context as androidx.activity.ComponentActivity)
-    val pty = terminalModel.controller(context, ksuCli.getBackendPath())
+    val pty = terminalModel.controller(context, backendCli.getBackendPath())
     androidx.compose.runtime.SideEffect { terminalModel.showingTerminal = tab == 1 }
     DisposableEffect(terminalModel) { onDispose { terminalModel.showingTerminal = false } }
 
@@ -210,7 +210,7 @@ fun ToolsPage(bottomPadding: Dp) {
         withContext(Dispatchers.IO) {
             val stdout = ArrayList<String>()
             val stderr = ArrayList<String>()
-            val result = ksuCli.withNewRootShell(globalMnt = true) {
+            val result = backendCli.withNewRootShell(globalMnt = true) {
                 newJob().add("(\n" + command + "\n)").to(stdout, stderr).exec()
             }
             val text = buildString {
@@ -240,7 +240,7 @@ fun ToolsPage(bottomPadding: Dp) {
                 "  n=$(" + busybox + " basename \"" + d + "f\")\n" +
                 "  printf '%s\\t%s\\t%s\\t%s\\t%s\\n' \"" + d + "t\" \"" + d + "s\" \"" + d + "m\" \"" + d + "p\" \"" + d + "n\"\n" +
                 "done"
-            ksuCli.withNewRootShell(globalMnt = true) {
+            backendCli.withNewRootShell(globalMnt = true) {
                 newJob().add(cmd).to(stdout, stderr).exec()
             }
             stdout.mapNotNull { line ->

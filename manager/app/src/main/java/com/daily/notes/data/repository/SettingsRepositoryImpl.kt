@@ -13,7 +13,7 @@ import com.daily.notes.runtime.noteApp
 import com.daily.notes.runtime.BootReceiver
 import com.daily.notes.ui.UiMode
 import com.daily.notes.ui.screen.modulerepo.RepoSort
-import com.daily.notes.ui.util.execKsud
+import com.daily.notes.ui.util.execRuntime
 import com.daily.notes.ui.util.getFeaturePersistValue
 import com.daily.notes.ui.util.getFeatureValue
 import com.daily.notes.ui.util.getFeatureStatus
@@ -209,7 +209,7 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override suspend fun getSulogValue(): Long? = getFeatureValue("sulog")
 
-    override fun setSulogEnabled(enabled: Boolean): Boolean = execKsud("feature set sulog ${if (enabled) 1 else 0}", true)
+    override fun setSulogEnabled(enabled: Boolean): Boolean = execRuntime("feature set sulog ${if (enabled) 1 else 0}", true)
 
     override suspend fun getAdbRootStatus(): String = getFeatureStatus("adb_root")
 
@@ -218,7 +218,7 @@ class SettingsRepositoryImpl : SettingsRepository {
     override suspend fun getAdbRootValue(): Long? = getFeatureValue("adb_root")
 
     override fun setAdbRootEnabled(enabled: Boolean): Boolean =
-        if (execKsud("feature set adb_root ${if (enabled) 1 else 0}", true)) {
+        if (execRuntime("feature set adb_root ${if (enabled) 1 else 0}", true)) {
             ShellUtils.fastCmd("setprop ctl.restart adbd")
             true
         } else {
@@ -232,7 +232,7 @@ class SettingsRepositoryImpl : SettingsRepository {
     override suspend fun getShellSuAdbOnlyValue(): Long? = getFeatureValue("shell_su_adb_only")
 
     override fun setShellSuAdbOnlyEnabled(enabled: Boolean): Boolean =
-        execKsud("feature set shell_su_adb_only ${if (enabled) 1 else 0}", true)
+        execRuntime("feature set shell_su_adb_only ${if (enabled) 1 else 0}", true)
 
     override fun isDefaultUmountModules(): Boolean = NativeApi.isDefaultUmountModules()
 
@@ -240,7 +240,7 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override fun isLkmMode(): Boolean = NativeApi.isLkmMode
 
-    override fun execKsudFeatureSave() {
-        execKsud("feature save", true)
+    override fun saveRuntimeFeature() {
+        execRuntime("feature save", true)
     }
 }

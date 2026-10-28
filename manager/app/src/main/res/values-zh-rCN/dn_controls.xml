@@ -1,0 +1,8 @@
+<resources>
+<string name="dn_authorization">授权</string>
+<string name="dn_application_controls">应用控制</string>
+<string name="dn_enable_apps">启用</string>
+<string name="dn_disable_apps">禁用</string>
+<string name="dn_select_all">全选</string>
+<string name="dn_select_none">取消选择</string>
+</resources>

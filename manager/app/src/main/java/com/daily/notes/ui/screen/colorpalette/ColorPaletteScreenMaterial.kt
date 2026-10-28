@@ -96,7 +96,7 @@ import com.daily.notes.ui.component.material.TopBarBackButton
 import com.daily.notes.ui.component.material.expressiveTopAppBarColors
 import com.daily.notes.ui.theme.ColorMode
 import com.daily.notes.ui.theme.keyColorOptions
-import com.daily.notes.ui.theme.rememberKernelSUColorScheme
+import com.daily.notes.ui.theme.rememberNotesColorScheme
 import kotlin.math.roundToInt
 
 @Composable
@@ -463,7 +463,7 @@ private fun ThemePreviewCard(
     val screenRatio = screenWidth / screenHeight
     val useRail = useNavigationRail(enableFloatingBottomBar = false)
 
-    val colorScheme = rememberKernelSUColorScheme(
+    val colorScheme = rememberNotesColorScheme(
         seedColor = if (keyColor == 0) Color.Unspecified else Color(keyColor),
         isDark = isDark,
         isAmoled = isAmoled,
@@ -588,7 +588,7 @@ private fun ColorButtonMaterial(
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val colorScheme = rememberKernelSUColorScheme(
+    val colorScheme = rememberNotesColorScheme(
         seedColor = color,
         isDark = isDark,
         isAmoled = isAmoled,

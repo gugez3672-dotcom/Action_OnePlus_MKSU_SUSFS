@@ -84,7 +84,7 @@ import com.daily.notes.ui.screen.sulog.SulogScreen
 import com.daily.notes.ui.screen.superuser.SuperUserPager
 import com.daily.notes.ui.screen.template.AppProfileTemplateScreen
 import com.daily.notes.ui.screen.templateeditor.TemplateEditorScreen
-import com.daily.notes.ui.theme.KernelSUTheme
+import com.daily.notes.ui.theme.NotesTheme
 import com.daily.notes.ui.theme.LocalColorMode
 import com.daily.notes.ui.theme.LocalEnableBlur
 import com.daily.notes.ui.theme.LocalEnableFloatingBottomBar
@@ -174,7 +174,7 @@ class HomeActivity : ComponentActivity() {
                 LocalModuleDescriptionMaxLines provides uiState.moduleDescriptionMaxLines,
                 LocalUiMode provides uiMode,
             ) {
-                KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
+                NotesTheme(appSettings = appSettings, uiMode = uiMode) {
                     IntentDispatcher(intentChannel = intentChannel)
                     val swipeDismiss = if (uiState.enableSwipeDismiss) {
                         if (LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) {
@@ -218,6 +218,8 @@ class HomeActivity : ComponentActivity() {
                                 }
                             }) {
                             entry<Route.Main>(swipeDismiss = swipeDismiss) { mainScreenEntry() }
+                            entry<Route.AppControls>(swipeDismiss = swipeDismiss) { key -> com.daily.notes.ui.screen.notes.DnAppControlsScreen(key.userId, key.packageName) }
+                            entry<Route.NoteFilesystem>(swipeDismiss = swipeDismiss) { com.daily.notes.ui.screen.notes.DnFilesystemScreen() }
                             entry<Route.NoteSettings>(swipeDismiss = swipeDismiss) { com.daily.notes.ui.screen.notes.DnSettingsScreen() }
                             entry<Route.About>(swipeDismiss = swipeDismiss) { AboutScreen() }
                             entry<Route.Sulog>(swipeDismiss = swipeDismiss) { SulogScreen() }
@@ -305,9 +307,6 @@ fun MainScreen(
 
     val enableNavigationBadge = LocalEnableNavigationBadge.current
     val badgeEnabled = enableNavigationBadge && isFullFeatured
-    val moduleViewModel = viewModel<ModuleViewModel>()
-    val moduleUiState by moduleViewModel.uiState.collectAsStateWithLifecycle()
-
     val superUserViewModel = viewModel<SuperUserViewModel>()
     val grantedUidCount by remember(superUserViewModel) {
         superUserViewModel.uiState
@@ -320,14 +319,6 @@ fun MainScreen(
         if (!isFullFeatured || startupPreloadStarted) {
             return@LaunchedEffect
         }
-
-        moduleViewModel.initializePreferences()
-        val moduleState = moduleViewModel.uiState.value
-        if (!moduleState.hasLoaded) {
-            if (!moduleState.isRefreshing) moduleViewModel.fetchModuleList()
-            moduleViewModel.uiState.first { it.hasLoaded }
-        }
-        moduleViewModel.syncModuleUpdateInfo(moduleViewModel.uiState.value.modules)
 
         val superUserState = superUserViewModel.uiState.value
         if (!superUserState.hasLoaded) {
@@ -351,8 +342,8 @@ fun MainScreen(
     val navigationBadge = if (badgeEnabled) {
         NavigationBadgeState(
             superuserCount = superuserCount,
-            moduleEnabledCount = moduleUiState.modules.count { it.enabled },
-            moduleUpdatableCount = moduleUiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
+            moduleEnabledCount = 0,
+            moduleUpdatableCount = 0,
         )
     } else {
         NavigationBadgeState()

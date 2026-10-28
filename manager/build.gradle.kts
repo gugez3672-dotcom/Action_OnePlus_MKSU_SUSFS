@@ -13,8 +13,9 @@ extra["androidBuildToolsVersion"] = "37.0.0"
 extra["androidCompileNdkVersion"] = libs.versions.ndk.get()
 extra["androidSourceCompatibility"] = JavaVersion.VERSION_21
 extra["androidTargetCompatibility"] = JavaVersion.VERSION_21
-extra["managerVersionCode"] = 36200
-extra["managerVersionName"] = "D2.0.0"
+val notesVersion = groovy.json.JsonSlurper().parse(file("../manager-custom/version.json")) as Map<*, *>
+extra["managerVersionCode"] = (notesVersion["code"] as Number).toInt()
+extra["managerVersionName"] = notesVersion["name"].toString()
 
 fun getGitCommitCount(): Int {
     val process = Runtime.getRuntime().exec(arrayOf("git", "rev-list", "--count", "HEAD"))

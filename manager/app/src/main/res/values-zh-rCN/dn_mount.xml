@@ -1,0 +1,12 @@
+<resources>
+    <string name="dn_mount_title">模块挂载依赖</string>
+    <string name="dn_mount_summary">启用元模块：%1$d · 系统挂载模块：%2$d · 查看依赖</string>
+    <string name="dn_mount_meta">元模块</string>
+    <string name="dn_mount_required">需要系统文件挂载</string>
+    <string name="dn_mount_other">未请求系统挂载；脚本仍可能有其他依赖</string>
+    <string name="dn_mount_enabled">已启用</string>
+    <string name="dn_mount_disabled">已停用</string>
+    <string name="dn_mount_pending">更新待生效；重启后核对</string>
+    <string name="dn_mount_removed">待移除</string>
+    <string name="dn_mount_explanation">系统文件覆盖需要一个兼容的元模块。管理器不会自动选择或安装。卸载、停用或更换元模块可能影响所有模块的挂载，后端保留仅允许一个元模块的限制。下列状态来自安装目录，实际挂载是否生效须重启后实机核对。未请求系统挂载的模块也可能通过自身脚本挂载文件。文件统计伪装在元模块挂载前采集，在 post-mount 阶段更新。</string>
+</resources>

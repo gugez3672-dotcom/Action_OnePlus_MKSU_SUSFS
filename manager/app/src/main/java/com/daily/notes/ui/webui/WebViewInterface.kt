@@ -191,7 +191,7 @@ class WebViewInterface(private val state: WebUIState) {
         for (i in 0 until moduleInfos.length()) {
             val currentInfo = moduleInfos.getJSONObject(i)
 
-            if (currentInfo.getString("id") != moduleId) {
+            if (currentInfo.getString("dir_id") != moduleId) {
                 continue
             }
 

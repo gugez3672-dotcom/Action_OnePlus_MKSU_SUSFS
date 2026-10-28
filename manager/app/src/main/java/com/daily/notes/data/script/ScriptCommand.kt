@@ -2,8 +2,8 @@ package com.daily.notes.data.script
 
 /** What the manager knows about the running KernelSU, exported to the script like ksud does. */
 data class ScriptHostInfo(
-    val ksuVersion: String,
-    val ksuVersionCode: Int,
+    val runtimeVersion: String,
+    val runtimeVersionCode: Int,
     val kernelVersionCode: Int,
     val lateLoad: Boolean,
 )
@@ -39,8 +39,8 @@ object ScriptCommand {
         val env = mutableListOf(
             "ASH_STANDALONE" to "1",
             "KSU" to "true",
-            "KSU_VER" to host.ksuVersion,
-            "KSU_VER_CODE" to host.ksuVersionCode.toString(),
+            "KSU_VER" to host.runtimeVersion,
+            "KSU_VER_CODE" to host.runtimeVersionCode.toString(),
             "KSU_KERNEL_VER_CODE" to host.kernelVersionCode.toString(),
         )
         if (host.lateLoad) env += "KSU_LATE_LOAD" to "1"

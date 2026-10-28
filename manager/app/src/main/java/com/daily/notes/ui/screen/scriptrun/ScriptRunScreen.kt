@@ -112,7 +112,7 @@ fun ScriptRunScreen(arg: ScriptRunArg, onBackEnabledChange: (Boolean) -> Unit) {
         val outputActions = ExecuteModuleActionScreenActions(
             // The script cannot be stopped; stay on the output until it ends.
             onBack = dropUnlessResumed { if (finished) navigator.pop() },
-            onSaveLog = saveLog(viewModel.logContent, scope, "KernelSU_script_log") { showMessage(it) },
+            onSaveLog = saveLog(viewModel.logContent, scope, "Notes_script_log") { showMessage(it) },
             onClose = { navigator.pop() },
         )
         when (uiMode) {

@@ -1,5 +1,7 @@
 package com.daily.notes.ui.screen.superuser
 
+import androidx.compose.foundation.clickable
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -98,7 +100,7 @@ fun SuperUserPagerMaterial(
         topBar = {
             SearchAppBar(
                 snackbarHostState = snackbarHostState,
-                title = { Text(stringResource(R.string.superuser)) },
+                title = { Text(stringResource(R.string.dn_authorization), modifier = Modifier.clickable(onClick = actions.onToggleShowOnlyPrimaryUserApps)) },
                 searchText = localSearchText,
                 onSearchTextChange = {
                     localSearchText = it
@@ -117,6 +119,8 @@ fun SuperUserPagerMaterial(
                     }
                 },
                 actions = {
+                        com.daily.notes.ui.screen.notes.AppControlsButton()
+
                     var showSortMenu by remember { mutableStateOf(false) }
 
                     IconButton(onClick = { showSortMenu = true }) {

@@ -4,13 +4,13 @@ import androidx.compose.runtime.Composable
 import com.daily.notes.NativeApi
 
 @Composable
-fun KsuIsValid(
+fun RuntimeIsValid(
     content: @Composable () -> Unit
 ) {
     val isManager = NativeApi.isManager
-    val ksuVersion = if (isManager) NativeApi.version else null
+    val runtimeVersion = if (isManager) NativeApi.version else null
 
-    if (ksuVersion != null) {
+    if (runtimeVersion != null) {
         content()
     }
 }

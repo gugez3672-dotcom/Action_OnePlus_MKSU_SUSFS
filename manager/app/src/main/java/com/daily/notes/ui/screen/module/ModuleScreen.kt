@@ -16,6 +16,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -43,6 +45,19 @@ fun ModulePager(
     bottomInnerPadding: Dp,
     isCurrentPage: Boolean = true,
 ) {
+    var listExpanded by rememberSaveable { mutableStateOf(false) }
+    if (!listExpanded) {
+        androidx.compose.foundation.layout.Column(
+            androidx.compose.ui.Modifier
+                .padding(top = 56.dp, start = 24.dp, end = 24.dp)
+        ) {
+            androidx.compose.material3.TextButton(onClick = { listExpanded = true }) {
+                androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.module))
+            }
+            androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.dn_modules_hidden))
+        }
+        return
+    }
     val uiMode = LocalUiMode.current
     val navigator = LocalNavigator.current
     val context = LocalContext.current
@@ -98,6 +113,7 @@ fun ModulePager(
     }
 
     val actions = ModuleActions(
+        onTitleClick = { listExpanded = false },
         onRefresh = {
             viewModel.fetchModuleList(checkUpdate = true)
         },

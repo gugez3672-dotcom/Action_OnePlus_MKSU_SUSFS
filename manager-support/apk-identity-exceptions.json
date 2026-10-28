@@ -1,0 +1,986 @@
+{
+  "scope": "Every allowance is an exact payload location plus exact full string SHA256; changes require review. No blanket ksu allowance.",
+  "source_commit": "75e179d378d7aaa0de8946358a3384444c3e36b0",
+  "entries": [
+    {
+      "location": "classes.dex",
+      "value": "\n        BB=/data/adb/ksu/bin/busybox\n        P=",
+      "sha256": "cd2d9f285b3612502a5435c89cba02a669167691699dd9521ffa5bab6e4f7e78",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "\nBB=/data/adb/ksu/bin/busybox\nP=",
+      "sha256": "dd6c7da03e602fa74368bf1c0a634a05f79c9ea75ce5b8ee30f2eae25ac6403c",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "\nfor f in \"$P\"/* \"$P\"/.[!.]* \"$P\"/..?*; do\n  [ -e \"$f\" ] || [ -L \"$f\" ] || continue\n  if [ -d \"$f\" ]; then t=D; elif [ -L \"$f\" ]; then t=L; else t=F; fi\n  s=$(/data/adb/ksu/bin/busybox stat -c '%s' \"$f\" 2>/dev/null || echo 0)\n  m=$(/data/adb/ksu/bin/busybox stat -c '%Y' \"$f\" 2>/dev/null || echo 0)\n  p=$(/data/adb/ksu/bin/busybox stat -c '%A' \"$f\" 2>/dev/null || echo ---------)\n  n=$(/data/adb/ksu/bin/busybox basename \"$f\")\n  printf '%s\\t%s\\t%s\\t%s\\t%s\\n' \"$t\" \"$s\" \"$m\" \"$p\" \"$n\"\ndone",
+      "sha256": "714e5aa999fe1c7094a3d9656b1c89e36d8a978b9061d677b05010218f70bf6b",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " && { if [ \"$(getprop init.svc.adbd)\" = running ]; then setprop ctl.restart adbd; fi; }; else if [ -x /data/adb/ksu/bin/resetprop ]; then /data/adb/ksu/bin/resetprop -p -d persist.adb.tcp.port 2>/dev/null; /data/adb/ksu/bin/resetprop -d service.adb.tcp.port 2>/dev/null; else setprop service.adb.tcp.port ''; fi; true; fi",
+      "sha256": "ae00fc7140e95e38a523d6e8503bd41f1300d953ccfd53e30c9a3bbec62e9699",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " -C /data/adb/ksu/log .",
+      "sha256": "bcd8fab048eb15b235fa6aceec2b8595bd2b0b99a0f2aea6bf626ce7f51135a5",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " > /data/adb/ksu/.adb_tcp_port && chmod 600 /data/adb/ksu/.adb_tcp_port",
+      "sha256": "5a9ab5e2c68df9b44578a22c2fd7467e696287471652378d15b26d2d10a85a89",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " ]; then echo '不支持修改符号链接权限'; exit 80; fi; /data/adb/ksu/bin/busybox chmod ",
+      "sha256": "f8bcbcfce00e2a878c38bd5eccf0329008f0e62b44c7b43541e5feb3b99df31c",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " ]; then echo NOT_FILE; else /data/adb/ksu/bin/busybox stat -c %s -- ",
+      "sha256": "73790eb3e623ff75787c440f633f9c03d1eb01dc389447e8c06d0ba0f2fb4197",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " ]; then echo on; else echo off; fi; elif [ \"$(cat /data/adb/ksu/.adb_tcp_port 2>/dev/null)\" = ",
+      "sha256": "43efa4ef8181b9b674c09e4c44420cc5d66cb20d2338436b48882d27d1727930",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": " ]; then exit 73; fi; /data/adb/ksu/bin/busybox mv -nT -- ",
+      "sha256": "d35f7d003b3e8ce96f413572f198dffcedde38306c1e6dc72b0665ca8b103504",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin",
+      "sha256": "7628735f4fb745e53968e0b192b23b900e09aedf79c4d9b0225769cc5b9db54e",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox",
+      "sha256": "1a6a8293eb03875f7420584be8b7b585c5e7a777bd75791c9216a4b2c1a01374",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox base64 -- ",
+      "sha256": "1fbe5ca8bccedeb717dc7e3a7fe839fbed261230d09f028aaf9c59198df680a1",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox hexdump -C -n 512 -- ",
+      "sha256": "6fbc0a6df73d53ee8f134adac74af2685bee91ba738a6417f4dc408f039382b4",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox sha256sum -- ",
+      "sha256": "827ba869be9be951bbc3316bcefb7075a601318aa789b2c2b839b9e4f859e92e",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox stat ",
+      "sha256": "640fb49ffb29a6059ec4983af23a828970f17cac2559fe9ca9a1b01e57c3dd51",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/bin/busybox stat -- ",
+      "sha256": "9731314898d26c48a9c06d64ea2a630692afdad2c8479ffb39c0f8586335ccb3",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/dn-adb-heartbeat",
+      "sha256": "694b71e9a54036674dba1d3c5a982b304425b394ec3162129aaa20cf383c38c4",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/log",
+      "sha256": "71449ecf0f4aea882aa45fcc6acaa322d64953778928d619d80f0c5e2b66d182",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "/data/adb/ksu/log/",
+      "sha256": "c063105314413cced9dd550c07acfea3950e2ae8f0e718b7a6bf827902d30be1",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": ":/system/bin:/system/xbin:/vendor/bin:/product/bin:/data/adb/ksu/bin",
+      "sha256": "89bcc4cb07d4dbd3687fcd28963a6908f0295423c63c6ec67a70fe0b10f80cb6",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU",
+      "sha256": "b43316db771ca4f4f2c430fc2a0d6e6fda262e8cb067ec3b310c243cf9726637",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_KERNEL_VER_CODE",
+      "sha256": "1d704966f78d44cafac937655f6732b0463b55a5ae23e851fc0fa1c8923cd6ab",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_LATE_LOAD",
+      "sha256": "55d627ed552779c7f978e6f5d9e5791e8d1fc8fcb76adb6f4c80654e77efe746",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_MODULE",
+      "sha256": "5e3c029bac76158daebaf47924b65447560d082645d03a9808001028856e0fe1",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_ONESHOT",
+      "sha256": "ccf8b06066f060658bea6c0163f272961c2245afbb9b019a582536dec4c930fc",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_PARAM_",
+      "sha256": "96a9bf6169c6b54994ade976f780bb3c5bb9ef92d6a6d460ddd13ab4b1b6107b",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_VER",
+      "sha256": "0ac2841f7245dafd4ab18fd92ef462483c3915451d91bbac5b19dd58a27ed50e",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "KSU_VER_CODE",
+      "sha256": "7072bc116317258332b124859611e087073113dbdc46678a1f7894a42aef533e",
+      "reason": "Exact module/script environment variable consumed by third-party scripts; paired with official backend module and oneshot interfaces.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/script/ScriptCommand.kt; ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "cp /data/adb/ksu/.allowlist ",
+      "sha256": "03246bffeaa2b529df1e7eb2bb0fef5933a6bdaa280a39c696afbfeaec4ff2c4",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "du -sh /data/adb/ksu/* > ",
+      "sha256": "202b4d549439e256f337f98f549cbde2942177984f1aca196b4fcc9171446819",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "https://kernelsu.org/templates/%s",
+      "sha256": "ab09c09344719e6c199f2b07cb7e370a2b98fd94ee78200bf16c3a193a4a4e12",
+      "reason": "Official SELinux profile template documents; exact template URL used by TemplateRepositoryImpl.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/repository/TemplateRepositoryImpl.kt; data/registry/RegistryUrls.kt; ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "https://kernelsu.org/templates/index.json",
+      "sha256": "8701dd2b8005049a74d7a64446deacff2b16c41003ee29def31c7fe9a15e8f9d",
+      "reason": "Official SELinux template index; exact service address used by TemplateRepositoryImpl.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/repository/TemplateRepositoryImpl.kt; data/registry/RegistryUrls.kt; ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "https://modules.kernelsu.org/",
+      "sha256": "883b3330e926d05da24b82623a5b9744091ce2527bdc740af14cab4100e3298f",
+      "reason": "Official module registry service endpoint; retaining the official module repository feature.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/repository/TemplateRepositoryImpl.kt; data/registry/RegistryUrls.kt; ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "https://mui.kernelsu.org/index.html",
+      "sha256": "90b8f06580e584a9215bbd6ce37f7a5054ce305765f237ca17a72aac91ac1bb8",
+      "reason": "Official manager WebUI front-end endpoint; retaining its existing bridge feature.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/repository/TemplateRepositoryImpl.kt; data/registry/RegistryUrls.kt; ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "if [ ! -e /data/adb/ksu/dn-adb-heartbeat/config.before-d110.json ]; then cp -p /data/adb/box/sing-box/config.json /data/adb/ksu/dn-adb-heartbeat/config.before-d110.json; fi",
+      "sha256": "411c58e0f5f5c7e932774b13c05f79c7fd78b4aa8f68429f2f08349aff9d03b2",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "if [ -x /data/adb/ksu/bin/resetprop ]; then /data/adb/ksu/bin/resetprop -p -d persist.adb.tcp.port 2>/dev/null; /data/adb/ksu/bin/resetprop -d service.adb.tcp.port 2>/dev/null; else setprop service.adb.tcp.port ''; fi; true",
+      "sha256": "1e8237824a6efe88edaa98d5c1169b95df59469cbf69622ef1714afea2f2db19",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "if [ -x /data/adb/ksu/bin/resetprop ]; then /data/adb/ksu/bin/resetprop -p -d persist.adb.tcp.port 2>/dev/null; /data/adb/ksu/bin/resetprop -d service.adb.tcp.port 2>/dev/null; else setprop service.adb.tcp.port ''; fi; true; setprop service.adb.tcp.port ",
+      "sha256": "f13e3542b6086570b5fdb7e2dd0dce7b352a5cd17b36cb6d6fd23c9384439479",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "ksu",
+      "sha256": "6f6f8a3bde084d2be5999cc55aa369784ed8ec1bf4a6da6c96b0b1cf7ba04cf0",
+      "reason": "Exact third-party JavaScript bridge object and WebUI icon URL scheme; app action/WebUI navigation uses the neutral notes scheme.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "mui.kernelsu.org",
+      "sha256": "dce098dc8b88a5cb52012cea56008615ad8ac6737e113e47b0605f4331e63fe4",
+      "reason": "Host check paired with the exact official manager WebUI endpoint.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data/repository/TemplateRepositoryImpl.kt; data/registry/RegistryUrls.kt; ui/webui/WebViewHelper.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "rm -f /data/adb/ksu/.adb_tcp_port",
+      "sha256": "8c322cb9e3507f6b1dc85ebc7da61ba4ada868cf4e624e48ea196198085ae2d8",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "classes.dex",
+      "value": "u:r:ksu:s0",
+      "sha256": "13c1e20a90a529e1434136ae1cd938b11d846657065e4bef090733eac5d6d593",
+      "reason": "Exact SELinux root domain shared with the official backend and kernel policy.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/ui/util/RuntimeCli.kt"
+    },
+    {
+      "location": "classes.dex",
+      "value": "umask 077; mkdir -p /data/adb/ksu/dn-adb-heartbeat && chmod 700 /data/adb/ksu/dn-adb-heartbeat",
+      "sha256": "203fcc247c2284d9b536ee9634de84de1029b3536febd1af4df1c0d89b9c6bc7",
+      "reason": "Exact installed root path used for official busybox/resetprop/log/allowlist or the frozen D111 heartbeat; it is not an application component identity.",
+      "source_reference": "manager/app/src/main/java/com/daily/notes/data; ui/util/RuntimeCli.kt; frozen D111 input hashes in docs/D111-inputs.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_bridge.so",
+      "value": "[ksu_driver]",
+      "sha256": "4a30ce8ce21b5d2d9b735a56db8e18a2ffd963c3bd6dddd8064b920f6ccf9d74",
+      "reason": "Exact kernel driver descriptor label used to acquire the restricted fd.",
+      "source_reference": "manager/app/src/main/cpp; official kernel fd ABI"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_connect.so",
+      "value": "/data/adb/ksu/.ksurc",
+      "sha256": "e1745f591f273c3dbf6bdc41da263d123ac105d108af4b99b6d990b22e0a96df",
+      "reason": "Exact installed shell PATH/ENV/rc used by the official root connection helper.",
+      "source_reference": "manager/app/src/main/cpp/connect.cc"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_connect.so",
+      "value": "/data/adb/ksu/bin",
+      "sha256": "7628735f4fb745e53968e0b192b23b900e09aedf79c4d9b0225769cc5b9db54e",
+      "reason": "Exact installed shell PATH/ENV/rc used by the official root connection helper.",
+      "source_reference": "manager/app/src/main/cpp/connect.cc"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_connect.so",
+      "value": ":/data/adb/ksu/bin",
+      "sha256": "042f60f4a9b427b17971c1272fcba3af147285739bbc2883339854c11b2e9af9",
+      "reason": "Exact installed shell PATH/ENV/rc used by the official root connection helper.",
+      "source_reference": "manager/app/src/main/cpp/connect.cc"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_connect.so",
+      "value": "ENV=/data/adb/ksu/.ksurc",
+      "sha256": "e6499308095ef064fa73b0b2aaee18b559ffea3512cab459289e401d261e3408",
+      "reason": "Exact installed shell PATH/ENV/rc used by the official root connection helper.",
+      "source_reference": "manager/app/src/main/cpp/connect.cc"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "      echo \"$MODULE_HOT_RUN_SCRIPT\" > $MODPATH/.ksu_hot_install",
+      "sha256": "03aea33ae1baaf0204a448c771ee170f1535bd6b1d40f17928ee8b201af8e096",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "      rm -f $MODPATH/.ksu_hot_install",
+      "sha256": "b15bb7b99684f8bc107e480d398007971760c4a526463b0ba063e682a3c9fbdc",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "    # Check feature status using ksud",
+      "sha256": "d0625d1aed17f8fd8e7492c4dc4643414233b0fe7e738c4c6521f7b6062f49dc",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "    # Tell ksud to apply the module right away",
+      "sha256": "3dc7d30ca9aa5b7598ea85288253c168ac25072aa63a93d2c515c4dd74d31413",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "    /data/adb/ksud sepolicy check \"$1\"",
+      "sha256": "d6b4e008a0af59b8bc14ff1e3333aee52e6cd25f0630c4facf1ee484e2b455d3",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "    local status=$(/data/adb/ksud feature check \"$feature\" 2>/dev/null)",
+      "sha256": "476365df62d7ae33796ff4dc0e41af23cea7bd24adfb48e834162258949f0fcf",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": " (built-in) (BTF)ksu_ext_memblock_reserveksu_ext_memstart_addrksu_ext_kimage_voffsetksu_ext_async_synchronize_fullksu_ext_vmallocksu_ext_memcpyksu_ext_load_moduleksu_ext_kstrdupksu_ext_strndup_userksu_image_baseksu_capsule_magicksu_capsule_versionksu_capsule_header_sizeksu_capsule_image_offsetksu_module_capsule_offsetksu_fixup_capsule_offsetksu_args_capsule_offsetksu_args_sizeksu_reserve_extensionksu_page_offsetksu_module_sizeksu_fixup_countksu_load_info_sizeksu_load_info_hdr_offsetksu_load_info_len_offsetksu_gfp_kernel",
+      "sha256": "fb78a6641db9a50c53355e3d039e2a83a0052c1281655b2193ee68b90f6fe65d",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": " ~Minor version parse errorPatch version parse errorMajor version parse errorNo kernel module foundFailed to get KMI from boot/modulesthe following required argument was not provided: allow_shellthe following required argument was not provided: no_preinitthe following required argument was not provided: no_custom_rcthe following required argument was not provided: bootthe following required argument was not provided: forcethe following required argument was not provided: outputthe following required argument was not provided: package_namethe following required argument was not provided: modulethe following required argument was not provided: post_magicacom.daily.notesthe following required argument was not provided: skip_svcthe following required argument was not provided: persist_onlythe following required argument was not provided: deletethe following required argument was not provided: verbosethe following required argument was not provided: waitthe following required argument was not provided: rebuildthe following required argument was not provided: show_contextthe following required argument was not provided: persistentthe following required argument was not provided: flashthe following required argument was not provided: otathe following required argument was not provided: apkthe following required argument was not provided: global_mntthe following required argument was not provided: namethe following required argument was not provided: paththe following required argument was not provided: mntthe following required argument was not provided: flagsthe following required argument was not provided: backupthe following required argument was not provided: enable_adbdthe following required argument was not provided: no_installthe following required argument was not provided: ramdiskthe following required argument was not provided: pidthe following required argument was not provided: sepolicythe following required argument was not provided: filethe following required argument was not provided: zipthe following required argument was not provided: idthe following required argument was not provided: keythe following required argument was not provided: stdinthe following required argument was not provided: tempthe following required argument was not provided: packagethe following required argument was not provided: policythe following required argument was not provided: templatethe following required argument was not provided: valuethe following required argument was not provided: configLocal time out of range for `NaiveDateTime`no custom rcnorc=1allow shellallow_shell=1no preinitpreinit=0SU Compatibility Mode - allows authorized apps to gain root via traditional 'su' commandKernel Umount - controls whether kernel automatically unmounts modules when not neededSU Log - streams kernel sulog events to userspace and persists them to diskADB Root - Enable adbd rootSELinux Hide - sanitize /sys/fs/selinux access results for app UIDsShell SU ADB Only - require adbd or a trusted root process when shell is granted rootsu_compatkernel_umountsulogselinux_hideshell_su_adb_onlywaitsyswaitsys is not embeddedfailed to create waitsys memfdfailed to create waitsys pipeget write_fd flagsset write_fd flagsKSU_WAITSYS_FDBTF contains conflicting struct load_info layoutsBTF contains struct load_info without usable hdr/len membersBTF struct load_info fields exceed the structure sizehdrload_modulevmallocmemcpykstrdupstrndup_userBTF load_module first parameter is not struct load_info *persist.configtmp.configbootctlbusyboxsymbol map has no non-zero kernel addressesexpected compressed size does not match actual compressed sizeConnection establishedadb_client::message_devices::adb_message_deviceDevice requires authentication, which is not supportedExpected CNXN commandhdr_offsetlen_offsetinvalid GKI load_info structure sizeinvalid GKI load_info storage sizeBTF load_info storage size overflowassertion failed: len > 0root_execvesucompatioctl_grant_rootfilename length overflowargv length overflowsulog variable payload length overflowsulog event length overflowbootstrap relocation has an invalid symbol indexbootstrap symbol address overflowbootstrap symbol has an invalid sectionbootstrap section address overflowksu_bootstrapksu_memblock_reserve_wrapperksu_strndup_user_adapterbootstrap relocation target is not loadablebootstrap relocation offset does not fit this hostbootstrap relocation output offset overflowbootstrap relocation address overflowbootstrap relocation uses an unexpected symbol tablebootstrap section offset does not fit this hostinvalid bootstrap section-name table.text.ksu_bootstrapbootstrap must contain exactly one .text.ksu_bootstrap section.rodata.ksu_bootstrapbootstrap rodata section has unsafe flags or typebootstrap image size overflowbootstrap symbol table has an invalid string tablebootstrap has no relocationsbootstrap relocation section has an invalid targetbootstrap relocation count overflowbootstrap uses unsupported REL relocationsbootstrap symbol table has invalid local symbol countbootstrap symbol names are not in a string tablebootstrap must contain exactly one symbol tablebootstrap has no loadable bytesbootstrap text section has unsafe flags or typebootstrap section-name table is not a string tablebootstrap section data offset does not fit this hostbootstrap section size does not fit this hostbootstrap section alignment does not fit this hostbootstrap section entry size does not fit this hostbootstrap section table is outside the objectextended or malformed bootstrap section tables are unsupportedmalformed bootstrap ELF headerunsupported ELF versionembedded bootstrap must be an AArch64 ET_REL object",
+      "sha256": "f2683bac18d10542ab97e5c9faf95ee613fb0a27e258fa73bb551874ecdfc445",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "'unload: delete_module kernelsu failed: ",
+      "sha256": "e85d61938b8125809b636997b071cf54bd58ef3ad50477bd33456221d70f6b6f",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": ".ksu_hot_install",
+      "sha256": "e76516f7ba22fcbe0d90768f33fcb64dc5dc275938e51608fed87c0279314ecb",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": ".rela.text.ksu_bootstrap",
+      "sha256": "04f8327ce9020de145d32cfcfbfa1caac17889b31b3bd25701dee707ae6cdfe5",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/",
+      "sha256": "f957cc63d73eda820a7c3ad43d3c304f0bf7600fe783385e2c891efec7570306",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/.feature_config",
+      "sha256": "b32751bfd797df6658f80f699b4881f21dbed33636e3650feb5edd9c47190c98",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/.ksurc",
+      "sha256": "e1745f591f273c3dbf6bdc41da263d123ac105d108af4b99b6d990b22e0a96df",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/bin/",
+      "sha256": "fb2364d13740d92f65197946dd285c387e302d8c2f66b3d6bf4a28af59b6437e",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/bin/bootctl",
+      "sha256": "0410e33197e005c229e860ea3f85c9b3e1fdc6765be1d95bba976f87f175bacd",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/bin/busybox",
+      "sha256": "1a6a8293eb03875f7420584be8b7b585c5e7a777bd75791c9216a4b2c1a01374",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/bin/ksud",
+      "sha256": "17c30c58d9b78d9cafdce1b6b2135afd91db83cb9af2814b94173f08bc4220ec",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/bin/resetprop",
+      "sha256": "b760b1bc2dfa107d6378dabc946e1b383765f32689b56bae2d0437711f29b820",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/hot_install_trash/hot_install_trash.oldnote_runtime::hot_installrm-rf- Hot install requested",
+      "sha256": "879dbc840465f778327ac5ee37d90ba27b2db1b5171fd043793d117bcbfcc7be",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/lib/",
+      "sha256": "a3a866005c4587e88c0b0046ad1189908c8e663e5cb43582ad6601cda63c433b",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/lib/libadbroot.so",
+      "sha256": "db686c47f413821817d603c1c2e22feb68db86f42fa589c13e767e2d165e1665",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/log/",
+      "sha256": "c063105314413cced9dd550c07acfea3950e2ae8f0e718b7a6bf827902d30be1",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/module_configs/",
+      "sha256": "3d64e6dcb6962b6115ced1c90601eeb717d391928f528721195d71adac43cc41",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/preinit_status",
+      "sha256": "a833c0f7deaf61e42e33486714d4c898ff0ab74d82e19a99b1f66cedd473af9d",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/profile/selinux/",
+      "sha256": "b15dbe2e3d543b8bff918cc35af094998d1f94bcce5746bead35c473e3a815b5",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/profile/templates/note_runtime::profileprofile sepolicy dir read failed.Unexpected v3 signature found!Can not found sig blocknot a zip filelkmlate-loadDaily Notes driver install syscall was blocked by seccomp",
+      "sha256": "b33c95877aa2c4629d6fbb3da319d5d462656e70e8ee20091b81c3203f859ec4",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksu/sulogd.lock",
+      "sha256": "c93868bf932e3afd5bdf31e71740c018fff576ea0e48fee177e74442ae062b3f",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksud",
+      "sha256": "9661833f4c500e436e72f07716215ff316d8338da505499edb76964a8b7e187b",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/data/adb/ksud.koJanuaryMarchAprilAugustSeptemberOctoberSundayMondayTuesdayWednesdayFridayAMPMSendError(..)allowauditallowdontauditBootPatchArgsboot image path, if not specified, will try to find the boot image automaticallykernelKERNELkernel image path to replacemoduleMODULELKM module path to replace, if not specified, will use the builtin oneinit to be replacedotaOTAwill use another slot when boot image is not specifiedflashFLASHFlash it to boot partition after patchbackupBACKUPForce backup source image as stock imageoutOUTOutput path. If not specified, will use current directory. If specified, the boot image will be written to the directory even if --flash is specifiedkmiKMIKMI version, if specified, will use the specified KMIpartitionPARTITIONtarget partition override (init_boot | boot | vendor_boot)File name of the output. If specified, the boot image will be written to the output directory even if --flash is specifiedcmdlineCMDLINEExtra cmdline to append to boot image headerenable_adbdENABLE_ADBDForce enable adbd and disable adbd authenable-adbdadb_debug_propADB_DEBUG_PROPAdd more adb_debug propadb-debug-propno_installNO_INSTALLDo not (re-)install kernelsu, only modify configs (allow_shell, etc.)no-installramdiskRAMDISKPatching ramdisk instead of boot image. This is used for AVD ramdiskpermissiveenforceJoinPathsErrorNormalPermXPermTypeStateTypeTransitionTypeChangesystem errorconfigDaily Notes userspace cli",
+      "sha256": "7a4f4bbfd12d10c0da00e687dbd6142e2e7860491d12dc81b4c7fee4961c9867",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "/metadata/vold/ksu//metadata/watchdog/ksu//metadata/ksu/- Restore boot image..",
+      "sha256": "cc27b3deca50c5f96165e3e01f61f83725affea38485e14e7f33e64f2997444b",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "7 failed boots (reset with `ksud module preinit reset`)",
+      "sha256": "2ac3facb7c4d7c29948db63465459d79a2716742409b0eec7f095e479c3862cb",
+      "reason": "Recovery/help text points to the real installed daemon command; keeping executable recovery instructions.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "7 failed boots, run `ksud module preinit reset` to retry",
+      "sha256": "8c8e09ce12ff5d280d936b7128fd8260fbc191e6e8c0e4f84dfb15d29b5b8213",
+      "reason": "Recovery/help text points to the real installed daemon command; keeping executable recovery instructions.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": ";'. Script will run without KSU_MODULE environment variable.",
+      "sha256": "b8d4b79856692461bbe98688d4f0401d356802056226aa950b92d2c6860e3020",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "Both /data/adb/ksu and ",
+      "sha256": "cdbd95c7cad7fc9f4a2273380a48c518eb2bb15983316c0eb8284f7383737eb3",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "Daily Notes driver install syscall was blocked by seccompnote_runtime::ksucallsanon_inode:[ksu_driver_su]anon_inode:[ksu_driver]kernel returned negative sepolicy applied countnote_runtime::sepolicy/proc/self/attr/current/proc/self/statusnote_runtime::late_loadlate-load command triggered!late-load startFailed to load kernelsu.koafter load_moduleDaily Notes already loaded, skip loading koFailed to install runtime-nboot imagekernel module- Reading boot image",
+      "sha256": "9133fc29df7a01ef259e8a40ce7726d1cf723ef96544d08c7cd02c6ba8d2f627",
+      "reason": "Exact driver descriptor/SELinux protocol string and corresponding ioctl diagnostics; shared with the unchanged kernel interface.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "KSU_RUNTIME_MODE",
+      "sha256": "b3f495679fad3b3117268af0bcf5a0f9f52413f334a3daf4c2f568718d6da555",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "KernelUmountSulogAdbRootSelinuxHideShellSuAdbOnlynote_runtimeallowxpermauditallowxpermdontauditxpermSetManagerAPKSet the manager app, kernel CONFIG_KSU_DEBUG should be enabledGetSignGet apk size and hashSuGLOBAL_MNTglobal-mntRoot ShellGet kernel versionFor testingExtractBinarybinary name (e.g. busybox, resetprop, bootctl)destination file pathExtract an embedded binary to a specified pathProcess mark managementLaunch sulogd daemon manuallyGet kernel infoPrint default package nameVersionPackagegetpidunmarkinternal error: entered unreachable code: splice should not return > 0 bytes on the fallback pathGetPIDtarget pid (0 for total count)Get mark status for a process (or all)Mark a processUnmarkRefresh mark for all running processespatchapplycheckPatchsepolicy statementsPatch sepolicyApplysepolicy file pathApply sepolicy from fileCheckCheck if sepolicy statement is supported/validPropertiesErrorcauseline_numberzipundo-uninstallenableZIPmodule zip file pathInstall module <ZIP>UndoUninstallIDmodule idUndo module uninstall mark <id>Uninstall module <id>Enableenable module <id>Disabledisable module <id>Actionrun action for module <id>Preinitpreinit actions run before SELinux policy is loadedConfigtarget internal module name (resolved as internal.<name>)manage module configurationstatusresetshow per-module preinit state for the next bootre-enable preinit after it was disabled by repeated failed bootsStatusResetTryFromFloatSecsErrorsetstdinclearoperationKEYconfig keyGet a config valueSetVALUEconfig value (omit to read from stdin)STDINread value from stdin (default if value not provided)use temporary config (cleared on reboot)Set a config valueList all config entriesDeletedelete from temporary configDelete a config entryClearclear temporary configClear all config entriesget-sepolicyset-sepolicypolicyget-templateset-templatedelete-templatelist-templatesGetSepolicyPACKAGEpackage nameget root profile's selinux policy of <package-name>SetSepolicyPOLICYpolicy statementsset root profile's selinux policy of <package-name> to <profile>GetTemplatetemplate idget template of <id>SetTemplatetemplate stringset template of <id> to <template string>DeleteTemplatedelete template of <id>list all templatesOverflowOrNanListTemplatesstypeFeature ID or name (su_compat, kernel_umount, sulog, adb_root, selinux_hide, shell_su_adb_only)CONFIGRead from config fileGet feature value and support statusFeature ID or nameFeature value (0=disable, 1=enable)Set feature valueList all available featuresCheck feature status (supported/unsupported/managed/forced)Load configuration from file and apply to kernelSave current kernel feature states to filenuke-ext4-sysfsumountnotify-module-mountedNukeExt4Sysfsmount pointNuke ext4 sysfsUmountManage umount listNotify that module is mountedsattrNotifyModuleMountedcould not resolve to any addressesroot:error while locking dataadb_client::message_devices::tcp::tcp_transportdata provided contains a nul byteFromUtf8Errorbytesgzip header field too long",
+      "sha256": "ee6b54d92ca57244115d3030edc3bdaffecdaebd6e1cccd12a0c18a03de611ed",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "Loading kernelsu.ko for KMI ",
+      "sha256": "59697dba56f8a524c408f17cbb8d5298648f444985369754afa818760d91f47d",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ParseFloatErrorModuleManage Daily Notes modulesTrigger `post-fs-data` eventTrigger `service` eventRun sulog reader daemon. Not for user. Use `note_runtime debug sulogd` to launch daemonTrigger `boot-complete` eventMAGICAUse adb root to execute late-load for jailbreaking by MagicaPass allow_shell=1 when loading kernelsu.koPOST_MAGICARestore adb properties after magica late-loadpost-magicaSpecify kernel KMI version instead of auto-detectionPACKAGE_NAMEmanager package namepackage-nameLoad kernelsu.ko and execute late-load stage scriptsEmulate system rebootInsmodkernel module pathPARAMSmodule load parameters (e.g. key=val key2=val2)Load a kernel module with kallsyms accessInstallLIBADBROOTDATA_PATHdata-pathInstall Daily Notes userspace component to systemUnload Daily Notes kernel module (LKM Only)UninstallUninstall Daily Notes modules and itself(LKM Only)SELinux policy Patch toolProfileManage App ProfilesFeatureManage kernel featuresPatch boot or init_boot images to apply Daily NotesRestore boot or init_boot images patched by Daily NotesPatch Daily Notes into a boot imagePatch Daily Notes into a boot image",
+      "sha256": "b2965bb0b4a49e2340ce2d4940c0ff26f5de18ae4154cf718d3c3164b4d1b2dc",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "_kernelsu.ko",
+      "sha256": "9cc54d48a5ce248f99474e556d8612d9f80e58f126164f66738b9c16fab78993",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "domainExitStatusParseErrorImpossibleNotEnoughInvalidTooShortTooLongBadFormat__Nonexhaustiveparser error, see to_string() for detailsno_custom_rcno_preinitforce_featureblock_moduletypeattributeattraddoutputforceXzWriter already finishedKsuConfigArgsALLOW_SHELLAlways allow shell to get root permissionallow-shellNO_CUSTOM_RCDo not load custom rcno-custom-rcNO_PREINITDo not run module preinit actionsno-preinitFORCE_FEATUREForce a kernel feature to a value at boot, e.g. `su_compat=0`. Forced features can not be changed or loaded by userspace. Can be repeatedforce-featureFEATURE=VALUEBLOCK_MODULE[Developer only] Block a kernel module from loading at boot by name, e.g. `oplus_secure_guard`. Comma-separated and/or repeated. Omitting clears it. Blocked modules fail to load with EPERM; blocking one that first stage init loads (modules.load / modules.load.recovery) or that others depend on can bootloop the device. You are on your ownblock-moduleDaily Notes module params, stored in ramdisk `/ksu_config` (boot-patch) or the injected capsule (boot-patch-v2)magicapost_magicapackage_namesoft-rebootinsmodparamsinstalllibadbrootdata_pathunloadprofilefeatureboot-patchboot-restoreboot-patch-v2boot-infodebugattributeBootPatchV2ArgsSource boot imageExact kernelsu.ko; auto-select the embedded KMI build when omittedOUTPUTPatched boot image outputFORCEReplace an existing output fileBacktrace:",
+      "sha256": "b1ed751dfa4b3b4cb739b4ff22808b62e125a188cb4e4d10c4e8799b55ea94e7",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "export KSU_HAS_HOT_INSTALL=true",
+      "sha256": "5ba37e1799b58df4caeb6e733df4770e74121d04c2a5ed0a73931fc4d7b3e12b",
+      "reason": "Exact module/metamodule/hot-install environment or marker; script comments name the real installed command.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "failed to open sulog fdinvalid epoll ready countsulog epoll hangupsulog fd closedepoll_wait failed for sulogddropped record missing internal flaginternal.ksud.sulogdfailed to compute sulog retention cutofffailed to write sulogd session markerinvalid current daymagiskpersist.sys.safemodero.sys.safemodecgroup.procs/acct/dev/cg2_bpfro.config.per_app_memcg/dev/memcg/apps/data/adb/",
+      "sha256": "a4641a6daf6f34fc04e47bd74794fff6aef9aa1f4a91134de122814d79dd92dc",
+      "reason": "Exact internal.ksud.sulogd property used by both official log daemon and manager reader.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "kernelsu",
+      "sha256": "33c7e0ab1b11a824d7d0bda0c29f8d0c60da85e108e95010533926530f9e7b32",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "kernelsu.ko loaded successfully!capsule did not extend the ImageRefCell already mutably borrowed",
+      "sha256": "f6cdc8e844eea81c6bfc7827b601519339852a4a194c04a73f6cc2b2b1d6dde3",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "kernelsu.koinit.realCannot work with Magisk patched imageksu_configbundled LKMbundled=1allow_shell- Removing /force_debuggable",
+      "sha256": "22ca69e0a7d17753fb2c0ce04f4e957d00805dad6a045166899324858ce721b2",
+      "reason": "Exact official boot/LKM/debug interface name or diagnostic referring to its real kernel module/configuration; no application identity is allowed by this exception.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_args_capsule_offset",
+      "sha256": "f9ed4b5ffe39eb4c8927b14817b3828677703be7ecd3663ef917b6e31fcbfdda",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_args_size",
+      "sha256": "17182c002af1fc0ee0477dec105597c3d419519824358762f8601311aef3ef01",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_backup_- Backup info is absent!",
+      "sha256": "8cec71011872c095ced7e58573f5f483c7773948f3a675fdc13b46f772fe593e",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_capsule_header_size",
+      "sha256": "19cfcecc5d3b55d15351e3b984aeeb1c98f6408ada454f79a0e4961a7ea5ba23",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_capsule_image_offset",
+      "sha256": "ec7bc7768f25c50da2a6454b734ab0a871bcd3a8a26f3b7b98e74663aed5fd15",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_capsule_magic",
+      "sha256": "6ec3138a77b0b74200b23573fc16429298fb202315d0f8b76c263632c8db1411",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_capsule_size",
+      "sha256": "62a693c7f01a352a0205fd91eefa3c06e3e296c01ee511d46570807d8f96e182",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_capsule_version",
+      "sha256": "41ae2129e344fd6a6d4edc0bb90508ffc9422ff8db32960daf564ac535a5f062",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_async_synchronize_full",
+      "sha256": "7445f3929102c7454193717080180dfb22a25075007a395f302493e1f5eef17a",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_kimage_voffset",
+      "sha256": "5554e7b6f63ed53c79fc6b6d38b4b3a6229063dfa435187c57f4a0898943f0f7",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_kstrdup",
+      "sha256": "46192c007584a99c8ae68f06a8f54e92bedda12ec0f860596f7a54931219c3b9",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_load_module",
+      "sha256": "4474b15c44b6a89a836f2d0891323102e5ae5398557587356021a264fc315e16",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_memblock_reserve",
+      "sha256": "f1bf00696f7e82095e3cb2bdfbe841aba693db9ef58581326d662ff1ce07a159",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_memcpy",
+      "sha256": "ca9e790768c983b8357ea314f96693933059b7deaab409588dc2ab802924e15b",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_memstart_addr",
+      "sha256": "0688d7af4b5c82e53aa98efeb35cd30f3374fe2af6108d199989db3b9ae558b7",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_strndup_user",
+      "sha256": "f454c095691dc0623a00573d4e4d0adaf21c84255671e2d2b2f89d57aee9b194",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_ext_vmalloc",
+      "sha256": "7753731e99b2279f41680b03a2035e0d6718ee2bb206d05451d5024146ab05e5",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_fixup_capsule_offset",
+      "sha256": "f4d72419cb260cc6f80df7ba40a57e7dfcf504650b75e1be1ccf0777a3612986",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_fixup_count",
+      "sha256": "40d59fb369032a79edc6b7d3c2447fe10078868de83c183ee2a025a337d01892",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_gfp_kernel",
+      "sha256": "e29d300c97f273cb7597f71b6ca49a67dbefb64fe343b6b99d781078f1062937",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_image_base",
+      "sha256": "e4d24fc963a7a6fcdb26e6bc8d47ede16075588bf9dcaf54fc702ade233b550a",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_load_info_hdr_offset",
+      "sha256": "d7af43493fda474b0ca818d0504157d22864b58302c80292515072146fa01154",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_load_info_len_offset",
+      "sha256": "a0dd6d757c80093de3093d95e9c7ae026a12db198ab204c7c57bc898c300cd9c",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_load_info_size",
+      "sha256": "b02067302233a8819ed11113db6992c9491579a432ee0162e65ae1b8f399b3e6",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_memblock_reserve_wrapper",
+      "sha256": "199c2bca97f1f2309e2cbc16d94fb8dd3cd3ce65f89a75ee84289669ede076be",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_module_capsule_offset",
+      "sha256": "2927a661ef19afcfe9f04fac38c93303d851d53d83ad95147e05db8cc2280f9a",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_module_size",
+      "sha256": "388e4ad467daf7a87bc9b6cc6b88f1c1d2bdd95e46cbc02fcb8664cda5a39950",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_page_offset",
+      "sha256": "217446e0b0d2eb17f5e9e4d767d01d7110e1cc8af89428ff64961c0d27773980",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_reserve_extension",
+      "sha256": "1f4e9c28ecebfc7f82092f5b23c4dc63781c406b82009018ba959bde4039ba7c",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "ksu_strndup_user_adapter",
+      "sha256": "47542097125c6de812fe89c78bb7769041af7302b0633f06b8c743a21d0795e8",
+      "reason": "Exact official embedded LKM bootstrap capsule symbol/relocation ABI; this is embedded bootstrap data, not an exported manager JNI identity.",
+      "source_reference": "Official userspace/ksud/src/lkm_image_bootstrap.S; lkm_image.rs; lkm_image_btf.rs; build.rs at 75e179d"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "module id not found in module.prop!/proc/self/fd[ksu_driver[ksu_fdwrapper]note_runtime::unload/procu:r:ksu:s0unload: starting Daily Notes unload sequenceunload: stopping Android services...unload: killing su domain processes...unload: killing processes holding runtime fds...unload: closing all runtime fds...unload: removing kernelsu module...unload: restarting Android services...unload: done, exiting runtimeForced: by boot config",
+      "sha256": "0bdc9071e7139f3d75f6f95dc7c2f54448a18cdefba4a97a75d511d12e87f875",
+      "reason": "Exact driver descriptor/SELinux protocol string and corresponding ioctl diagnostics; shared with the unchanged kernel interface.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "reboot_kernelsu.koro.debuggableFailed to get context for ro.debuggablenote_runtime::magicaro.adb.secureFailed to get context for ro.adb.secure/dev/__properties__/properties_serialchmodExecutingFailed to set ro.debuggableExecuting: resetprop -n ro.debuggable 1Failed to set ro.adb.secureExecuting: resetprop -n ro.adb.secure 0setpropservice.adb.tcp.portctl.restartmust be run as rootRestoring: resetprop -n ro.debuggable 0Restoring: resetprop -n ro.adb.secure 1ro.boot.selinuxRestoringFailed to create ADBTcpDeviceFailed to get self exe path --allow-shelldir_idwebrootaction.shenabledwebactionmountactionIconwebuiIconoverride.descriptionmanagedFeaturesFailed to get module id from dir nameu:object_r:metadata_file:s0no remaining modules./metadata/vold/metadata/watchdogmodules.rc#!/system/bin/sh",
+      "sha256": "7225bbff592345a91d793c2f0eb66b4fd345cb1a2f647ff8145f08629937c411",
+      "reason": "Exact installed root/preinit/backup location and associated official diagnostics; needed for shared runtime state and recovery.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "shcould not retrieve kernelsu driver fd",
+      "sha256": "9f6b6ddc98db9bb7ed6d59b2b13fab02add8471e4a52326684d47b773f77657e",
+      "reason": "Exact driver descriptor/SELinux protocol string and corresponding ioctl diagnostics; shared with the unchanged kernel interface.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "lib/arm64-v8a/libnote_runtime.so",
+      "value": "u:object_r:ksu_file:s0",
+      "sha256": "9b3263a683aaf708062c84b4598e0b34f603125df26a593f7ae5952e5bbe2a64",
+      "reason": "Exact driver descriptor/SELinux protocol string and corresponding ioctl diagnostics; shared with the unchanged kernel interface.",
+      "source_reference": "KernelSU 75e179d + manager-support/official-backend-branding.patch; exact literal locations in backend-literal-policy.json"
+    },
+    {
+      "location": "assets/dn-adb-heartbeat/control.sh",
+      "value": "base=/data/adb/ksu/dn-adb-heartbeat",
+      "sha256": "b124a9e308575c9e75f924f5d7f398c06c0e8596d8c0ddb76534d63f2caa6610",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-adb-heartbeat/control.sh",
+      "value": "busybox=/data/adb/ksu/bin/busybox",
+      "sha256": "a833845ad91720b40011290b59e79b062e3642d3aa1eb93eb9e482dc0ebafbb9",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-adb-heartbeat/control.sh",
+      "value": "case \"$want\" in ''|*[!0-9]*) want=$(cat /data/adb/ksu/.adb_tcp_port 2>/dev/null || true);; esac",
+      "sha256": "bea36fe5c917408b1ea7580c8b4837e65ccf9ad39bf67359c4c7cac4fe9c7479",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-files/operate.sh",
+      "value": "BB=/data/adb/ksu/bin/busybox",
+      "sha256": "2644748102a95e0d8d08b51c8aa78fd99e891c6bfdd89806efb3b9c1d44b2b29",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "               ! /data/adb/ksu/bin/busybox chmod 700 -- \"$executable\"; then",
+      "sha256": "c28320c7e4b3b12bee887ac2b2ae6dc8a2441ca77644accd82e1061a9de13569",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "            ash) /data/adb/ksu/bin/busybox ash \"${arguments[@]}\" \"$file\" ;;",
+      "sha256": "b5347678414468c2e47f4b43220b9e4696b1f279583a978099a36a28646f3e2f",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "            directory=$(/data/adb/ksu/bin/busybox mktemp -d \"$TMPDIR/native.XXXXXXXX\") || exit",
+      "sha256": "9307c79d814bb0883dd32ac32feb13c954b01674ab1d17cbbecd6267b3a86abf",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "            if ! /data/adb/ksu/bin/busybox cp -- \"$file\" \"$executable\" ||",
+      "sha256": "d594333af8dd098e9106074d291de00f724eb79e0c38cdacab6b84bd74db7123",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "            trap '/data/adb/ksu/bin/busybox rm -rf -- \"$directory\"' EXIT",
+      "sha256": "b18ce7e2bbc81681e45ce4b8aa7aabbd76fda8a60c2b49a36de4e8353d71e488",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/bashrc",
+      "value": "    magic=$(/data/adb/ksu/bin/busybox od -An -tx1 -N4 -- \"$file\")",
+      "sha256": "d84da57ff9845722e6a9ab641f35cf23a11c224d8b30457e493f2103c0c49b24",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    },
+    {
+      "location": "assets/dn-terminal/start-shell",
+      "value": "PATH=\"$DN_TOOLS:/system/bin:/system/xbin:/vendor/bin:/product/bin:/data/adb/ksu/bin\"",
+      "sha256": "e6cad4899e3c1476a932069226e39ca175f7d92cfd2948f2ebb6371a066a0b49",
+      "reason": "Frozen D111 terminal/files/heartbeat use the official installed busybox, resetprop or heartbeat-state path; path protocol retained.",
+      "source_reference": "docs/D111-inputs.json; manager-support/native; manager/app/src/main/assets"
+    }
+  ]
+}

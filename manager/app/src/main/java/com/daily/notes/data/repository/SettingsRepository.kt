@@ -66,5 +66,5 @@ interface SettingsRepository {
 
     fun isLkmMode(): Boolean
 
-    fun execKsudFeatureSave()
+    fun saveRuntimeFeature()
 }

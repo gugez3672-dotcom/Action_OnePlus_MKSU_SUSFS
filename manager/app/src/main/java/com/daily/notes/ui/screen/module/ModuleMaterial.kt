@@ -1,5 +1,7 @@
 package com.daily.notes.ui.screen.module
 
+import androidx.compose.foundation.clickable
+
 import android.annotation.SuppressLint
 import android.app.Activity.RESULT_OK
 import android.content.ClipData
@@ -273,7 +275,7 @@ fun ModulePagerMaterial(
     ExpressiveScaffold(
         topBar = {
             SearchAppBar(
-                title = { Text(stringResource(R.string.module)) },
+                title = { Text(stringResource(R.string.module), modifier = Modifier.clickable(onClick = actions.onTitleClick)) },
                 searchText = uiState.searchStatus.searchText,
                 onSearchTextChange = actions.onSearchTextChange,
                 onClearClick = actions.onClearSearch,
@@ -346,6 +348,7 @@ fun ModulePagerMaterial(
                         uiState.searchStatus.searchText,
                     ) { latestSearchResults.value }
                     ModuleList(
+                allModules = uiState.modules,
                         bottomInnerPadding = bottomPadding,
                         modifier = Modifier.fillMaxSize(),
                         listState = searchListState,
@@ -451,6 +454,7 @@ fun ModulePagerMaterial(
                 isBusy = { latestRefreshing.value },
             ) { latestModuleList.value }
             ModuleList(
+                allModules = uiState.modules,
                 bottomInnerPadding = bottomInnerPadding,
                 modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 listState = listState,
@@ -480,6 +484,7 @@ fun ModulePagerMaterial(
 
 @Composable
 private fun ModuleList(
+    allModules: List<Module>,
     bottomInnerPadding: Dp,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
@@ -500,6 +505,7 @@ private fun ModuleList(
             bottom = 16.dp + bottomInnerPadding + 56.dp + 16.dp
         ),
     ) {
+        item(key = "dn_mount_dependencies") { ModuleMountSummary(allModules) }
         items(displayModules, key = { it.id }, contentType = { "module" }) { module ->
             val scope = rememberCoroutineScope()
             val moduleUpdateInfo = updateInfoMap[module.id] ?: ModuleUpdateInfo.Empty
@@ -553,7 +559,7 @@ private fun ModuleShortcutSheet(
     fun copyShortcutUrl() {
         val url = shortcutState.buildShortcutUrl() ?: return
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("KernelSU deep link", url))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Module deep link", url))
         Toast.makeText(context, resources.getString(R.string.module_shortcut_scheme_copied), Toast.LENGTH_SHORT).show()
     }
 

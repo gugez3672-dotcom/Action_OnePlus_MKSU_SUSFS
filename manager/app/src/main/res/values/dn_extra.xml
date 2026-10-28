@@ -1,0 +1,117 @@
+<resources>
+<string name="dn_files_copy_right">Copy →</string>
+    
+<string name="dn_files_copy_left">Copy ←</string>
+    
+<string name="dn_files_move_right">Move →</string>
+    
+<string name="dn_files_move_left">Move ←</string>
+    
+<string name="dn_files_operation_failed">Operation failed</string>
+    
+<string name="dn_files_unsafe_destination">Protected path or destination inside source</string>
+    
+<string name="dn_files_completed_compact">Done %1$d · Skip %2$d · Fail %3$d</string>
+    
+<string name="dn_files_cancelled"> · Remaining tasks cancelled</string>
+    
+<string name="dn_files_clipboard_copy_prompt">Copy %1$d · Choose folder</string>
+    
+<string name="dn_files_clipboard_move_prompt">Move %1$d · Choose folder</string>
+    
+<string name="dn_files_clipboard_cancel">Cancel pending transfer</string>
+    
+<string name="dn_files_clipboard_paste">Paste here</string>
+    
+<string name="dn_files_actions">File actions</string>
+    
+<string name="dn_files_menu_back">History back</string>
+    
+<string name="dn_files_menu_forward">History forward</string>
+    
+<string name="dn_files_apk_preparing">Preparing APK…</string>
+    
+<string name="dn_files_apk_open_failed">Could not open the system APK installer</string>
+    
+<string name="dn_files_menu_refresh">Refresh pane</string>
+    
+<string name="dn_files_menu_sync">Sync other pane</string>
+    
+<string name="dn_files_menu_new">New file / folder</string>
+    
+<string name="dn_files_menu_filter">Filter pane</string>
+    
+<string name="dn_files_menu_filter_off">Close filter</string>
+    
+<string name="dn_files_menu_sort">Sort</string>
+    
+<string name="dn_files_menu_bookmark">Bookmark folder</string>
+    
+<string name="dn_files_menu_unbookmark">Remove bookmark</string>
+    
+<string name="dn_files_menu_favorites">Quick access</string>
+    
+<string name="dn_files_menu_path">Enter path</string>
+    
+<string name="dn_files_conflict_count">%1$d item(s) already exist at the destination. Choose how to handle them:</string>
+    
+<string name="dn_terminal_root">Root terminal</string>
+    
+<string name="dn_terminal_root_number">Root %1$d</string>
+    
+<string name="dn_terminal_channel">Terminal sessions</string>
+    
+<string name="dn_terminal_notification">Terminal running · %1$d sessions</string>
+    
+<string name="dn_terminal_notification_hint">Tap to return to Daily Notes</string>
+    
+<string name="dn_terminal_files">Files</string>
+    
+<string name="dn_terminal_sessions">Sessions</string>
+    
+<string name="dn_terminal_new_short">New</string>
+    
+<string name="dn_terminal_end">End session</string>
+    
+<string name="dn_terminal_empty">No active sessions. Tap New above.</string>
+    
+<string name="dn_terminal_reset">Reset terminal display</string>
+    
+<string name="dn_terminal_paste">Paste</string>
+    
+<string name="dn_terminal_font_up">Larger text</string>
+    
+<string name="dn_terminal_font_down">Smaller text</string>
+    
+<string name="dn_terminal_wake">Keep awake</string>
+    
+<string name="dn_terminal_finished">Session ended (%1$d), press Enter to close</string>
+    
+<string name="dn_terminal_exit_code">Exit code</string>
+    
+<string name="dn_terminal_interpreter_error">Unsupported interpreter</string>
+    
+<string name="dn_terminal_start_failed">Unable to start terminal: %1$s</string>
+    
+<string name="dn_terminal_esc">Esc</string>
+<string name="dn_terminal_tab">Tab</string>
+    
+<string name="dn_terminal_pgup">PgUp</string>
+<string name="dn_terminal_pgdn">PgDn</string>
+    
+<string name="dn_terminal_home">Home</string>
+<string name="dn_terminal_end_key">End</string>
+    
+<string name="dn_terminal_ctrl">Ctrl</string>
+<string name="dn_terminal_alt">Alt</string>
+    
+<string name="dn_terminal_up">↑</string>
+<string name="dn_terminal_down">↓</string>
+    
+<string name="dn_terminal_left">←</string>
+<string name="dn_terminal_right">→</string>
+    
+<string name="dn_terminal_more_key">⋮</string>
+<string name="dn_terminal_keyboard_key">⇄</string>
+    
+</resources>

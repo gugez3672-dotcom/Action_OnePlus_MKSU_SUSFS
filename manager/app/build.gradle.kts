@@ -23,7 +23,7 @@ val managerVersionName = rootProject.extra["managerVersionName"] as String
 
 val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
 val defaultManagerPackageName = if (isPrBuild) "com.daily.notes.pr" else "com.daily.notes"
-val defaultManagerName = if (isPrBuild) "KernelSU PR" else "KernelSU"
+val defaultManagerName = if (isPrBuild) "Daily Notes Preview" else "Daily Notes"
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
 val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
 
@@ -107,6 +107,8 @@ android {
         }
         jniLibs {
             useLegacyPackaging = true
+            // Both executables are already stripped and fingerprinted by their own build steps.
+            keepDebugSymbols += setOf("**/libnote_runtime.so", "**/libnote_filesystem.so")
             excludes += "lib/*/libandroidx.graphics.path.so"
         }
     }
@@ -120,6 +122,12 @@ android {
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
+    }
+
+    lint {
+        // DN additions and upstream locales intentionally fall back to English where untranslated.
+        // Keep every missing translation visible in reports without treating it as a runtime error.
+        warning += "MissingTranslation"
     }
 
     androidResources {
@@ -238,6 +246,7 @@ dependencies {
     implementation(libs.protobuf.kotlin.lite)
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20250517")
 }
 
 kotlin {

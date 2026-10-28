@@ -118,7 +118,7 @@ fun SendLogBottomSheet(
                             haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm")
                             val current = LocalDateTime.now().format(formatter)
-                            exportBugreportLauncher.launch("KernelSU_bugreport_${current}.tar.gz")
+                            exportBugreportLauncher.launch("Notes_bugreport_${current}.tar.gz")
                         }) {
                         Icon(
                             Icons.Filled.Save,

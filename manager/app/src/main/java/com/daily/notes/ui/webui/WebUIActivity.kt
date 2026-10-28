@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.daily.notes.data.repository.SettingsRepositoryImpl
 import com.daily.notes.ui.LocalUiMode
 import com.daily.notes.ui.UiMode
-import com.daily.notes.ui.theme.KernelSUTheme
+import com.daily.notes.ui.theme.NotesTheme
 import com.daily.notes.ui.theme.ThemeController
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 
@@ -65,7 +65,7 @@ class WebUIActivity : ComponentActivity() {
             }
 
             CompositionLocalProvider(LocalUiMode provides uiMode) {
-                KernelSUTheme(appSettings = appSettings, uiMode = uiMode) {
+                NotesTheme(appSettings = appSettings, uiMode = uiMode) {
                     MainContent(activity = this, onFinish = { finish() })
                 }
             }

@@ -245,9 +245,10 @@ private fun StatusCard(
     state: HomeUiState,
     actions: HomeActions,
 ) {
+    Text(stringResource(R.string.dn_home_module_count, 0))
     Column {
         when {
-            state.ksuVersion != null -> {
+            state.runtimeVersion != null -> {
                 val workingState = buildString {
                     if (state.isSafeMode) {
                         append(" [${stringResource(id = R.string.safe_mode)}]")
@@ -335,7 +336,7 @@ private fun StatusCard(
                                         Text(
                                             text = stringResource(
                                                 R.string.home_working_version,
-                                                "${state.ksuVersion}-${state.kernelUAPIVersion}"
+                                                "${state.runtimeVersion}-${state.kernelUAPIVersion}"
                                             ),
                                             modifier = Modifier.weight(1f, fill = false),
                                             fontSize = 15.sp,
@@ -438,7 +439,7 @@ private fun SupportLinks(
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val learnMoreUrl = stringResource(R.string.home_learn_kernelsu_url)
+    val learnMoreUrl = stringResource(R.string.home_learn_runtime_url)
 
     Card(modifier = modifier) {
         ArrowPreference(
@@ -455,12 +456,12 @@ private fun SupportLinks(
             onClick = { onOpenUrl("https://patreon.com/weishu") },
         )
         ArrowPreference(
-            title = stringResource(R.string.home_learn_kernelsu),
-            summary = stringResource(R.string.home_click_to_learn_kernelsu),
+            title = stringResource(R.string.home_learn_runtime),
+            summary = stringResource(R.string.home_click_to_learn_runtime),
             startAction = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                    contentDescription = stringResource(R.string.home_learn_kernelsu),
+                    contentDescription = stringResource(R.string.home_learn_runtime),
                     modifier = Modifier.padding(end = 6.dp),
                     tint = colorScheme.onBackground,
                 )
@@ -578,7 +579,7 @@ private fun InfoCard(
 @Composable
 private fun StatusCardActivatedPreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = 12345, lkmMode = true),
+        state = previewHomeScreenState(runtimeVersion = 12345, lkmMode = true),
         actions = HomeActions({}, {})
     )
 }
@@ -586,14 +587,14 @@ private fun StatusCardActivatedPreview() {
 @Preview(name = "Not Activated")
 @Composable
 private fun StatusCardNotActivatedPreview() {
-    StatusCard(state = previewHomeScreenState(ksuVersion = null, lkmMode = null), actions = HomeActions({}, {}))
+    StatusCard(state = previewHomeScreenState(runtimeVersion = null, lkmMode = null), actions = HomeActions({}, {}))
 }
 
 @Preview(name = "Permissive")
 @Composable
 private fun StatusCardPermissivePreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = null, lkmMode = null, selinuxStatus = "Permissive"),
+        state = previewHomeScreenState(runtimeVersion = null, lkmMode = null, selinuxStatus = "Permissive"),
         actions = HomeActions({}, {})
     )
 }
@@ -602,7 +603,7 @@ private fun StatusCardPermissivePreview() {
 @Composable
 private fun StatusCardJailbreakPreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = 12345, lkmMode = true, isLateLoadMode = true),
+        state = previewHomeScreenState(runtimeVersion = 12345, lkmMode = true, isLateLoadMode = true),
         actions = HomeActions({}, {})
     )
 }
@@ -622,7 +623,7 @@ private val previewUriHandler = object : UriHandler {
 
 @Composable
 private fun HomeScreenPreviewContent(
-    ksuVersion: Int?,
+    runtimeVersion: Int?,
     lkmMode: Boolean?,
     isSafeMode: Boolean = false,
     isLateLoadMode: Boolean = false,
@@ -637,7 +638,7 @@ private fun HomeScreenPreviewContent(
             val actions = HomeActions({}, {})
             StatusCard(
                 state = previewHomeScreenState(
-                    ksuVersion = ksuVersion,
+                    runtimeVersion = runtimeVersion,
                     lkmMode = lkmMode,
                     isSafeMode = isSafeMode,
                     isLateLoadMode = isLateLoadMode,
@@ -660,36 +661,36 @@ private fun HomeScreenPreviewContent(
 @Preview(name = "Home Activated", showBackground = true)
 @Composable
 private fun HomeScreenActivatedPreview() {
-    HomeScreenPreviewContent(ksuVersion = 12345, lkmMode = true)
+    HomeScreenPreviewContent(runtimeVersion = 12345, lkmMode = true)
 }
 
 @Preview(name = "Home Not Activated", showBackground = true)
 @Composable
 private fun HomeScreenNotActivatedPreview() {
-    HomeScreenPreviewContent(ksuVersion = null, lkmMode = null)
+    HomeScreenPreviewContent(runtimeVersion = null, lkmMode = null)
 }
 
 @Preview(name = "Home Permissive", showBackground = true)
 @Composable
 private fun HomeScreenPermissivePreview() {
-    HomeScreenPreviewContent(ksuVersion = null, lkmMode = null, selinuxStatus = "Permissive")
+    HomeScreenPreviewContent(runtimeVersion = null, lkmMode = null, selinuxStatus = "Permissive")
 }
 
 @Preview(name = "Home Jailbreak", showBackground = true)
 @Composable
 private fun HomeScreenJailbreakPreview() {
-    HomeScreenPreviewContent(ksuVersion = 12345, lkmMode = true, isLateLoadMode = true)
+    HomeScreenPreviewContent(runtimeVersion = 12345, lkmMode = true, isLateLoadMode = true)
 }
 
 private fun previewHomeScreenState(
-    ksuVersion: Int?,
+    runtimeVersion: Int?,
     lkmMode: Boolean?,
     isSafeMode: Boolean = false,
     isLateLoadMode: Boolean = false,
     selinuxStatus: String = "Enforcing",
 ) = HomeUiState(
     kernelVersion = KernelVersion(6, 1, 0),
-    ksuVersion = ksuVersion,
+    runtimeVersion = runtimeVersion,
     lkmMode = lkmMode,
     isLkmBundled = lkmMode == true,
     isManager = true,
@@ -697,7 +698,7 @@ private fun previewHomeScreenState(
     isKernelPrBuild = false,
     requiresNewKernel = false,
     requiresNewManager = false,
-    isRootAvailable = ksuVersion != null,
+    isRootAvailable = runtimeVersion != null,
     isSafeMode = isSafeMode,
     isLateLoadMode = isLateLoadMode,
     checkUpdateEnabled = false,

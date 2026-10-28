@@ -134,7 +134,6 @@ fun HomePagerMaterial(
                 actions = actions,
             )
             InfoCard(systemInfo = state.systemInfo)
-            SupportLinks(onOpenUrl = actions.onOpenUrl)
             Spacer(
                 Modifier.height(
                     bottomInnerPadding + if (!NativeApi.isFullFeatured())
@@ -197,10 +196,11 @@ private fun StatusCard(
     actions: HomeActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        val ksuActive = state.ksuVersion != null
-        val notInstalled = !ksuActive && state.kernelVersion.isGKI()
+        val runtimeActive = state.runtimeVersion != null
+        Text(stringResource(R.string.dn_home_module_count, 0))
+        val notInstalled = !runtimeActive && state.kernelVersion.isGKI()
 
-        val containerColor = if (ksuActive) {
+        val containerColor = if (runtimeActive) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.errorContainer
@@ -208,21 +208,21 @@ private fun StatusCard(
         val contentColor = MaterialTheme.colorScheme.contentColorFor(containerColor)
 
         val statusIcon = when {
-            ksuActive -> Icons.Rounded.CheckCircle
+            runtimeActive -> Icons.Rounded.CheckCircle
             notInstalled -> Icons.Rounded.Warning
             else -> Icons.Rounded.Block
         }
         val statusTitle = when {
-            ksuActive -> stringResource(R.string.home_working)
+            runtimeActive -> stringResource(R.string.home_working)
             notInstalled -> stringResource(R.string.home_not_installed)
             else -> stringResource(R.string.home_unsupported)
         }
         val statusSummary = when {
-            ksuActive -> stringResource(R.string.home_working_version, "${state.ksuVersion}-${state.kernelUAPIVersion}")
+            runtimeActive -> stringResource(R.string.home_working_version, "${state.runtimeVersion}-${state.kernelUAPIVersion}")
             notInstalled -> stringResource(R.string.home_click_to_install)
             else -> stringResource(R.string.home_unsupported_reason)
         }
-        val workingMode = if (ksuActive) {
+        val workingMode = if (runtimeActive) {
             when (state.lkmMode) {
                 null -> ""
                 true -> "LKM"
@@ -230,7 +230,7 @@ private fun StatusCard(
             }
         } else ""
 
-        val statusTrailing: (@Composable () -> Unit)? = if (ksuActive && workingMode.isNotEmpty()) {
+        val statusTrailing: (@Composable () -> Unit)? = if (runtimeActive && workingMode.isNotEmpty()) {
             {
                 StatusTag(
                     label = workingMode,
@@ -302,7 +302,7 @@ private fun StatusCard(
                             text = statusTitle,
                             style = MaterialTheme.typography.titleMediumEmphasized
                         )
-                        if (ksuActive && state.isSafeMode) {
+                        if (runtimeActive && state.isSafeMode) {
                             Spacer(Modifier.width(8.dp))
                             StatusTag(
                                 label = stringResource(id = R.string.safe_mode),
@@ -310,7 +310,7 @@ private fun StatusCard(
                                 backgroundColor = MaterialTheme.colorScheme.errorContainer
                             )
                         }
-                        if (ksuActive && state.isLateLoadMode) {
+                        if (runtimeActive && state.isLateLoadMode) {
                             Spacer(Modifier.width(8.dp))
                             StatusTag(
                                 label = stringResource(id = R.string.jailbreak_mode),
@@ -360,7 +360,7 @@ private fun SupportLinks(
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val learnMoreUrl = stringResource(R.string.home_learn_kernelsu_url)
+    val learnMoreUrl = stringResource(R.string.home_learn_runtime_url)
 
     SegmentedColumn(modifier = modifier.fillMaxWidth()) {
         item {
@@ -377,10 +377,10 @@ private fun SupportLinks(
         item {
             SegmentedListItem(
                 onClick = { onOpenUrl(learnMoreUrl) },
-                headlineContent = { Text(stringResource(R.string.home_learn_kernelsu)) },
-                supportingContent = { Text(stringResource(R.string.home_click_to_learn_kernelsu)) },
+                headlineContent = { Text(stringResource(R.string.home_learn_runtime)) },
+                supportingContent = { Text(stringResource(R.string.home_click_to_learn_runtime)) },
                 leadingContent = {
-                    Icon(Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.home_learn_kernelsu))
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.home_learn_runtime))
                 },
                 trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
             )
@@ -485,7 +485,7 @@ private fun InfoCard(
 @Composable
 private fun StatusCardActivatedPreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = 12345, lkmMode = true),
+        state = previewHomeScreenState(runtimeVersion = 12345, lkmMode = true),
         actions = HomeActions({}, {})
     )
 }
@@ -493,14 +493,14 @@ private fun StatusCardActivatedPreview() {
 @Preview(name = "Not Activated")
 @Composable
 private fun StatusCardNotActivatedPreview() {
-    StatusCard(state = previewHomeScreenState(ksuVersion = null, lkmMode = null), actions = HomeActions({}, {}))
+    StatusCard(state = previewHomeScreenState(runtimeVersion = null, lkmMode = null), actions = HomeActions({}, {}))
 }
 
 @Preview(name = "Permissive")
 @Composable
 private fun StatusCardPermissivePreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = null, lkmMode = null, selinuxStatus = "Permissive"),
+        state = previewHomeScreenState(runtimeVersion = null, lkmMode = null, selinuxStatus = "Permissive"),
         actions = HomeActions({}, {})
     )
 }
@@ -509,7 +509,7 @@ private fun StatusCardPermissivePreview() {
 @Composable
 private fun StatusCardJailbreakPreview() {
     StatusCard(
-        state = previewHomeScreenState(ksuVersion = 12345, lkmMode = true, isLateLoadMode = true),
+        state = previewHomeScreenState(runtimeVersion = 12345, lkmMode = true, isLateLoadMode = true),
         actions = HomeActions({}, {})
     )
 }
@@ -529,7 +529,7 @@ private val previewUriHandler = object : UriHandler {
 
 @Composable
 private fun HomeScreenPreviewContent(
-    ksuVersion: Int?,
+    runtimeVersion: Int?,
     lkmMode: Boolean?,
     isSafeMode: Boolean = false,
     isLateLoadMode: Boolean = false,
@@ -543,7 +543,7 @@ private fun HomeScreenPreviewContent(
             val actions = HomeActions({}, {})
             StatusCard(
                 state = previewHomeScreenState(
-                    ksuVersion = ksuVersion,
+                    runtimeVersion = runtimeVersion,
                     lkmMode = lkmMode,
                     isSafeMode = isSafeMode,
                     isLateLoadMode = isLateLoadMode,
@@ -560,36 +560,36 @@ private fun HomeScreenPreviewContent(
 @Preview(name = "Home Activated", showBackground = true)
 @Composable
 private fun HomeScreenActivatedPreview() {
-    HomeScreenPreviewContent(ksuVersion = 12345, lkmMode = true)
+    HomeScreenPreviewContent(runtimeVersion = 12345, lkmMode = true)
 }
 
 @Preview(name = "Home Not Activated", showBackground = true)
 @Composable
 private fun HomeScreenNotActivatedPreview() {
-    HomeScreenPreviewContent(ksuVersion = null, lkmMode = null)
+    HomeScreenPreviewContent(runtimeVersion = null, lkmMode = null)
 }
 
 @Preview(name = "Home Permissive", showBackground = true)
 @Composable
 private fun HomeScreenPermissivePreview() {
-    HomeScreenPreviewContent(ksuVersion = null, lkmMode = null, selinuxStatus = "Permissive")
+    HomeScreenPreviewContent(runtimeVersion = null, lkmMode = null, selinuxStatus = "Permissive")
 }
 
 @Preview(name = "Home Jailbreak", showBackground = true)
 @Composable
 private fun HomeScreenJailbreakPreview() {
-    HomeScreenPreviewContent(ksuVersion = 12345, lkmMode = true, isLateLoadMode = true)
+    HomeScreenPreviewContent(runtimeVersion = 12345, lkmMode = true, isLateLoadMode = true)
 }
 
 private fun previewHomeScreenState(
-    ksuVersion: Int?,
+    runtimeVersion: Int?,
     lkmMode: Boolean?,
     isSafeMode: Boolean = false,
     isLateLoadMode: Boolean = false,
     selinuxStatus: String = "Enforcing",
 ) = HomeUiState(
     kernelVersion = KernelVersion(6, 1, 0),
-    ksuVersion = ksuVersion,
+    runtimeVersion = runtimeVersion,
     lkmMode = lkmMode,
     isLkmBundled = lkmMode == true,
     isManager = true,
@@ -597,7 +597,7 @@ private fun previewHomeScreenState(
     isKernelPrBuild = false,
     requiresNewKernel = false,
     requiresNewManager = false,
-    isRootAvailable = ksuVersion != null,
+    isRootAvailable = runtimeVersion != null,
     isSafeMode = isSafeMode,
     isLateLoadMode = isLateLoadMode,
     checkUpdateEnabled = false,

@@ -7,7 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.daily.notes.R
-import com.daily.notes.ui.component.KsuIsValid
+import com.daily.notes.ui.component.RuntimeIsValid
 import com.daily.notes.ui.component.ListPopupDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -24,7 +24,7 @@ fun RebootListPopupMiuix(
     alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd
 ) {
     val showTopPopup = remember { mutableStateOf(false) }
-    KsuIsValid {
+    RuntimeIsValid {
         val onReboot = rememberRebootAction()
         IconButton(
             modifier = modifier,

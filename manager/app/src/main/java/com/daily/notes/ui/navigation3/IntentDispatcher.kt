@@ -29,7 +29,7 @@ import com.daily.notes.ui.util.DownloadService
 import com.daily.notes.ui.util.getFileName
 import com.daily.notes.ui.webui.WebUIActivity
 
-private const val SCHEME_KSU = "ksu"
+private const val SCHEME_NOTES = "notes"
 private const val HOST_ACTION = "action"
 private const val HOST_WEBUI = "webui"
 private const val PARAM_ID = "id"
@@ -80,14 +80,14 @@ private sealed interface PendingAction {
     data class OpenWebUI(val moduleId: String) : PendingAction
 }
 
-private sealed interface KsuDeepLink {
-    data class Action(val moduleId: String) : KsuDeepLink
-    data class WebUi(val moduleId: String) : KsuDeepLink
+private sealed interface ModuleDeepLink {
+    data class Action(val moduleId: String) : ModuleDeepLink
+    data class WebUi(val moduleId: String) : ModuleDeepLink
 }
 
 private fun buildInternalWebUiUri(moduleId: String): Uri {
     return Uri.Builder()
-        .scheme(SCHEME_KSU)
+        .scheme(SCHEME_NOTES)
         .authority(HOST_WEBUI)
         .appendQueryParameter(PARAM_ID, moduleId)
         .build()
@@ -128,22 +128,22 @@ private fun resolveIntent(intent: Intent): PendingAction? {
 
     // Check deep links
     return when (val deepLink = parseValidatedDeepLink(intent.data)) {
-        is KsuDeepLink.Action -> PendingAction.ExecuteAction(deepLink.moduleId)
-        is KsuDeepLink.WebUi -> PendingAction.OpenWebUI(deepLink.moduleId)
+        is ModuleDeepLink.Action -> PendingAction.ExecuteAction(deepLink.moduleId)
+        is ModuleDeepLink.WebUi -> PendingAction.OpenWebUI(deepLink.moduleId)
         null -> null
     }
 }
 
-private fun parseValidatedDeepLink(uri: Uri?): KsuDeepLink? {
-    if (uri?.scheme != SCHEME_KSU) return null
+private fun parseValidatedDeepLink(uri: Uri?): ModuleDeepLink? {
+    if (uri?.scheme != SCHEME_NOTES) return null
 
     val moduleId = uri.getQueryParameter(PARAM_ID)?.takeIf { it.isNotBlank() } ?: return null
     val token = uri.getQueryParameter(PARAM_TOKEN)?.takeIf { it.isNotBlank() } ?: return null
     if (token != SettingsRepositoryImpl().intentToken) return null
 
     return when (uri.host) {
-        HOST_ACTION -> KsuDeepLink.Action(moduleId)
-        HOST_WEBUI -> KsuDeepLink.WebUi(moduleId)
+        HOST_ACTION -> ModuleDeepLink.Action(moduleId)
+        HOST_WEBUI -> ModuleDeepLink.WebUi(moduleId)
         else -> null
     }
 }

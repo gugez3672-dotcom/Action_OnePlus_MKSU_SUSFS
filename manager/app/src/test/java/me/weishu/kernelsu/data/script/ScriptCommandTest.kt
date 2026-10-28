@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ScriptCommandTest {
 
-    private val host = ScriptHostInfo(ksuVersion = "v3.0.0-1-gabc", ksuVersionCode = 31234, kernelVersionCode = 32500, lateLoad = false)
+    private val host = ScriptHostInfo(runtimeVersion = "v3.0.0-1-gabc", runtimeVersionCode = 31234, kernelVersionCode = 32500, lateLoad = false)
     private val dir = "/data/user/0/com.daily.notes/files/oneshot/" + "a".repeat(64)
 
     private val params = ScriptParamsParser.parse(

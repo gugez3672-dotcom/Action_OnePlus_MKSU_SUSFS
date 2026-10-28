@@ -129,7 +129,7 @@ class SulogViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             if (repo.setSulogEnabled(true)) {
-                repo.execKsudFeatureSave()
+                repo.saveRuntimeFeature()
             }
             refresh(preferredFilePath)
         }
