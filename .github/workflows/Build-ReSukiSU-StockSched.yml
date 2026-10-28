@@ -242,7 +242,9 @@ jobs:
         run: python3 scripts/prepare_stock_ikconfig.py
 
       - name: Verify source invariants before compilation
-        run: python3 scripts/verify_official_sources.py
+        run: |
+          python3 scripts/verify_official_sources.py
+          python3 scripts/check_sus_map_predicate.py
 
       - name: Exercise source gate regressions and restore original bytes
         run: python3 scripts/check_source_guards.py --fixture .

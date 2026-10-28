@@ -55,7 +55,7 @@ def verify_smaps_hooks(text):
         raise ValueError('show_smaps_rollup: all three old-structure paths must be guarded')
     for indent, offset in (('\t\t', '0'), ('\t\t\t\t', '0'), ('\t\t\t\t', 'last_vma_end')):
         expected = ('#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n'
-                    f'{indent}if (!vma->vm_file || !{predicate})\n'
+                    f'{indent}if (!vma->vm_file || !({predicate}))\n'
                     '#endif\n'
                     f'{indent}\tsmap_gather_stats(vma, &mss, {offset});\n'
                     f'{indent}last_vma_end = vma->vm_end;')

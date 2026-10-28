@@ -18,6 +18,9 @@ def main():
     ksu = 'kernel_workspace/kernel_platform/KernelSU/kernel/'
     common = 'kernel_workspace/kernel_platform/common/'
     cases = [
+        ('unparenthesized compound SUS_MAP negation', common + 'fs/proc/task_mmu.c',
+         '!(SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))',
+         '!SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))'),
         ('manager fd exposed', ksu + 'supercall/supercall.c',
          '    if (!manager_or_root())\n        return -EPERM;', '    if (0)\n        return -EPERM;'),
         ('unprivileged reboot task queued', ksu + 'supercall/supercall.c',
@@ -48,7 +51,7 @@ def main():
          'static inline bool pte_is_pinned(struct vm_area_struct *vma, unsigned long addr, pte_t pte)\n{\n'
          '\tif (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) goto bypass_orig_flow;'),
         ('rollup path left unfiltered', common + 'fs/proc/task_mmu.c',
-         '\t\tif (!vma->vm_file || !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))', '\t\tif (1)'),
+         '\t\tif (!vma->vm_file || !(SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))))', '\t\tif (1)'),
         ('rollup cursor no longer advances', common + 'fs/proc/task_mmu.c',
          '\t\tlast_vma_end = vma->vm_end;', '\t\tif (0) last_vma_end = vma->vm_end;'),
     ]

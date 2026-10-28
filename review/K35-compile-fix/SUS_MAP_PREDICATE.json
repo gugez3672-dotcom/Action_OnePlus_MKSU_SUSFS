@@ -1,0 +1,7 @@
+{
+  "actual_upstream_macro": "#define SUSFS_IS_INODE_SUS_MAP(inode) \\\n\t\tinode && inode->i_mapping && \\\n\t\tunlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags)) && \\\n\t\tsusfs_is_current_proc_umounted_app()",
+  "old_expression_rejected_by_clang": true,
+  "corrected_expression_compiles": true,
+  "visibility_combinations_passed": 32,
+  "boundary": "Host C macro/logic regression, not a substitute for the full A67 kernel build."
+}

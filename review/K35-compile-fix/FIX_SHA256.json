@@ -1,0 +1,11 @@
+{
+  "failed_build": 40525562241,
+  "failed_commit": "6a735e781f04deb1785b3ff92c7c724c30a9c9c1",
+  "code_sha256": {
+    "patches/PLK110_A67_SUSFS_519_compat.patch": "a0c3ba7564143826c0aa232700e588fb572b2fcabb29307cfbc3a99c4f9c2f1e",
+    "scripts/c_source_checks.py": "767ebda8062174bbb1cce147e64967fb13865a0af2ae7c5b9084c7a6e45f356d",
+    "scripts/check_source_guards.py": "11f6fb3193f5feeab53b643501768c81db172fa5bf8f53c5e0028b258f23055b",
+    "scripts/check_sus_map_predicate.py": "9f3cc723152255f1e35297b21aee301c7a19a6e0a0728cae8cb2f39582499a7a",
+    ".github/workflows/Build-ReSukiSU-StockSched.yml": "449761fb3188b5a96917cfe4ddd2e8f20dce93360175ac3dde580a42c015c99c"
+  }
+}
