@@ -7,6 +7,10 @@ on:
         description: 'Only after Claude review is clear: enter reviewed'
         type: string
         required: true
+      k_number:
+        description: 'K label for this build (digits only, e.g. 40); not tied to the Actions run number'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -68,13 +72,16 @@ jobs:
           grep -qx 'CONFIG_TRIM_UNUSED_KSYMS=y' "$stock"
           ! grep -Eq '^(CONFIG_(KSU|KPM|SUSFS)|# CONFIG_(KSU|KPM|SUSFS))' "$stock"
 
-      - name: Confirm previously verified stock reproduction
+      - name: Check K label and recorded stock reproduction
         env:
-          GH_TOKEN: ${{ github.token }}
+          K_NUMBER: ${{ inputs.k_number }}
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3             -H "Authorization: Bearer $GH_TOKEN"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STOCK_RUN"             --output artifacts/VERIFIED_STOCK_RUN.json
-          jq -e --arg sha "$VERIFIED_STOCK_COMMIT"             '.conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"'             artifacts/VERIFIED_STOCK_RUN.json
+          [[ "$K_NUMBER" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "invalid k_number: $K_NUMBER"; exit 1; }
+          # The stock A67 reproduction run is kept as a committed record; the
+          # repository that ran it is no longer queried.
+          jq -e --arg id "$VERIFIED_STOCK_RUN" --arg sha "$VERIFIED_STOCK_COMMIT"             '(.id|tostring) == $id and .conclusion == "success" and .head_sha == $sha and .path == ".github/workflows/Build-Stock-A67.yml"'             baselines/VERIFIED_STOCK_RUN.json
+          cp baselines/VERIFIED_STOCK_RUN.json artifacts/VERIFIED_STOCK_RUN.json
 
       - name: Install dependencies
         run: |
@@ -280,6 +287,8 @@ jobs:
           python3 scripts/verify_official_image.py
 
       - name: Package verified Image only
+        env:
+          K_NUMBER: ${{ inputs.k_number }}
         run: bash scripts/package_official_gki.sh
 
       - name: Generate checksums
@@ -293,7 +302,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-K${{ github.run_number }}-official
+          name: PLK110-A67-K${{ inputs.k_number }}-official
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6

@@ -35,12 +35,12 @@ for forbidden in \
   test ! -e "AnyKernel3/$forbidden"
 done
 test -z "$(find AnyKernel3 -type f \( -iname '*.zip' -o -iname '*.apk' -o -iname '*.img' \) -print -quit)"
-run_number="${GITHUB_RUN_NUMBER:?Actions run number is required for the package label}"
+k_number="${K_NUMBER:?k_number workflow input is required for the package label}"
 cp inputs.lock.json artifacts/inputs.lock.json
 cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
 (
   cd AnyKernel3
-  zip -r9 "../artifacts/PLK110_A67_K${run_number}_KernelSU_SUSFS.zip" .
+  zip -r9 "../artifacts/PLK110_A67_K${k_number}_KernelSU_SUSFS.zip" .
 )
 python3 - <<'PY'
 import hashlib
@@ -49,7 +49,7 @@ import os
 from pathlib import Path
 lock = json.loads(Path('inputs.lock.json').read_text())
 record = {
-    'K': int(os.environ['GITHUB_RUN_NUMBER']), 'definition_commit': os.environ['GITHUB_SHA'],
+    'K': int(os.environ['K_NUMBER']), 'definition_commit': os.environ['GITHUB_SHA'],
     'image_sha256': hashlib.sha256(Path('artifacts/Image').read_bytes()).hexdigest(),
     'kernelsu': lock['kernelsu'], 'susfs': lock['susfs'], 'anykernel': lock['anykernel'],
     'pguard': False, 'embedded_k_number': False,

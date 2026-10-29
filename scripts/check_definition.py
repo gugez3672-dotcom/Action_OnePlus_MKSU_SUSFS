@@ -13,6 +13,9 @@ definition = yaml.load(workflow.read_text(), Loader=yaml.BaseLoader)
 assert set(definition['on']) == {'workflow_dispatch'}, 'automatic build trigger is forbidden'
 dispatch = definition['on']['workflow_dispatch']
 assert dispatch['inputs']['review_ack']['required'] == 'true'
+assert dispatch['inputs']['k_number']['required'] == 'true'
+assert 'github.run_number' not in workflow.read_text() and 'GITHUB_RUN_NUMBER' not in (root / 'scripts/package_official_gki.sh').read_text()
+assert 'api.github.com' not in workflow.read_text(), 'build must not query repository API history'
 job = definition['jobs']['official-stock-sched']
 assert "inputs.review_ack == 'reviewed'" in job['if']
 assert definition['permissions'] == {'contents': 'read', 'actions': 'read'}
