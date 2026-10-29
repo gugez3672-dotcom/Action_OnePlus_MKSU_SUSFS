@@ -49,6 +49,63 @@ def harden_dispatch(text):
     return text
 
 
+def defer_live_selinux_lookup(text):
+    # Validate user/role/type against the backup policy first; query the live
+    # policy only once all three are valid. An invalid field then costs the
+    # same symtab lookups as the stock single-policy parser. Live IDs still
+    # come only from the live policy; MLS, cleanup, SID sync and ESTALE retry
+    # are untouched.
+    text = once(text,
+        '    char *scontextp, *p, oldc;\n',
+        '    char *scontextp, *p, oldc;\n    char *user_name, *role_name, *type_name;\n', 'field names')
+    text = once(text,
+        '    usrdatum = symtab_search(&pol->p_users, scontextp);\n'
+        '    orig_usrdatum = symtab_search(&orig_pol->p_users, scontextp);\n'
+        '    if (!usrdatum)\n        goto out;\n\n'
+        '    ctx->user = usrdatum->value;\n'
+        '    if (orig_usrdatum)\n        orig_ctx->user = orig_usrdatum->value;\n'
+        '    else\n        orig_valid = false;\n',
+        '    user_name = scontextp;\n'
+        '    usrdatum = symtab_search(&pol->p_users, user_name);\n'
+        '    if (!usrdatum)\n        goto out;\n\n'
+        '    ctx->user = usrdatum->value;\n', 'user lookup')
+    text = once(text,
+        '    role = symtab_search(&pol->p_roles, scontextp);\n'
+        '    orig_role = symtab_search(&orig_pol->p_roles, scontextp);\n'
+        '    if (!role)\n        goto out;\n'
+        '    ctx->role = role->value;\n'
+        '    if (orig_role)\n        orig_ctx->role = orig_role->value;\n'
+        '    else\n        orig_valid = false;\n',
+        '    role_name = scontextp;\n'
+        '    role = symtab_search(&pol->p_roles, role_name);\n'
+        '    if (!role)\n        goto out;\n'
+        '    ctx->role = role->value;\n', 'role lookup')
+    text = once(text,
+        '    typdatum = symtab_search(&pol->p_types, scontextp);\n'
+        '    orig_typdatum = symtab_search(&orig_pol->p_types, scontextp);\n'
+        '    if (!typdatum || typdatum->attribute)\n        goto out;\n\n'
+        '    ctx->type = typdatum->value;\n'
+        '    if (orig_typdatum && !orig_typdatum->attribute)\n        orig_ctx->type = orig_typdatum->value;\n'
+        '    else\n        orig_valid = false;\n',
+        '    type_name = scontextp;\n'
+        '    typdatum = symtab_search(&pol->p_types, type_name);\n'
+        '    if (!typdatum || typdatum->attribute)\n        goto out;\n\n'
+        '    ctx->type = typdatum->value;\n\n'
+        '    // backup fields are valid; look up the live policy now\n'
+        '    orig_usrdatum = symtab_search(&orig_pol->p_users, user_name);\n'
+        '    if (orig_usrdatum)\n        orig_ctx->user = orig_usrdatum->value;\n'
+        '    else\n        orig_valid = false;\n\n'
+        '    orig_role = symtab_search(&orig_pol->p_roles, role_name);\n'
+        '    if (orig_role)\n        orig_ctx->role = orig_role->value;\n'
+        '    else\n        orig_valid = false;\n\n'
+        '    orig_typdatum = symtab_search(&orig_pol->p_types, type_name);\n'
+        '    if (orig_typdatum && !orig_typdatum->attribute)\n        orig_ctx->type = orig_typdatum->value;\n'
+        '    else\n        orig_valid = false;\n', 'type lookup')
+    if text.count('symtab_search(') != 6 or text.count('symtab_search(&orig_pol->') != 3:
+        raise RuntimeError('selinux_hide lookup count drift')
+    return text
+
+
 def main():
     lock = json.loads(Path('inputs.lock.json').read_text())
     ksu = Path('kernel_workspace/kernel_platform/KernelSU/kernel')
@@ -83,6 +140,8 @@ def main():
         kbuild_path: kbuild,
         ksu / 'supercall/supercall.c': harden_supercall((ksu / 'supercall/supercall.c').read_text()),
         ksu / 'supercall/dispatch.c': harden_dispatch((ksu / 'supercall/dispatch.c').read_text()),
+        ksu / 'feature/selinux_hide.c':
+            defer_live_selinux_lookup((ksu / 'feature/selinux_hide.c').read_text()),
         build_path: build,
         common / 'arch/arm64/configs/plk110_official.fragment':
             Path('baselines/PLK110_A67_official.config.additions').read_text(),
@@ -103,6 +162,7 @@ def main():
         'manager_fd_permission': 'manager_or_root at entry and actual installation',
         'info_ioctl_permissions': ['GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'],
         'su_session_fd_path_unchanged': True, 'pguard': False,
+        'selinux_hide': 'live user/role/type lookup deferred until backup fields are valid',
         'compiled': False, 'device_tested': False,
     }
     Path('artifacts/OFFICIAL_KERNEL_PREPARATION.json').write_text(json.dumps(report, indent=2) + '\n')
