@@ -49,60 +49,62 @@ def harden_dispatch(text):
     return text
 
 
-def defer_live_selinux_lookup(text):
-    # Validate user/role/type against the backup policy first; query the live
-    # policy only once all three are valid. An invalid field then costs the
-    # same symtab lookups as the stock single-policy parser. Live IDs still
-    # come only from the live policy; MLS, cleanup, SID sync and ESTALE retry
-    # are untouched.
-    text = once(text,
-        '    char *scontextp, *p, oldc;\n',
-        '    char *scontextp, *p, oldc;\n    char *user_name, *role_name, *type_name;\n', 'field names')
-    text = once(text,
-        '    usrdatum = symtab_search(&pol->p_users, scontextp);\n'
-        '    orig_usrdatum = symtab_search(&orig_pol->p_users, scontextp);\n'
-        '    if (!usrdatum)\n        goto out;\n\n'
-        '    ctx->user = usrdatum->value;\n'
-        '    if (orig_usrdatum)\n        orig_ctx->user = orig_usrdatum->value;\n'
-        '    else\n        orig_valid = false;\n',
-        '    user_name = scontextp;\n'
-        '    usrdatum = symtab_search(&pol->p_users, user_name);\n'
-        '    if (!usrdatum)\n        goto out;\n\n'
-        '    ctx->user = usrdatum->value;\n', 'user lookup')
-    text = once(text,
-        '    role = symtab_search(&pol->p_roles, scontextp);\n'
-        '    orig_role = symtab_search(&orig_pol->p_roles, scontextp);\n'
-        '    if (!role)\n        goto out;\n'
-        '    ctx->role = role->value;\n'
-        '    if (orig_role)\n        orig_ctx->role = orig_role->value;\n'
-        '    else\n        orig_valid = false;\n',
-        '    role_name = scontextp;\n'
-        '    role = symtab_search(&pol->p_roles, role_name);\n'
-        '    if (!role)\n        goto out;\n'
-        '    ctx->role = role->value;\n', 'role lookup')
-    text = once(text,
-        '    typdatum = symtab_search(&pol->p_types, scontextp);\n'
-        '    orig_typdatum = symtab_search(&orig_pol->p_types, scontextp);\n'
-        '    if (!typdatum || typdatum->attribute)\n        goto out;\n\n'
-        '    ctx->type = typdatum->value;\n'
-        '    if (orig_typdatum && !orig_typdatum->attribute)\n        orig_ctx->type = orig_typdatum->value;\n'
-        '    else\n        orig_valid = false;\n',
-        '    type_name = scontextp;\n'
-        '    typdatum = symtab_search(&pol->p_types, type_name);\n'
-        '    if (!typdatum || typdatum->attribute)\n        goto out;\n\n'
-        '    ctx->type = typdatum->value;\n\n'
-        '    // backup fields are valid; look up the live policy now\n'
-        '    orig_usrdatum = symtab_search(&orig_pol->p_users, user_name);\n'
-        '    if (orig_usrdatum)\n        orig_ctx->user = orig_usrdatum->value;\n'
-        '    else\n        orig_valid = false;\n\n'
-        '    orig_role = symtab_search(&orig_pol->p_roles, role_name);\n'
-        '    if (orig_role)\n        orig_ctx->role = orig_role->value;\n'
-        '    else\n        orig_valid = false;\n\n'
-        '    orig_typdatum = symtab_search(&orig_pol->p_types, type_name);\n'
-        '    if (orig_typdatum && !orig_typdatum->attribute)\n        orig_ctx->type = orig_typdatum->value;\n'
-        '    else\n        orig_valid = false;\n', 'type lookup')
-    if text.count('symtab_search(') != 6 or text.count('symtab_search(&orig_pol->') != 3:
-        raise RuntimeError('selinux_hide lookup count drift')
+STOCK_PARSER_ANCHOR = 'static int string_to_context_struct(struct policydb *pol,\n'
+STOCK_PARSER_END = 'out:\n\tif (rc)\n\t\tcontext_destroy(ctx);\n\treturn rc;\n}\n'
+HIDE_PARSER_START = '/*\n * Caveat:  Mutates scontext.\n */\nstatic int string_to_context_struct('
+HIDE_PARSER_SHA256 = '7d667a071019e4dc2d9841b842deb04ad66bf229d834d9fec4e58fab58ab2f2a'
+HIDE_PARSER_ENTRY = 'ksu_string_to_context_struct('
+
+
+def share_stock_context_parser(text):
+    # One out-of-line copy of the stock parser, reachable with an explicit policy.
+    text = once(text, STOCK_PARSER_ANCHOR,
+                'static noinline int string_to_context_struct(struct policydb *pol,\n', 'stock parser noinline')
+    return once(text, STOCK_PARSER_END, STOCK_PARSER_END +
+        '\n/* SELinux hide parses the backup and live policies with the stock parser. */\n'
+        'int ksu_string_to_context_struct(struct policydb *pol, struct sidtab *sidtabp,\n'
+        '\t\t\t\t char *scontext, struct context *ctx, u32 def_sid);\n\n'
+        'int ksu_string_to_context_struct(struct policydb *pol, struct sidtab *sidtabp,\n'
+        '\t\t\t\t char *scontext, struct context *ctx, u32 def_sid)\n'
+        '{\n\treturn string_to_context_struct(pol, sidtabp, scontext, ctx, def_sid);\n}\n',
+        'stock parser entry')
+
+
+def use_stock_context_parser(text):
+    # Replace the hide copy of the parser: a context rejected by the backup
+    # policy then runs exactly the stock code; the live policy is parsed only
+    # after the backup context is fully valid. Live IDs still come only from
+    # the live policy; SID sync and ESTALE retry in the caller are unchanged.
+    if text.count(HIDE_PARSER_START) != 1 or HIDE_PARSER_ENTRY in text:
+        raise RuntimeError('selinux_hide parser preimage drift')
+    start = text.index(HIDE_PARSER_START)
+    end = text.index('\n}\n', start) + 3
+    if hashlib.sha256(text[start:end].encode()).hexdigest() != HIDE_PARSER_SHA256:
+        raise RuntimeError('selinux_hide parser preimage drift')
+    parser = (
+        'int ksu_string_to_context_struct(struct policydb *pol, struct sidtab *sidtabp, char *scontext,\n'
+        '                                 struct context *ctx, u32 def_sid);\n\n'
+        '/*\n * Caveat:  Mutates scontext.\n */\n'
+        'static int string_to_context_struct(struct policydb *pol, struct policydb *orig_pol, struct sidtab *sidtabp,\n'
+        '                                    struct sidtab *orig_sidtabp, char *scontext, const char *source, u32 source_len,\n'
+        '                                    struct context *ctx, struct context *orig_ctx, u32 def_sid, int *orig_rc_p)\n'
+        '{\n'
+        '    int rc;\n\n'
+        '    // the stock parser destroys ctx on failure; orig_ctx stays untouched\n'
+        '    rc = ksu_string_to_context_struct(pol, sidtabp, scontext, ctx, def_sid);\n'
+        '    if (rc) {\n'
+        '        *orig_rc_p = -EINVAL;\n'
+        '        return rc;\n'
+        '    }\n\n'
+        '    // backup context is valid; parse the live policy from the original string\n'
+        '    memcpy(scontext, source, source_len);\n'
+        "    scontext[source_len] = '\\0';\n"
+        '    *orig_rc_p = ksu_string_to_context_struct(orig_pol, orig_sidtabp, scontext, orig_ctx, def_sid);\n'
+        '    return 0;\n'
+        '}\n')
+    text = text[:start] + parser + text[end:]
+    if 'symtab_search(' in text or text.count(HIDE_PARSER_ENTRY) != 3:
+        raise RuntimeError('selinux_hide parser replacement drift')
     return text
 
 
@@ -141,7 +143,9 @@ def main():
         ksu / 'supercall/supercall.c': harden_supercall((ksu / 'supercall/supercall.c').read_text()),
         ksu / 'supercall/dispatch.c': harden_dispatch((ksu / 'supercall/dispatch.c').read_text()),
         ksu / 'feature/selinux_hide.c':
-            defer_live_selinux_lookup((ksu / 'feature/selinux_hide.c').read_text()),
+            use_stock_context_parser((ksu / 'feature/selinux_hide.c').read_text()),
+        common / 'security/selinux/ss/services.c':
+            share_stock_context_parser((common / 'security/selinux/ss/services.c').read_text()),
         build_path: build,
         common / 'arch/arm64/configs/plk110_official.fragment':
             Path('baselines/PLK110_A67_official.config.additions').read_text(),
@@ -162,7 +166,7 @@ def main():
         'manager_fd_permission': 'manager_or_root at entry and actual installation',
         'info_ioctl_permissions': ['GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'],
         'su_session_fd_path_unchanged': True, 'pguard': False,
-        'selinux_hide': 'live user/role/type lookup deferred until backup fields are valid',
+        'selinux_hide': 'backup and live contexts parsed by the shared stock parser; live only after backup is valid',
         'compiled': False, 'device_tested': False,
     }
     Path('artifacts/OFFICIAL_KERNEL_PREPARATION.json').write_text(json.dumps(report, indent=2) + '\n')

@@ -7,7 +7,7 @@
 ## 审查顺序
 
 1. 看 `inputs.lock.json`：官方 KernelSU `75e179d3` / 32705、SUSFS `519c86c`、一加 A67 四组源码与 clang 固定提交。
-2. 看 `review/LOCAL_OFFICIAL_OVERLAY.patch`：官方 SUSFS 之后仅额外改 Kbuild 的可复现版本/官方管理器参数、管理器 fd 两处权限门槛、三个信息 ioctl、负 fd 失败回收、SELinux Hide 现行策略字段查找延后（备份 user/role/type 全部有效后才查现行策略）及 common 的 root fragment。
+2. 看 `review/LOCAL_OFFICIAL_OVERLAY.patch`：官方 SUSFS 之后仅额外改 Kbuild 的可复现版本/官方管理器参数、管理器 fd 两处权限门槛、三个信息 ioctl、负 fd 失败回收、SELinux Hide 改用原厂解析函数（common services.c 的 string_to_context_struct 标 noinline 并加带策略参数的入口；备份策略完整通过后才解析现行策略）及 common 的 root fragment。
 3. 看 `patches/PLK110_A67_SUSFS_519_compat.patch`、`scripts/susfs_patch_policy.py` 与 `review/OFFICIAL_SUSFS_INTEGRATION.json`：六个不兼容块由独立 A67 适配替代，其余官方原文保留；全部使用 git apply 严格上下文，禁止 fuzz。
 4. 看 `scripts/link_official_driver.py`、`prepare_stock_build.py`、`prepare_stock_trust.py`、`prepare_stock_ikconfig.py`：driver 链接、两处原厂构建适配、模块证书信任、原厂公开配置。
 5. 看 `verify_official_sources.py`、`verify_gki.py`、`verify_official_image.py` 和 workflow：检查是否能在错误输入、ABI/证书/完整 banner 漂移时阻断，并且打包前没有绕过检查。
