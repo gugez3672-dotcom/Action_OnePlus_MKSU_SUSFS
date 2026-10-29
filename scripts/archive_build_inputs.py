@@ -10,6 +10,7 @@ finished entries are verified and skipped. INDEX.json lists what was archived.
 import hashlib
 import json
 import subprocess
+import tarfile
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -24,7 +25,9 @@ MANIFEST_URL = 'https://github.com/OnePlusOSS/kernel_manifest.git'
 REPO_LAUNCHER_URL = 'https://gerrit.googlesource.com/git-repo/+/refs/tags/v2.68.1/repo?format=TEXT'
 CLANG_URL = ('https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/'
              '{commit}/clang-r536225.tar.gz')
-CLANG_SHA256 = '4908f981a6143db22807323cbdf6a37f3842c9de3891c29f2f04211de465a7ab'
+# googlesource +archive tarballs are generated per request and not byte-stable;
+# the payload is identified by the pinned commit and the clang version string.
+CLANG_SHA256 = None
 ACTIONS = {
     'easimon/maximize-build-space': 'c28619d8999a147d5e09c1199f84ff6af6ad5794',
     'actions/checkout': '11d5960a326750d5838078e36cf38b85af677262',
@@ -119,6 +122,15 @@ def main():
         index['files'][name] = {'url': url, 'sha256': digest, 'state': state}
         print(f'      {state} {digest[:16]}', flush=True)
 
+    with tarfile.open(out / 'files' / 'clang-r536225.tar.gz') as tar:
+        names = {n.lstrip('./'): n for n in tar.getnames()}
+        version = tar.extractfile(names['AndroidVersion.txt']).read().decode().split()[0]
+        binary = tar.extractfile(names['bin/clang-19']).read()
+    for marker in (LOCK['llvm_commit'], LOCK['clang_android_build']):
+        if marker.encode() not in binary:
+            raise RuntimeError(f'clang payload mismatch: {marker} not in bin/clang-19')
+    index['files']['clang-r536225.tar.gz'].update(
+        clang_version=version, llvm_commit=LOCK['llvm_commit'], android_build=LOCK['clang_android_build'])
     (out / 'INDEX.json').write_text(json.dumps(index, indent=2) + '\n', encoding='utf-8')
     print(f"Archived {len(index['git'])} git inputs and {len(index['files'])} files to {out}")
 
