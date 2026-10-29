@@ -67,6 +67,10 @@ def main():
     }
     for file, hook in hooks.items():
         assert hook in read(common, file), f'missing manual hook {file}: {hook}'
+    selinux_hooks = read(common, 'security/selinux/hooks.c')
+    assert 'handle_selinux_setprocattr' not in selinux_hooks, 'app attr writes must use stock setprocattr'
+    assert 'selinux_hide_type_bound());' in selinux_hooks, 'missing SELinux hide type bound'
+    assert 'WRITE_ONCE(ksu_selinux_hide_type_bound' in read(ksu, 'selinux/rules.c')
     observer = read(ksu, 'manager/pkg_observer.c')
     callback = observer.split('static void ksu_track_throne_tw_func', 1)[1].split('\n}', 1)[0]
     assert callback.index('track_throne(false);') < callback.index('susfs_parse_priority_app_strings();')

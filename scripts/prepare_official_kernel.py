@@ -108,6 +108,93 @@ def use_stock_context_parser(text):
     return text
 
 
+def bound_stock_context_parser(text):
+    # K40: a stock context_to_sid entry whose parser treats types above a bound
+    # as undefined; the bound is 0 (no-op) for every existing caller.
+    text = once(text, '\t\t\t\t    u32 def_sid)\n{\n\tstruct role_datum *role;',
+                '\t\t\t\t    u32 def_sid,\n\t\t\t\t    u32 type_bound)\n{\n\tstruct role_datum *role;', 'parser bound arg')
+    text = once(text, '\tif (!typdatum || typdatum->attribute)\n\t\tgoto out;\n\n\tctx->type = typdatum->value;',
+                '\tif (!typdatum || typdatum->attribute ||\n\t    (type_bound && typdatum->value > type_bound))\n'
+                '\t\tgoto out;\n\n\tctx->type = typdatum->value;', 'parser bound check')
+    text = once(text, '\t\t\t\t\tu32 *sid, u32 def_sid, gfp_t gfp_flags,\n\t\t\t\t\tint force)\n{',
+                '\t\t\t\t\tu32 *sid, u32 def_sid, gfp_t gfp_flags,\n\t\t\t\t\tint force, u32 type_bound)\n{', 'core bound arg')
+    text = once(text, '\trc = string_to_context_struct(policydb, sidtab, scontext2,\n\t\t\t\t      &context, def_sid);',
+                '\trc = string_to_context_struct(policydb, sidtab, scontext2,\n\t\t\t\t      &context, def_sid, type_bound);',
+                'core parse')
+    text = once(text, 'rc = string_to_context_struct(args->newp, NULL, s, newc, SECSID_NULL);',
+                'rc = string_to_context_struct(args->newp, NULL, s, newc, SECSID_NULL, 0);', 'convert parse')
+    text = once(text, '\treturn string_to_context_struct(pol, sidtabp, scontext, ctx, def_sid);\n',
+                '\treturn string_to_context_struct(pol, sidtabp, scontext, ctx, def_sid, 0);\n', 'hide parse')
+    text = once(text, '\t\t\t\t\t    sid, SECSID_NULL, gfp, 0);\n}\n',
+                '\t\t\t\t\t    sid, SECSID_NULL, gfp, 0, 0);\n}\n\n'
+                'int security_context_to_sid_bounded(const char *scontext, u32 scontext_len,\n'
+                '\t\t\t\t    u32 *sid, gfp_t gfp, u32 type_bound);\n\n'
+                '/* As security_context_to_sid; types above a nonzero type_bound are undefined. */\n'
+                'int security_context_to_sid_bounded(const char *scontext, u32 scontext_len,\n'
+                '\t\t\t\t    u32 *sid, gfp_t gfp, u32 type_bound)\n{\n'
+                '\treturn security_context_to_sid_core(scontext, scontext_len,\n'
+                '\t\t\t\t\t    sid, SECSID_NULL, gfp, 0, type_bound);\n}\n', 'bounded entry')
+    text = once(text, '\t\t\t\t\t    sid, def_sid, gfp_flags, 1);\n',
+                '\t\t\t\t\t    sid, def_sid, gfp_flags, 1, 0);\n', 'default core')
+    text = once(text, '\t\t\t\t\t    sid, SECSID_NULL, GFP_KERNEL, 1);\n',
+                '\t\t\t\t\t    sid, SECSID_NULL, GFP_KERNEL, 1, 0);\n', 'force core')
+    if text.count('security_context_to_sid_core(') != 5:
+        raise RuntimeError('context_to_sid_core caller drift')
+    return text
+
+
+HIDE_SETPROCATTR = (
+    '#ifdef CONFIG_KSU_SUSFS\n'
+    'static int handle_selinux_setprocattr(const char *name, void *value, size_t size)\n{\n'
+    '\tif ((likely(!strcmp(name, "current") &&\n'
+    '\t\t\t\tcurrent_uid().val >= 10000 &&\n'
+    '\t\t\t\tksu_selinux_hide_running)))\n'
+    '\t\treturn my_setprocattr(name, value, size);\n'
+    '\treturn selinux_setprocattr(name, value, size);\n}\n'
+    '#endif // #ifdef CONFIG_KSU_SUSFS\n\n')
+
+
+def bound_stock_setattr(text):
+    # K40: app attr writes run the stock selinux_setprocattr, so the newline and
+    # permission paths are stock code; hiding is only the bound in the stock parse.
+    hook = ('#ifdef CONFIG_KSU_SUSFS\n\tLSM_HOOK_INIT(setprocattr, handle_selinux_setprocattr),\n'
+            '#else\n\tLSM_HOOK_INIT(setprocattr, selinux_setprocattr),\n#endif // #ifdef CONFIG_KSU_SUSFS\n')
+    for old, new in ((HIDE_SETPROCATTR, ''), (hook, '\tLSM_HOOK_INIT(setprocattr, selinux_setprocattr),\n')):
+        if text.count(old) != 1:
+            raise RuntimeError('hide setprocattr dispatch: expected exactly one unmodified preimage')
+        text = text.replace(old, new, 1)
+    text = once(text, 'static int selinux_lsm_setattr(u64 attr, void *value, size_t size)\n{',
+                'int security_context_to_sid_bounded(const char *scontext, u32 scontext_len,\n'
+                '\t\t\t\t    u32 *sid, gfp_t gfp, u32 type_bound);\n'
+                '#ifdef CONFIG_KSU_SUSFS\nextern u32 ksu_selinux_hide_type_bound;\n#endif\n\n'
+                '/* SELinux hide: app UIDs do not see KernelSU-added types. */\n'
+                'static inline u32 selinux_hide_type_bound(void)\n{\n'
+                '#ifdef CONFIG_KSU_SUSFS\n'
+                '\tif (current_uid().val >= 10000 && READ_ONCE(ksu_selinux_hide_running))\n'
+                '\t\treturn READ_ONCE(ksu_selinux_hide_type_bound);\n'
+                '#endif\n\treturn 0;\n}\n\n'
+                'static int selinux_lsm_setattr(u64 attr, void *value, size_t size)\n{', 'setattr bound')
+    text = once(text, '\t\terror = security_context_to_sid(value, size,\n\t\t\t\t\t\t&sid, GFP_KERNEL);\n'
+                '\t\tif (error == -EINVAL && attr == LSM_ATTR_FSCREATE) {',
+                '\t\terror = security_context_to_sid_bounded(value, size,\n\t\t\t\t\t\t&sid, GFP_KERNEL,\n'
+                '\t\t\t\t\t\tselinux_hide_type_bound());\n'
+                '\t\tif (error == -EINVAL && attr == LSM_ATTR_FSCREATE) {', 'setattr parse')
+    if 'handle_selinux_setprocattr' in text:
+        raise RuntimeError('hide setprocattr dispatch remains')
+    return text
+
+
+def publish_hide_type_bound(text):
+    # KernelSU only appends types to the live policy, so the backup type count is the bound.
+    text = once(text, 'struct selinux_policy *backup_sepolicy;\n',
+                'struct selinux_policy *backup_sepolicy;\nu32 ksu_selinux_hide_type_bound;\n', 'bound definition')
+    return once(text,
+        '                pr_info("backup sepolicy success! latest_granting=%d\\n", backup_sepolicy->latest_granting);\n',
+        '                WRITE_ONCE(ksu_selinux_hide_type_bound, backup_sepolicy->policydb.p_types.nprim);\n'
+        '                pr_info("backup sepolicy success! latest_granting=%d\\n", backup_sepolicy->latest_granting);\n',
+        'bound publish')
+
+
 def main():
     lock = json.loads(Path('inputs.lock.json').read_text())
     ksu = Path('kernel_workspace/kernel_platform/KernelSU/kernel')
@@ -144,8 +231,11 @@ def main():
         ksu / 'supercall/dispatch.c': harden_dispatch((ksu / 'supercall/dispatch.c').read_text()),
         ksu / 'feature/selinux_hide.c':
             use_stock_context_parser((ksu / 'feature/selinux_hide.c').read_text()),
+        ksu / 'selinux/rules.c': publish_hide_type_bound((ksu / 'selinux/rules.c').read_text()),
         common / 'security/selinux/ss/services.c':
-            share_stock_context_parser((common / 'security/selinux/ss/services.c').read_text()),
+            bound_stock_context_parser(
+                share_stock_context_parser((common / 'security/selinux/ss/services.c').read_text())),
+        common / 'security/selinux/hooks.c': bound_stock_setattr((common / 'security/selinux/hooks.c').read_text()),
         build_path: build,
         common / 'arch/arm64/configs/plk110_official.fragment':
             Path('baselines/PLK110_A67_official.config.additions').read_text(),
@@ -166,7 +256,8 @@ def main():
         'manager_fd_permission': 'manager_or_root at entry and actual installation',
         'info_ioctl_permissions': ['GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'],
         'su_session_fd_path_unchanged': True, 'pguard': False,
-        'selinux_hide': 'backup and live contexts parsed by the shared stock parser; live only after backup is valid',
+        'selinux_hide': 'selinuxfs context/access: shared stock parser, backup then live; '
+                        '/proc attr writes: stock selinux_setprocattr, app UIDs bounded to backup type count',
         'compiled': False, 'device_tested': False,
     }
     Path('artifacts/OFFICIAL_KERNEL_PREPARATION.json').write_text(json.dumps(report, indent=2) + '\n')
