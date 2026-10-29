@@ -1,8 +1,0 @@
-<resources>
-<string name="dn_authorization">Authorization</string>
-<string name="dn_application_controls">App controls</string>
-<string name="dn_enable_apps">Enable</string>
-<string name="dn_disable_apps">Disable</string>
-<string name="dn_select_all">Select all</string>
-<string name="dn_select_none">Clear selection</string>
-</resources>

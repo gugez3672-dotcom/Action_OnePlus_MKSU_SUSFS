@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       review_ack:
-        description: 'Only after Claude review is clear: enter reviewed'
+        description: 'Enter reviewed'
         type: string
         required: true
       k_number:
