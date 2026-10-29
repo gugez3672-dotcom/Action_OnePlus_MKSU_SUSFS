@@ -9,9 +9,9 @@
   "oneplus_modules": "f45a4a587a0ba9107a5421a2dd978404f545164b",
   "kernelsu": {
     "repository": "https://github.com/tiann/KernelSU.git",
-    "commit": "75e179d378d7aaa0de8946358a3384444c3e36b0",
-    "git_count": 2705,
-    "version": 32705
+    "commit": "db6263d3bdf136c9f478308351dc6fa62a92edba",
+    "git_count": 2707,
+    "version": 32707
   },
   "susfs": {
     "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
