@@ -71,6 +71,7 @@ def main():
     assert 'handle_selinux_setprocattr' not in selinux_hooks, 'app attr writes must use stock setprocattr'
     assert 'selinux_hide_type_bound());' in selinux_hooks, 'missing SELinux hide type bound'
     assert 'WRITE_ONCE(ksu_selinux_hide_type_bound' in read(ksu, 'selinux/rules.c')
+    assert read(common, 'fs/exec.c').count('NOKPROBE_SYMBOL(do_execveat_common);') == 1, 'exec entry must stay unprobed'
     observer = read(ksu, 'manager/pkg_observer.c')
     callback = observer.split('static void ksu_track_throne_tw_func', 1)[1].split('\n}', 1)[0]
     assert callback.index('track_throne(false);') < callback.index('susfs_parse_priority_app_strings();')

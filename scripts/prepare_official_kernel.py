@@ -195,6 +195,14 @@ def publish_hide_type_bound(text):
         'bound publish')
 
 
+def keep_exec_entry_unprobed(text):
+    text = once(text, '#include <linux/kernel_read_file.h>\n',
+                '#include <linux/kernel_read_file.h>\n#include <linux/kprobes.h>\n', 'kprobes include')
+    return once(text, '\nint kernel_execve(const char *kernel_filename,\n',
+                '\nNOKPROBE_SYMBOL(do_execveat_common);\n\nint kernel_execve(const char *kernel_filename,\n',
+                'exec entry')
+
+
 def main():
     lock = json.loads(Path('inputs.lock.json').read_text())
     ksu = Path('kernel_workspace/kernel_platform/KernelSU/kernel')
@@ -236,6 +244,7 @@ def main():
             bound_stock_context_parser(
                 share_stock_context_parser((common / 'security/selinux/ss/services.c').read_text())),
         common / 'security/selinux/hooks.c': bound_stock_setattr((common / 'security/selinux/hooks.c').read_text()),
+        common / 'fs/exec.c': keep_exec_entry_unprobed((common / 'fs/exec.c').read_text()),
         build_path: build,
         common / 'arch/arm64/configs/plk110_official.fragment':
             Path('baselines/PLK110_A67_official.config.additions').read_text(),
