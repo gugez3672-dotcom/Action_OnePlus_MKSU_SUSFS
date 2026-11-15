@@ -9,9 +9,9 @@
   "oneplus_modules": "f45a4a587a0ba9107a5421a2dd978404f545164b",
   "kernelsu": {
     "repository": "https://github.com/tiann/KernelSU.git",
-    "commit": "db6263d3bdf136c9f478308351dc6fa62a92edba",
-    "git_count": 2707,
-    "version": 32707
+    "commit": "64833c005eca6a8dc3d73ec2d37d84c37e0d9ad2",
+    "git_count": 2730,
+    "version": 32730
   },
   "susfs": {
     "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
@@ -36,5 +36,11 @@
   "k32_reference_commit": "ba4ff939d8825906289424a7079e91925c8a4c90",
   "repo_launcher_sha256": "1211b57b57e4122a9c546295a59b37d24068f1164d0e87bef096d5323c413e4f",
   "pguard": false,
-  "kernel_embedded_k_number": false
+  "kernel_embedded_k_number": false,
+  "k41": {
+    "susfs_ksu_patch": "patches/K41_SUSFS519_KSU64833.patch",
+    "patch_sha256": "f6d359995371a0130ba95d6e14f15078439872c6d62342a1c76d28ea90f72bfa",
+    "selinux_route": "A67 native parser/attrs/xattr; KSU policy epochs; filtered KSU notifications",
+    "pguard": false
+  }
 }

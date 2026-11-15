@@ -239,7 +239,7 @@ def main():
         ksu / 'supercall/dispatch.c': harden_dispatch((ksu / 'supercall/dispatch.c').read_text()),
         ksu / 'feature/selinux_hide.c':
             use_stock_context_parser((ksu / 'feature/selinux_hide.c').read_text()),
-        ksu / 'selinux/rules.c': publish_hide_type_bound((ksu / 'selinux/rules.c').read_text()),
+        ksu / 'selinux/rules.c': (ksu / 'selinux/rules.c').read_text(),
         common / 'security/selinux/ss/services.c':
             bound_stock_context_parser(
                 share_stock_context_parser((common / 'security/selinux/ss/services.c').read_text())),
@@ -249,6 +249,8 @@ def main():
         common / 'arch/arm64/configs/plk110_official.fragment':
             Path('baselines/PLK110_A67_official.config.additions').read_text(),
     }
+    from k41_selinux import extend_k41
+    updates = extend_k41(updates, ksu, common)
     overlay = []
     for path, text in updates.items():
         original = path.read_text() if path.exists() else ''
@@ -266,7 +268,8 @@ def main():
         'info_ioctl_permissions': ['GET_INFO', 'GET_INFO_LEGACY', 'CHECK_SAFEMODE'],
         'su_session_fd_path_unchanged': True, 'pguard': False,
         'selinux_hide': 'selinuxfs context/access: shared stock parser, backup then live; '
-                        '/proc attr writes: stock selinux_setprocattr, app UIDs bounded to backup type count',
+                        '/proc attrs/setselfattr/xattr: native paths, exact KSU policy epoch/type checks; '
+                        'KSU-only filtered policyload notifications',
         'compiled': False, 'device_tested': False,
     }
     Path('artifacts/OFFICIAL_KERNEL_PREPARATION.json').write_text(json.dumps(report, indent=2) + '\n')

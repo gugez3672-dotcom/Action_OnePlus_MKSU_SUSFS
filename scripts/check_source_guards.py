@@ -18,6 +18,18 @@ def main():
     ksu = 'kernel_workspace/kernel_platform/KernelSU/kernel/'
     common = 'kernel_workspace/kernel_platform/common/'
     cases = [
+        ('K41 native xattr hiding removed', common + 'security/selinux/hooks.c',
+         'security_context_to_sid_bounded(value, size, &newsid, GFP_KERNEL, 1)',
+         'security_context_to_sid(value, size, &newsid, GFP_KERNEL)'),
+        ('K41 type epoch validation bypassed', common + 'security/selinux/ss/services.c',
+         'ksu_type_is_original(pol, type_bound, typdatum->value)', '1'),
+        ('K41 KSU notification leaks to apps', ksu + 'selinux/rules.c',
+         'ksu_selinux_hide_notify_policyload(seqno);', 'selnl_notify_policyload(seqno);'),
+        ('K41 notification filter blocks system listeners', common + 'security/selinux/netlink.c',
+         '__kuid_val(sock_i_uid(sk)) >= 10000', '__kuid_val(sock_i_uid(sk)) >= 0'),
+        ('K41 stale policy accepted', ksu + 'selinux/sepolicy.c',
+         'original_types_policy != db || original_types_generation != policy_generation',
+         'false || false'),
         ('unparenthesized compound SUS_MAP negation', common + 'fs/proc/task_mmu.c',
          '!(SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))',
          '!SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))'),

@@ -1,5 +1,6 @@
 """Review gate for manual triggers, source pins, and build command structure."""
 import ast
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -48,4 +49,7 @@ for path in (root / 'scripts').glob('*.sh'):
 lock = json.loads((root / 'inputs.lock.json').read_text())
 assert lock['susfs']['commit'] == '519c86c5d8ad3832ff4a2e1a81dc1b81076f1693'
 assert lock['manager']['version_code'] == 36200 and lock['pguard'] is False
-print(f'PASS: manual reviewed trigger, {len(steps)} step bodies, Python/Bash syntax, fixed 519 inputs.')
+assert lock['kernelsu']['commit'] == '64833c005eca6a8dc3d73ec2d37d84c37e0d9ad2'
+assert lock['kernelsu']['version'] == 32730 and lock['kernelsu']['git_count'] == 2730
+assert hashlib.sha256((root / lock['k41']['susfs_ksu_patch']).read_bytes()).hexdigest() == lock['k41']['patch_sha256']
+print(f'PASS: manual reviewed trigger, {len(steps)} step bodies, Python/Bash syntax, K41 pinned inputs.')

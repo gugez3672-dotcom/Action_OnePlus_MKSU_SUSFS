@@ -13,7 +13,9 @@ symbols = (out / 'System.map').read_text()
 config = (out / 'image.config').read_text()
 preinit = verify_preinit(image, symbols, {name: (out / name).read_text(errors='replace')
                                         for name in ('preflight.log', 'build.log')})
-for symbol in ('kernelsu_init', 'susfs_init', 'ksu_install_fd', 'ksu_install_su_fd'):
+for symbol in ('kernelsu_init', 'susfs_init', 'ksu_install_fd', 'ksu_install_su_fd',
+               'ksu_type_is_original', 'security_context_to_sid_bounded',
+               'ksu_selinux_hide_notify_policyload', 'selnl_notify_policyload_filtered'):
     assert re.search(r' [Tt] ' + symbol + r'$', symbols, re.M), symbol
 for setting in ('CONFIG_KSU=y', 'CONFIG_KSU_SUSFS=y', 'CONFIG_SCHED_CLASS_EXT=y', 'CONFIG_MODVERSIONS=y'):
     assert setting in config.splitlines(), setting

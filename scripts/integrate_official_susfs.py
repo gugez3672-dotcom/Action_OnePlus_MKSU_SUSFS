@@ -40,7 +40,9 @@ def main():
     if count != lock['kernelsu']['git_count']:
         raise RuntimeError(f'KernelSU version count drift: {count}')
 
-    ksu_patch = (susfs / 'kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch').read_bytes()
+    upstream_ksu_patch = (susfs / 'kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch').read_bytes()
+    ksu_patch = Path(lock['k41']['susfs_ksu_patch']).read_bytes()
+    assert hashlib.sha256(ksu_patch).hexdigest() == lock['k41']['patch_sha256'], 'rebased KSU patch drift'
     common_patch = (susfs / 'kernel_patches/50_add_susfs_in_gki-android16-6.12.patch').read_bytes()
     ksu_log = command(['git', 'apply', '--check', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
     ksu_log += command(['git', 'apply', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
@@ -93,13 +95,16 @@ def main():
     for repo in (ksu, common):
         command(['git', 'diff', '--check'], cwd=repo)
 
-    (out / 'OFFICIAL_10_KSU.patch').write_bytes(ksu_patch)
+    (out / 'OFFICIAL_10_KSU.patch').write_bytes(upstream_ksu_patch)
+    (out / 'K41_REBASED_10_KSU.patch').write_bytes(ksu_patch)
     (out / 'OFFICIAL_50_COMMON.patch').write_bytes(common_patch)
     (out / 'OFFICIAL_50_STRICT_SUBSET.patch').write_bytes(strict_patch)
     (out / 'A67_SUSFS_519_COMPAT.patch').write_bytes(compat_patch)
     report = {
         'kernelsu': lock['kernelsu'], 'susfs': lock['susfs'],
         'ksu_patch_sha256': hashlib.sha256(ksu_patch).hexdigest(),
+        'upstream_ksu_patch_sha256': hashlib.sha256(upstream_ksu_patch).hexdigest(),
+        'ksu_patch_route': lock['k41'],
         'common_patch_sha256': hashlib.sha256(common_patch).hexdigest(),
         'strict_official_subset_sha256': hashlib.sha256(strict_patch).hexdigest(),
         'a67_compatibility_patch_sha256': hashlib.sha256(compat_patch).hexdigest(),

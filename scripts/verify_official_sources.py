@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 from c_source_checks import function_body, verify_smaps_hooks
+from k41_checks import verify_k41_sources, check_epoch_helpers
 
 
 def read(root, relative):
@@ -70,7 +71,8 @@ def main():
     selinux_hooks = read(common, 'security/selinux/hooks.c')
     assert 'handle_selinux_setprocattr' not in selinux_hooks, 'app attr writes must use stock setprocattr'
     assert 'selinux_hide_type_bound());' in selinux_hooks, 'missing SELinux hide type bound'
-    assert 'WRITE_ONCE(ksu_selinux_hide_type_bound' in read(ksu, 'selinux/rules.c')
+    k41 = verify_k41_sources(common, ksu)
+    epoch_test = check_epoch_helpers(ksu)
     assert read(common, 'fs/exec.c').count('NOKPROBE_SYMBOL(do_execveat_common);') == 1, 'exec entry must stay unprobed'
     observer = read(ksu, 'manager/pkg_observer.c')
     callback = observer.split('static void ksu_track_throne_tw_func', 1)[1].split('\n}', 1)[0]
@@ -98,7 +100,8 @@ def main():
               'official_added_source_hashes': source_hashes, 'manual_hooks': hooks,
               'manager_info_access': 'manager_or_root', 'su_session_preserved': True,
               'unprivileged_reboot_magic': 'falls back to stock validation', 'smaps_hooks': smaps,
-              'pguard': False, 'embedded_k_number': False}
+              'pguard': False, 'embedded_k_number': False,
+              'k41': k41, 'epoch_test': epoch_test}
     Path('artifacts/SOURCE_INVARIANTS.json').write_text(json.dumps(report, indent=2) + '\n')
     print('PASS: official pins/hooks, K32 gates, SU session, stock public config, no PGuard/K suffix.')
 
