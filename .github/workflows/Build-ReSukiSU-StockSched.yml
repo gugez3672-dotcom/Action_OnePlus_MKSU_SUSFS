@@ -7,10 +7,6 @@ on:
         description: 'Enter reviewed'
         type: string
         required: true
-      k_number:
-        description: 'K label for this build (digits only, e.g. 40); not tied to the Actions run number'
-        type: string
-        required: true
 
 permissions:
   contents: read
@@ -74,7 +70,7 @@ jobs:
 
       - name: Check K label and recorded stock reproduction
         env:
-          K_NUMBER: ${{ inputs.k_number }}
+          K_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           [[ "$K_NUMBER" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "invalid k_number: $K_NUMBER"; exit 1; }
@@ -288,7 +284,7 @@ jobs:
 
       - name: Package verified Image only
         env:
-          K_NUMBER: ${{ inputs.k_number }}
+          K_NUMBER: ${{ github.run_number }}
         run: bash scripts/package_official_gki.sh
 
       - name: Generate checksums
@@ -302,7 +298,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PLK110-A67-K${{ inputs.k_number }}-official
+          name: PLK110-A67-K${{ github.run_number }}-official
           path: artifacts/
           if-no-files-found: warn
           compression-level: 6

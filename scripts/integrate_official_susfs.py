@@ -46,6 +46,12 @@ def main():
     common_patch = (susfs / 'kernel_patches/50_add_susfs_in_gki-android16-6.12.patch').read_bytes()
     ksu_log = command(['git', 'apply', '--check', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
     ksu_log += command(['git', 'apply', '--whitespace=nowarn', '-'], cwd=ksu, data=ksu_patch)
+    expectations = Path(lock['k41']['expected_sources']).read_bytes()
+    assert hashlib.sha256(expectations).hexdigest() == lock['k41']['expected_sources_sha256']
+    for relative, expected in json.loads(expectations).items():
+        actual = hashlib.sha256((ksu / relative).read_bytes()).hexdigest()
+        if actual != expected:
+            raise RuntimeError(f'rebased patch output mismatch: {relative}')
     (out / 'OFFICIAL_KSU_PATCH.log').write_text(ksu_log or 'git apply --check and apply: PASS\n')
 
     strict_patch, replacements = strict_official_patch(common_patch)
@@ -105,6 +111,7 @@ def main():
         'ksu_patch_sha256': hashlib.sha256(ksu_patch).hexdigest(),
         'upstream_ksu_patch_sha256': hashlib.sha256(upstream_ksu_patch).hexdigest(),
         'ksu_patch_route': lock['k41'],
+        'rebased_sources_byte_verified': len(json.loads(expectations)),
         'common_patch_sha256': hashlib.sha256(common_patch).hexdigest(),
         'strict_official_subset_sha256': hashlib.sha256(strict_patch).hexdigest(),
         'a67_compatibility_patch_sha256': hashlib.sha256(compat_patch).hexdigest(),

@@ -14,8 +14,10 @@ definition = yaml.load(workflow.read_text(), Loader=yaml.BaseLoader)
 assert set(definition['on']) == {'workflow_dispatch'}, 'automatic build trigger is forbidden'
 dispatch = definition['on']['workflow_dispatch']
 assert dispatch['inputs']['review_ack']['required'] == 'true'
-assert dispatch['inputs']['k_number']['required'] == 'true'
-assert 'github.run_number' not in workflow.read_text() and 'GITHUB_RUN_NUMBER' not in (root / 'scripts/package_official_gki.sh').read_text()
+assert set(dispatch['inputs']) == {'review_ack'}
+assert workflow.read_text().count('K_NUMBER: ${{ github.run_number }}') == 2
+assert 'name: PLK110-A67-K${{ github.run_number }}-official' in workflow.read_text()
+assert 'inputs.k_number' not in workflow.read_text()
 assert 'api.github.com' not in workflow.read_text(), 'build must not query repository API history'
 job = definition['jobs']['official-stock-sched']
 assert "inputs.review_ack == 'reviewed'" in job['if']
@@ -52,4 +54,5 @@ assert lock['manager']['version_code'] == 36200 and lock['pguard'] is False
 assert lock['kernelsu']['commit'] == '64833c005eca6a8dc3d73ec2d37d84c37e0d9ad2'
 assert lock['kernelsu']['version'] == 32730 and lock['kernelsu']['git_count'] == 2730
 assert hashlib.sha256((root / lock['k41']['susfs_ksu_patch']).read_bytes()).hexdigest() == lock['k41']['patch_sha256']
+assert hashlib.sha256((root / lock['k41']['expected_sources']).read_bytes()).hexdigest() == lock['k41']['expected_sources_sha256']
 print(f'PASS: manual reviewed trigger, {len(steps)} step bodies, Python/Bash syntax, K41 pinned inputs.')

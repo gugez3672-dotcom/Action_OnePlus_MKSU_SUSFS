@@ -14,6 +14,9 @@ def verify_k41_sources(common, ksu):
     services = read(common, 'security/selinux/ss/services.c')
     rules = read(ksu, 'selinux/rules.c')
     hide = read(ksu, 'feature/selinux_hide.c')
+    assert 'int ret;' not in function_body(read(ksu, 'core/init.c'), 'kernelsu_init'), 'unused legacy init ret'
+    for relative in ('feature/selinux_hide.c', 'feature/sucompat.h', 'hook/setuid_hook.c'):
+        assert 'diff --git' not in read(ksu, relative), f'patch header leaked into {relative}'
     assert 'handle_selinux_setprocattr' not in hooks
     assert 'LSM_HOOK_INIT(setprocattr, selinux_setprocattr)' in hooks
     assert 'LSM_HOOK_INIT(setselfattr, selinux_setselfattr)' in hooks

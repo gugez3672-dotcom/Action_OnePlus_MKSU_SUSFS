@@ -18,6 +18,10 @@ def main():
     ksu = 'kernel_workspace/kernel_platform/KernelSU/kernel/'
     common = 'kernel_workspace/kernel_platform/common/'
     cases = [
+        ('K42 patch EOF header contamination', ksu + 'feature/sucompat.h',
+         '#endif', '#endifdiff --git a/b b/b'),
+        ('K42 obsolete init local retained', ksu + 'core/init.c',
+         'int __init kernelsu_init(void)\n{', 'int __init kernelsu_init(void)\n{\n    int ret;'),
         ('K41 native xattr hiding removed', common + 'security/selinux/hooks.c',
          'security_context_to_sid_bounded(value, size, &newsid, GFP_KERNEL, 1)',
          'security_context_to_sid(value, size, &newsid, GFP_KERNEL)'),

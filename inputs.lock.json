@@ -39,8 +39,10 @@
   "kernel_embedded_k_number": false,
   "k41": {
     "susfs_ksu_patch": "patches/K41_SUSFS519_KSU64833.patch",
-    "patch_sha256": "f6d359995371a0130ba95d6e14f15078439872c6d62342a1c76d28ea90f72bfa",
+    "patch_sha256": "ade392e13f74d8559b212559f471bdf46c08def3eb71545f0160566f67690afc",
     "selinux_route": "A67 native parser/attrs/xattr; KSU policy epochs; filtered KSU notifications",
-    "pguard": false
+    "pguard": false,
+    "expected_sources": "patches/K41_SUSFS519_KSU64833.sources.json",
+    "expected_sources_sha256": "aa4b60172fe6b7a187e54d6ce2da35c2b7f0615c1ca8f3c6a827db6c209fb588"
   }
 }

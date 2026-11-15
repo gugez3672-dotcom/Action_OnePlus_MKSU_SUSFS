@@ -35,7 +35,7 @@ for forbidden in \
   test ! -e "AnyKernel3/$forbidden"
 done
 test -z "$(find AnyKernel3 -type f \( -iname '*.zip' -o -iname '*.apk' -o -iname '*.img' \) -print -quit)"
-k_number="${K_NUMBER:?k_number workflow input is required for the package label}"
+k_number="${K_NUMBER:?GitHub workflow run number is required for the package label}"
 cp inputs.lock.json artifacts/inputs.lock.json
 cp AnyKernel3/anykernel.sh artifacts/packaged_anykernel.sh
 (

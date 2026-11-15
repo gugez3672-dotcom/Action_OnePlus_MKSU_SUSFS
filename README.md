@@ -1,11 +1,16 @@
 # PLK110 A67 kernel
 
 - `inputs.lock.json`: pinned sources.
-- `.github/workflows/Build-ReSukiSU-StockSched.yml`: manual build (`review_ack=reviewed`, `k_number=<K>`).
+- `.github/workflows/Build-ReSukiSU-StockSched.yml`: manual build (`review_ack=reviewed`); K label follows the GitHub Actions run number, including failed builds.
 - `scripts/`, `patches/`, `baselines/`: build steps, patches and stock references.
 - `scripts/archive_build_inputs.py <SOURCE_MANIFEST.xml> <dir>`: archive all pinned inputs locally.
 
 ## K41 combination
+
+First attempted as K41; the corrected next build is K42. Source filenames below
+identify this patch series, not a reusable artifact version. K41 failed during
+compilation because of malformed EOF patch boundaries and an unused init local;
+the corrected integration checks every rebased source against its expected hash.
 
 K41 uses official KernelSU `64833c00` / 32730 with the verified SUSFS
 `519c86c5` common implementation. The 519 KSU integration patch is rebased
